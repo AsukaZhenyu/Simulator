@@ -1,0 +1,47 @@
+# ==================== 换行符统一 ====================
+# 仓库内与工作区一律 LF，不受各机器 core.autocrlf 影响。
+# 本机 core.autocrlf=true，若不锁定，checkout 时会被转成 CRLF，
+# 之后每次改动都产生整文件 diff 噪音。
+* text=auto eol=lf
+
+# ==================== 显式声明文本文件 ====================
+*.py        text eol=lf
+*.pyi       text eol=lf
+*.json      text eol=lf
+*.toml      text eol=lf
+*.cfg       text eol=lf
+*.ini       text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.csv       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sh        text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+
+# ==================== 二进制文件（禁止任何转换） ====================
+*.bin       binary
+*.gguf      binary
+*.safetensors binary
+*.sqlite    binary
+*.db        binary
+*.nsys-rep  binary
+*.qdrep     binary
+*.pdf       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.ico       binary
+*.so        binary
+*.dll       binary
+*.dylib     binary
+*.exe       binary
+*.pyc       binary
+
+# ==================== 语言统计（GitHub Linguist） ====================
+# 把 vendored 依赖和产物排除出语言占比统计
+modeling/.deps/**     linguist-vendored
+modeling/outputs/**   linguist-generated
