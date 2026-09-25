@@ -42,6 +42,5 @@
 *.pyc       binary
 
 # ==================== 语言统计（GitHub Linguist） ====================
-# 把 vendored 依赖和产物排除出语言占比统计
-modeling/.deps/**     linguist-vendored
+# 把运行产物排除出语言占比统计；tests/data/ 是示例测量数据，照常统计
 modeling/outputs/**   linguist-generated

@@ -126,6 +126,33 @@ HOST_STAGING_EXPOSED on aggregate critical path when K < K_o
 
 因此模拟结果应位于解析下界和无重叠上界之间。
 
+## 安装
+
+只需要 Python ≥3.10 和 pip，不需要 conda 或 uv。
+
+核心模型（`model` / `analytical` / `simulator` / `calibration` / `nsys_analysis` / `cli`）
+**只用标准库**；只有 GGUF 结构提取需要可选的 `gguf` 依赖。
+
+```powershell
+cd modeling
+python -m venv .venv
+.venv\Scripts\python -m pip install -e ".[gguf]"
+```
+
+`.[gguf]` 拉入 `gguf` 及其传递依赖（numpy、PyYAML、requests、tqdm）。只跑核心模型
+可以改用 `pip install -e .`，此时 GGUF 相关的测试会带原因跳过、相关命令会给出安装
+提示，不会静默降级。
+
+下面所有命令里的 `python` 都指 `.venv\Scripts\python`（或先激活 `.venv`）。
+
+跑测试：
+
+```powershell
+.venv\Scripts\python -m unittest discover -s tests
+```
+
+不需要 GPU、不需要 1.28 GB 的模型文件，也不需要预先生成 `outputs/`。
+
 ## 运行
 
 在本目录执行：
@@ -147,11 +174,10 @@ python -m llm_infer_model sweep `
 
 ### 从本地 GGUF 建立真实层结构
 
-GGUF 解析额外需要 NumPy 和 PyYAML；`gguf-py` 默认使用 `design/release-b8705/llama.cpp-b8705-layer/gguf-py`：
+GGUF 解析用 PyPI 的 `gguf` 包（`pip install -e ".[gguf]"`）。要改用一个 llama.cpp
+源码树里的 `gguf-py`，用 `--gguf-python-path` 指向它的目录。
 
 ```powershell
-python -m pip install -e ".[gguf]"
-
 python -m llm_infer_model extract-gguf `
   --model ..\design\Qwen-Series-GGUF-Q4_K_M\Qwen3.5-9B-Q4_K_M.gguf `
   --output outputs\gguf\qwen35_9b_q4_k_m_manifest.json `

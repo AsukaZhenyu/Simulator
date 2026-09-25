@@ -7,10 +7,15 @@ name = "llm-infer-model"
 version = "0.1.0"
 description = "Analytical and discrete-event models for resource-constrained LLM inference"
 requires-python = ">=3.10"
+# 核心模型（model/analytical/simulator/calibration/nsys_analysis/cli）只用标准库，
+# 因此运行时依赖保持为空。任何新增的核心依赖都会破坏可离线复现这一属性。
 dependencies = []
 
 [project.optional-dependencies]
-gguf = ["numpy>=1.26", "PyYAML>=6.0"]
+# 只有 GGUF 结构提取（gguf_extract）和它的测试需要第三方库。
+# gguf 自身会拉入 numpy / PyYAML / requests / tqdm；numpy 在此显式声明，
+# 因为测试直接用它构造合成 GGUF 张量。
+gguf = ["gguf>=0.19.0", "numpy>=1.26"]
 
 [project.scripts]
 llm-infer-model = "llm_infer_model.cli:main"

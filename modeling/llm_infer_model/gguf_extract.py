@@ -5,7 +5,6 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 from .model import config_from_dict
@@ -24,50 +23,23 @@ def _plain(value: Any) -> Any:
     return value
 
 
-def _dependency_paths(gguf_python_path: str | Path | None) -> list[Path]:
-    modeling_dir = Path(__file__).resolve().parents[1]
-    paths: list[Path] = []
-    try:
-        import numpy  # noqa: F401
-    except ImportError:
-        paths.append(modeling_dir / ".deps")
-    if gguf_python_path is not None:
-        paths.append(Path(gguf_python_path))
-    else:
-        paths.append(
-            modeling_dir.parent
-            / "design"
-            / "release-b8705"
-            / "llama.cpp-b8705-layer"
-            / "gguf-py"
-        )
-    return paths
-
-
 def _load_gguf_reader(gguf_python_path: str | Path | None) -> Any:
-    for path in reversed(_dependency_paths(gguf_python_path)):
-        if path.exists():
-            sys.path.insert(0, str(path.resolve()))
-    try:
-        import yaml  # noqa: F401
-    except ImportError:
-        # GGUFReader itself does not use YAML. The package imports its optional
-        # model-card helper eagerly, so provide a narrow stub when only the
-        # reader dependencies are installed.
-        yaml_stub = ModuleType("yaml")
+    """Import GGUFReader from the installed ``gguf`` distribution.
 
-        def unavailable_safe_load(_: object) -> object:
-            raise RuntimeError("PyYAML is required for GGUF metadata overrides")
-
-        yaml_stub.safe_load = unavailable_safe_load  # type: ignore[attr-defined]
-        sys.modules["yaml"] = yaml_stub
+    ``gguf_python_path`` remains as an escape hatch for pointing at a gguf-py
+    checkout from a llama.cpp source tree instead of the installed package.
+    """
+    if gguf_python_path is not None:
+        path = Path(gguf_python_path)
+        if not path.is_dir():
+            raise RuntimeError(f"--gguf-python-path is not a directory: {path}")
+        sys.path.insert(0, str(path.resolve()))
     try:
         from gguf import GGUFReader
     except ImportError as exc:
         raise RuntimeError(
-            "GGUF extraction requires NumPy, PyYAML, and llama.cpp/gguf-py. "
-            "Install the optional dependencies and pass --gguf-python-path when "
-            "gguf-py is outside the default design/release-b8705 location."
+            "GGUF extraction requires the 'gguf' package, which is an optional "
+            'dependency. Install it with:  pip install -e ".[gguf]"'
         ) from exc
     return GGUFReader
 

@@ -7,11 +7,10 @@
 # 只忽略仓库根目录的 md；mapping/*.md 是设计文档，保留
 /*.md
 
-# ==================== 生成产物与本地依赖（不入库） ====================
-# 仿真运行产物：nsys trace、结果 json/csv，可由 configs + 代码复现
+# ==================== 生成产物与本地文件（不入库） ====================
+# 仿真运行产物：结果 json/csv。由 `python -m llm_infer_model regenerate` 从
+# configs/ + tests/data/ 的示例测量数据重建，不需要入库。
 modeling/outputs/
-# 本地 vendored 依赖（numpy 等），由 pyproject.toml 恢复
-modeling/.deps/
 # llama.cpp 引擎导出的 pipeline KV backing file，396MB，运行时生成
 modeling/llama_pipeline_kv.bin
 

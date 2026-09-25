@@ -1,0 +1,15 @@
+# 依赖快照 —— 由 `.venv` 的 pip freeze --exclude-editable 生成
+# 用于精确复现：pip install -r requirements-lock.txt && pip install -e .
+# 新增/升级依赖请改 pyproject.toml 后重新生成本文件，不要手工编辑。
+# 生成日期：2026-09-25
+
+certifi==2026.7.22
+charset-normalizer==3.5.1
+colorama==0.4.6
+gguf==0.19.0
+idna==3.20
+numpy==2.5.3
+PyYAML==6.0.3
+requests==2.34.2
+tqdm==4.70.1
+urllib3==2.8.0
