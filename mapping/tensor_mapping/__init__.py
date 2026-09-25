@@ -18,6 +18,13 @@ The package is split along the contract's own seams:
     restating it.
 ``mapper``
     Uniform-cost search over the action space.
+``artifacts``
+    Result objects rendered as the four on-disk documents of ``DESIGN.md`` §8.
+    Decides nothing: every number it writes is already on an evaluation or a
+    search result.
+``cli``
+    The ``model`` and ``search`` entry points -- argument handling, exit codes,
+    and the mapping from a core refusal to a one-line diagnostic.
 
 The core is pure standard library, so the test suite runs with no installation
 step (``mapping/DESIGN.md`` §2). Times are integers in nanoseconds; this is
@@ -25,11 +32,16 @@ deliberately unlike ``modeling/``, which works in float seconds.
 
 Status
 ------
-This is the M0 Python core only. The GGML exporter under ``mapping/ggml/``, the
-``model``/``search`` CLI entry points and the on-disk artefacts are not built
-yet, so every example fixture here is marked ``origin.kind =
-"synthetic_fixture"``. Passing these tests is not M0 acceptance
-(``DESIGN.md`` §9, ``ACCEPTANCE.md`` §7).
+The M0 Python core, the GGML exporter under ``mapping/ggml/``, and the
+``model``/``search`` entry points with their four artefacts are all implemented
+and covered by tests. Every example fixture is still marked ``origin.kind =
+"synthetic_fixture"`` except the four under ``examples/ggml/``, which are real
+exporter output (``ACCEPTANCE.md`` §7 reserves ``"ggml"`` for exactly those).
+
+Passing the tests is **not** M0 acceptance on its own: ``DESIGN.md`` §9 requires
+the GGML build environment for the integration half of the verification, and
+``ACCEPTANCE.md`` §7 lists the items that must each be answered before M0 can be
+called complete.
 """
 
 from __future__ import annotations

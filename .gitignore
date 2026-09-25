@@ -11,6 +11,9 @@
 # 仿真运行产物：结果 json/csv。由 `python -m llm_infer_model regenerate` 从
 # configs/ + tests/data/ 的示例测量数据重建，不需要入库。
 modeling/outputs/
+# 映射与搜索产物：stats/events/states/mapping。`python -m tensor_mapping
+# model|search --out outputs/...` 的默认落地处，可从 examples/ 复跑重建。
+mapping/outputs/
 # llama.cpp 引擎导出的 pipeline KV backing file，396MB，运行时生成
 modeling/llama_pipeline_kv.bin
 
