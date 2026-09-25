@@ -1,0 +1,283 @@
+{
+  "schema_version": 2,
+  "environment": {
+    "date": "2026-08-21",
+    "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "vram_total_mib": 8188,
+    "driver_version": "581.57",
+    "cuda_toolkit": "12.6",
+    "cpu": "AMD Ryzen 9 7940HX with Radeon Graphics",
+    "llama_cpp_commit": "773d8e7",
+    "threads": 16,
+    "flash_attention": true
+  },
+  "h2d": {
+    "tool": "CUDA Samples bandwidthTest",
+    "note": "CUDA Samples warns that GPU Boost can vary results; MB/s values are reported by the tool.",
+    "pinned": [
+      {
+        "size_bytes": 33554432,
+        "bandwidth_MiB_per_s": 11411.0,
+        "time_seconds": 0.0028
+      },
+      {
+        "size_bytes": 50331648,
+        "bandwidth_MiB_per_s": 11551.2,
+        "time_seconds": 0.00416
+      },
+      {
+        "size_bytes": 67108864,
+        "bandwidth_MiB_per_s": 11716.1,
+        "time_seconds": 0.00546
+      },
+      {
+        "size_bytes": 83886080,
+        "bandwidth_MiB_per_s": 11345.8,
+        "time_seconds": 0.00705
+      },
+      {
+        "size_bytes": 100663296,
+        "bandwidth_MiB_per_s": 11732.6,
+        "time_seconds": 0.00818
+      },
+      {
+        "size_bytes": 117440512,
+        "bandwidth_MiB_per_s": 11708.2,
+        "time_seconds": 0.00957
+      },
+      {
+        "size_bytes": 134217728,
+        "bandwidth_MiB_per_s": 11659.1,
+        "time_seconds": 0.01098
+      },
+      {
+        "size_bytes": 150994944,
+        "bandwidth_MiB_per_s": 11479.1,
+        "time_seconds": 0.01254
+      },
+      {
+        "size_bytes": 167772160,
+        "bandwidth_MiB_per_s": 11393.9,
+        "time_seconds": 0.01404
+      }
+    ],
+    "pageable": [
+      {
+        "size_bytes": 33554432,
+        "bandwidth_MiB_per_s": 5924.0,
+        "time_seconds": 0.0054
+      },
+      {
+        "size_bytes": 50331648,
+        "bandwidth_MiB_per_s": 5207.1,
+        "time_seconds": 0.00922
+      },
+      {
+        "size_bytes": 67108864,
+        "bandwidth_MiB_per_s": 4992.2,
+        "time_seconds": 0.01282
+      },
+      {
+        "size_bytes": 83886080,
+        "bandwidth_MiB_per_s": 5491.7,
+        "time_seconds": 0.01457
+      },
+      {
+        "size_bytes": 100663296,
+        "bandwidth_MiB_per_s": 5398.2,
+        "time_seconds": 0.01778
+      },
+      {
+        "size_bytes": 117440512,
+        "bandwidth_MiB_per_s": 5370.2,
+        "time_seconds": 0.02086
+      },
+      {
+        "size_bytes": 134217728,
+        "bandwidth_MiB_per_s": 5791.9,
+        "time_seconds": 0.0221
+      },
+      {
+        "size_bytes": 150994944,
+        "bandwidth_MiB_per_s": 5947.5,
+        "time_seconds": 0.02421
+      },
+      {
+        "size_bytes": 167772160,
+        "bandwidth_MiB_per_s": 5318.8,
+        "time_seconds": 0.03008
+      }
+    ]
+  },
+  "models": [
+    {
+      "id": "2b",
+      "config": "configs/generated/qwen35_2b_q4_k_m.json",
+      "nsys_decomposition": "tests/data/nsys/qwen35_2b_k24_decomposition.json",
+      "layer_count": 24,
+      "layer_weight_bytes": 852688384,
+      "resident": {
+        "generation_tokens": 128,
+        "repetitions": 5,
+        "avg_tokens_per_second": 124.398259,
+        "stddev_tokens_per_second": 3.463829,
+        "samples_ns": [
+          1080642200,
+          1022134800,
+          1026355900,
+          1006628400,
+          1012298800
+        ],
+        "test_time_utc": "2026-08-21T07:50:26Z"
+      },
+      "pipeline": {
+        "window_size": 4,
+        "generation_tokens": 32,
+        "repetitions": 3,
+        "avg_tokens_per_second": 4.724722,
+        "stddev_tokens_per_second": 0.04561,
+        "samples_ns": [
+          6724188000,
+          6747801700,
+          6847934800
+        ],
+        "test_time_utc": "2026-08-21T07:55:10Z"
+      },
+      "pipeline_resident": {
+        "window_size": 24,
+        "generation_tokens": 32,
+        "repetitions": 3,
+        "avg_tokens_per_second": 16.002046,
+        "stddev_tokens_per_second": 0.079923,
+        "samples_ns": [
+          2002222200,
+          1988811800,
+          2008298400
+        ],
+        "test_time_utc": "2026-08-21T08:16:43Z"
+      },
+      "window_validation": [
+        {
+          "window_size": 1,
+          "status": "interrupted",
+          "note": "16 tokens x 3 repetitions did not finish after more than 150 seconds"
+        },
+        {
+          "window_size": 2,
+          "generation_tokens": 8,
+          "repetitions": 2,
+          "avg_tokens_per_second": 3.60837
+        },
+        {
+          "window_size": 8,
+          "generation_tokens": 8,
+          "repetitions": 2,
+          "avg_tokens_per_second": 4.941898
+        }
+      ],
+      "context_validation": {
+        "window_size": 4,
+        "baseline": "tests/data/context_validation/2b_k4_ctx0_g16_r2.json",
+        "cached_fit_max_context_tokens": 8192,
+        "points": [
+          "tests/data/context_validation/2b_k4_ctx4096_g16_r2.json",
+          "tests/data/context_validation/2b_k4_ctx8192_g16_r2.json",
+          "tests/data/context_validation/2b_k4_ctx16384_g16_r2.json",
+          "tests/data/context_validation/2b_k4_ctx32768_g32_r3.json"
+        ]
+      }
+    },
+    {
+      "id": "4b",
+      "config": "configs/generated/qwen35_4b_q4_k_m.json",
+      "nsys_decomposition": "tests/data/nsys/qwen35_4b_k32_decomposition.json",
+      "layer_count": 32,
+      "layer_weight_bytes": 2208487424,
+      "resident": {
+        "generation_tokens": 128,
+        "repetitions": 5,
+        "avg_tokens_per_second": 62.809219,
+        "stddev_tokens_per_second": 0.31065,
+        "samples_ns": [
+          2046009700,
+          2026507200,
+          2045147000,
+          2044724500,
+          2027397600
+        ],
+        "test_time_utc": "2026-08-21T07:51:20Z"
+      },
+      "pipeline": {
+        "window_size": 4,
+        "generation_tokens": 16,
+        "repetitions": 3,
+        "avg_tokens_per_second": 2.112243,
+        "stddev_tokens_per_second": 0.030866,
+        "samples_ns": [
+          7635035700,
+          7449278700,
+          7643549300
+        ],
+        "test_time_utc": "2026-08-21T07:56:33Z"
+      },
+      "pipeline_resident": {
+        "window_size": 32,
+        "generation_tokens": 16,
+        "repetitions": 2,
+        "avg_tokens_per_second": 11.170015,
+        "stddev_tokens_per_second": 0.210206,
+        "samples_ns": [
+          1451724200,
+          1413595700
+        ],
+        "test_time_utc": "2026-08-21T08:17:43Z"
+      }
+    },
+    {
+      "id": "9b",
+      "config": "configs/generated/qwen35_9b_q4_k_m.json",
+      "nsys_decomposition": "tests/data/nsys/qwen35_9b_k32_decomposition.json",
+      "layer_count": 32,
+      "layer_weight_bytes": 4263053312,
+      "resident": {
+        "generation_tokens": 128,
+        "repetitions": 5,
+        "avg_tokens_per_second": 37.501377,
+        "stddev_tokens_per_second": 0.295312,
+        "samples_ns": [
+          3452857600,
+          3416319500,
+          3392385100,
+          3420947200,
+          3384379700
+        ],
+        "test_time_utc": "2026-08-21T07:52:23Z"
+      },
+      "pipeline": {
+        "window_size": 4,
+        "generation_tokens": 8,
+        "repetitions": 3,
+        "avg_tokens_per_second": 1.122898,
+        "stddev_tokens_per_second": 0.068855,
+        "samples_ns": [
+          7665093600,
+          6846451800,
+          6917351500
+        ],
+        "test_time_utc": "2026-08-21T07:57:48Z"
+      },
+      "pipeline_resident": {
+        "window_size": 32,
+        "generation_tokens": 8,
+        "repetitions": 2,
+        "avg_tokens_per_second": 9.946067,
+        "stddev_tokens_per_second": 0.182473,
+        "samples_ns": [
+          814909700,
+          794037200
+        ],
+        "test_time_utc": "2026-08-21T08:18:39Z"
+      }
+    }
+  ]
+}

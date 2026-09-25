@@ -172,6 +172,25 @@ python -m llm_infer_model sweep `
   --output outputs\historical_9b_sweep.csv
 ```
 
+### 一键重建 outputs/
+
+`outputs/` 不入库，克隆后用一条命令重建全部**免 GPU** 产物：
+
+```powershell
+python -m llm_infer_model regenerate --outputs outputs
+```
+
+它做三件事：从 measurements 重新拟合 → 重建 `configs/calibrated_rtx4070/` 与拟合报告；
+对 `generated` 和 `calibrated_rtx4070` 两套配置各跑 analyze / simulate / trace / sweep；
+再跑 embedding 反事实和状态驻留两个对照实验。
+
+默认使用仓库自带的示例测量数据 `tests/data/measurements_rtx4070_20260821.json`
+（一次真实 RTX 4070 测量）。要换成自己机器的数据，先用 `benchmark-llama`、
+`benchmark-h2d`、`analyze-nsys` 采集，再用 `--measurements` 传进来。
+
+`regenerate` 不重跑需要 GPU 的原始测量，也不重建 `outputs/gguf/`（需要 1.28 GB 模型）
+和 `outputs/nsys/`（需要 Nsight trace）；这两者要用 `extract-gguf` 和 `analyze-nsys`。
+
 ### 从本地 GGUF 建立真实层结构
 
 GGUF 解析用 PyPI 的 `gguf` 包（`pip install -e ".[gguf]"`）。要改用一个 llama.cpp

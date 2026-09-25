@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "source_sqlite": "outputs/nsys/llminfer_4b_k32.sqlite",
+  "generation_tokens": 32,
+  "steady_state": {
+    "excluded_tokens": [
+      1,
+      32
+    ],
+    "token_count": 30,
+    "mean_token_seconds": 0.09031575873333333,
+    "median_token_seconds": 0.0898750055,
+    "p95_token_seconds": 0.095860342,
+    "min_token_seconds": 0.086271562,
+    "max_token_seconds": 0.097889987,
+    "tokens_per_second_from_mean": 11.072264840874602
+  },
+  "graph_fragmentation": {
+    "total_graph_launches": 3360,
+    "graphs_per_token": 105,
+    "expected_formula": "3 * layer_count + attention_layer_count + 1",
+    "expected_graphs_per_token": 105,
+    "matches_expected_formula": true
+  },
+  "architecture": {
+    "layer_count": 32,
+    "attention_layer_count": 8,
+    "ssm_layer_count": 24
+  },
+  "embedding_fallback": {
+    "expected_token_embedding_bytes": 521472000,
+    "d2h_copies": 30,
+    "d2h_copies_per_token": 1.0,
+    "d2h_gpu_milliseconds_per_token": 40.38297716666666,
+    "matches_once_per_token": true
+  },
+  "copy_summary": {
+    "d2h_bytes_per_token": 575942560.0,
+    "h2d_bytes_per_token": 52702244.0,
+    "non_embedding_d2h_bytes_per_token": 54470560.0,
+    "directions": [
+      {
+        "direction": "Device-to-Host",
+        "copies": 1500,
+        "bytes": 17278276800,
+        "total_ns": 1338758878,
+        "copies_per_token": 50.0,
+        "bytes_per_token": 575942560.0,
+        "gpu_milliseconds_per_token": 44.62529593333333
+      },
+      {
+        "direction": "Host-to-Device",
+        "copies": 1620,
+        "bytes": 1581067320,
+        "total_ns": 123723882,
+        "copies_per_token": 54.0,
+        "bytes_per_token": 52702244.0,
+        "gpu_milliseconds_per_token": 4.1241294
+      }
+    ],
+    "sizes": [
+      {
+        "direction": "Device-to-Host",
+        "copy_bytes": 521472000,
+        "copies": 30,
+        "total_ns": 1211489315,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 40.38297716666666
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 2097152,
+        "copies": 720,
+        "total_ns": 115989132,
+        "copies_per_token": 24.0,
+        "gpu_milliseconds_per_token": 3.8663043999999998
+      },
+      {
+        "direction": "Device-to-Host",
+        "copy_bytes": 2097152,
+        "copies": 720,
+        "total_ns": 117342251,
+        "copies_per_token": 24.0,
+        "gpu_milliseconds_per_token": 3.9114083666666666
+      },
+      {
+        "direction": "Device-to-Host",
+        "copy_bytes": 993280,
+        "copies": 30,
+        "total_ns": 2365560,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 0.078852
+      },
+      {
+        "direction": "Device-to-Host",
+        "copy_bytes": 131068,
+        "copies": 720,
+        "total_ns": 7561752,
+        "copies_per_token": 24.0,
+        "gpu_milliseconds_per_token": 0.2520584
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 98304,
+        "copies": 720,
+        "total_ns": 7356127,
+        "copies_per_token": 24.0,
+        "gpu_milliseconds_per_token": 0.24520423333333333
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 10240,
+        "copies": 30,
+        "total_ns": 96384,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 0.0032128
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 1024,
+        "copies": 30,
+        "total_ns": 39553,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 0.0013184333333333333
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 16,
+        "copies": 30,
+        "total_ns": 85859,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 0.002861966666666667
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 8,
+        "copies": 60,
+        "total_ns": 73470,
+        "copies_per_token": 2.0,
+        "gpu_milliseconds_per_token": 0.002449
+      },
+      {
+        "direction": "Host-to-Device",
+        "copy_bytes": 4,
+        "copies": 30,
+        "total_ns": 83357,
+        "copies_per_token": 1.0,
+        "gpu_milliseconds_per_token": 0.0027785666666666664
+      }
+    ]
+  },
+  "cuda_api_summary": [
+    {
+      "api": "cudaStreamSynchronize_v3020",
+      "calls": 12750,
+      "total_ns": 1941425209,
+      "average_ns": 152268.64384313725,
+      "calls_per_token": 425.0,
+      "milliseconds_per_token": 64.71417363333333
+    },
+    {
+      "api": "cudaGraphLaunch_v10000",
+      "calls": 3150,
+      "total_ns": 147714654,
+      "average_ns": 46893.54095238095,
+      "calls_per_token": 105.0,
+      "milliseconds_per_token": 4.9238218
+    },
+    {
+      "api": "cudaMemcpyAsync_v3020",
+      "calls": 3120,
+      "total_ns": 87809871,
+      "average_ns": 28144.189423076925,
+      "calls_per_token": 104.0,
+      "milliseconds_per_token": 2.9269957
+    }
+  ],
+  "kernel_summary": {
+    "kernels": 0,
+    "kernels_per_token": 0.0,
+    "gpu_milliseconds_per_token": 0.0
+  },
+  "gpu_timeline": {
+    "active_kernel_or_memcpy_milliseconds_per_token": 48.749425333333335,
+    "idle_or_untraced_milliseconds_per_token": 41.5663334,
+    "active_fraction": 0.5397665481311084
+  },
+  "method": [
+    "Token starts are inferred from equal-sized cudaGraphLaunch groups.",
+    "Token 1 is excluded because CUDA graphs are captured/instantiated there.",
+    "The final token is excluded because a following token start is unavailable.",
+    "CUDA API duration sums are service-time diagnostics and can overlap across host threads."
+  ]
+}

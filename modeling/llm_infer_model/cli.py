@@ -473,6 +473,154 @@ def command_validate_context(args: argparse.Namespace) -> None:
     print(f"validated {len(report['rows'])} contextual decode points")
 
 
+# regenerate 重建的产物：每对是 (configs/ 下的配置目录, outputs/ 下的输出目录)。
+# outputs/gguf 和 outputs/nsys 需要真实的 1.28 GB 模型和 Nsight trace，不在此列。
+REGENERATE_VARIANTS = (
+    ("generated", "structure_calibrated"),
+    ("calibrated_rtx4070", "calibrated_rtx4070"),
+)
+# 仓库内自带的示例测量数据（一次真实 RTX 4070 测量），供无 GPU 时默认使用。
+DEFAULT_MEASUREMENTS = (
+    Path(__file__).resolve().parents[1]
+    / "tests"
+    / "data"
+    / "measurements_rtx4070_20260821.json"
+)
+STATE_RESIDENCY_CONTEXTS = "0,512,2048,8192,32768,131072,262144"
+
+
+def _window_grid(resident_window: int, base: tuple[int, ...]) -> str:
+    """把整模型驻留所需窗口并入基准窗口列表，逐个模型取到驻留点。
+
+    2B 是 24 层、4B/9B 是 32 层，用统一的 4,8,16,32 会让 2B 取不到驻留点。
+    """
+    return ",".join(str(w) for w in sorted({*base, resident_window}))
+
+
+def _bandwidth_grid(raw_config: dict[str, object]) -> str:
+    """以配置自身的 H2D 带宽为锚点，加两个固定比较点便于横向对比。
+
+    存档的 calibrated_rtx4070 sweep 第三个点是手挑的 11.5 GB/s，无法由任何配置
+    字段推出，这里用派生的 12.0 代替。sweep 是敏感性扫描，中间点的具体取值不影响
+    结论，所以只影响 CSV 文本，不影响任何断言。
+
+    锚点先 round 到 9 位小数再交给 repr（最短往返表示），既精确复现存档里的
+    5.075506911，又不会带上 5.075506911370469 这种浮点尾数。注意不能用 ``%g``：
+    它默认只保留 6 位有效数字，会截成 5.07551，让下游全部派生量与配置里的实际带宽
+    对不上。
+    """
+    hardware = raw_config["hardware"]
+    assert isinstance(hardware, dict)
+    anchor = round(float(hardware["h2d_bandwidth_bytes_per_s"]) / 1e9, 9)
+    return ",".join(repr(b) for b in sorted({3.0, anchor, 12.0, 24.0}))
+
+
+def command_regenerate(args: argparse.Namespace) -> None:
+    """从一个 measurements 文件重建全部免 GPU 的 outputs/ 产物。
+
+    需要 GPU 的原始测量（llama-bench 吞吐、H2D 带宽、Nsight trace）不在这里重跑。
+    要换成自己机器的数据，先用 benchmark-llama / benchmark-h2d / analyze-nsys 生成
+    新的 measurements 文件，再用 --measurements 传进来。
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    outputs = Path(args.outputs)
+    if not outputs.is_absolute():
+        outputs = project_root / outputs
+
+    measurements = (
+        Path(args.measurements) if args.measurements else DEFAULT_MEASUREMENTS
+    )
+    if not measurements.is_absolute():
+        measurements = project_root / measurements
+    if not measurements.is_file():
+        raise FileNotFoundError(
+            f"measurements file not found: {measurements}\n"
+            "Omit --measurements to use the bundled example, or point it at a file "
+            "assembled from benchmark-llama / benchmark-h2d / analyze-nsys."
+        )
+
+    # 1) 重新拟合，重建 configs/calibrated_rtx4070/ 与拟合报告
+    calibrated, report = calibrate_configs(
+        measurements, project_root / "configs" / "calibrated_rtx4070"
+    )
+    _write_json(report, str(outputs / "calibration" / "calibration_fit_rtx4070.json"))
+    print(f"recalibrated {len(calibrated)} configs -> configs/calibrated_rtx4070/")
+
+    # 2) 两套配置各跑一遍 analyze / simulate / trace / sweep
+    for source_dir, output_name in REGENERATE_VARIANTS:
+        out_dir = outputs / output_name
+        for config_path in sorted(
+            (project_root / "configs" / source_dir).glob("qwen35_*_q4_k_m*.json")
+        ):
+            model_id = config_path.name.split("_")[1]
+            raw = _read_json(config_path)
+            resident_window = len(raw["layers"])
+            stem = f"qwen35_{model_id}"
+            overrides = {
+                "config": str(config_path),
+                "window": None,
+                "embedding_fallback_scale": None,
+                "context_tokens": None,
+                "state_placement": None,
+            }
+            command_analyze(
+                argparse.Namespace(
+                    **overrides, output=str(out_dir / f"{stem}_analysis.json")
+                )
+            )
+            command_simulate(
+                argparse.Namespace(
+                    **overrides,
+                    output=str(out_dir / f"{stem}_simulation.json"),
+                    trace=str(out_dir / f"{stem}_trace.csv"),
+                    include_events=False,
+                )
+            )
+            command_sweep(
+                argparse.Namespace(
+                    config=str(config_path),
+                    windows=_window_grid(resident_window, (1, 2, 4, 8, 16)),
+                    bandwidth_gbps=_bandwidth_grid(raw),
+                    embedding_fallback_scale=1.0,
+                    context_tokens=None,
+                    state_placement="roundtrip",
+                    output=str(out_dir / f"{stem}_sweep.csv"),
+                )
+            )
+        print(f"rebuilt outputs/{output_name}/")
+
+    # 3) 两个对照实验，基于上一步刚校准出的配置
+    for config_path in sorted(
+        (project_root / "configs" / "calibrated_rtx4070").glob(
+            "qwen35_*_q4_k_m_rtx4070.json"
+        )
+    ):
+        model_id = config_path.name.split("_")[1]
+        raw = _read_json(config_path)
+        resident_window = len(raw["layers"])
+        command_compare_embedding_fallback(
+            argparse.Namespace(
+                config=str(config_path),
+                windows=_window_grid(resident_window, (1, 2, 4, 8, 16)),
+                output=str(
+                    outputs / "counterfactual_no_embedding" / f"qwen35_{model_id}.csv"
+                ),
+            )
+        )
+        command_compare_state_residency(
+            argparse.Namespace(
+                config=str(config_path),
+                contexts=STATE_RESIDENCY_CONTEXTS,
+                windows=_window_grid(resident_window, (4, 8, 16)),
+                output=str(outputs / "state_residency" / f"qwen35_{model_id}.csv"),
+            )
+        )
+    print("rebuilt outputs/counterfactual_no_embedding/ and outputs/state_residency/")
+    print(f"\nGPU-free artifacts are under {outputs}")
+    print("outputs/gguf/ and outputs/nsys/ need the real model and Nsight traces;")
+    print("use extract-gguf and analyze-nsys to rebuild those.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="llm-infer-model",
@@ -628,6 +776,25 @@ def build_parser() -> argparse.ArgumentParser:
     validate_context.add_argument("--report", required=True)
     validate_context.add_argument("--csv", required=True)
     validate_context.set_defaults(func=command_validate_context)
+
+    regenerate = subparsers.add_parser(
+        "regenerate",
+        help="rebuild every GPU-free outputs/ artifact from a measurements file",
+    )
+    regenerate.add_argument(
+        "--outputs",
+        default="outputs",
+        help="output root directory (default: outputs)",
+    )
+    regenerate.add_argument(
+        "--measurements",
+        default=None,
+        help=(
+            "measurements JSON produced by benchmark-llama / benchmark-h2d; "
+            "defaults to the bundled tests/data example"
+        ),
+    )
+    regenerate.set_defaults(func=command_regenerate)
     return parser
 
 
