@@ -1,6 +1,8 @@
 # mapping：GGML 计算图的执行映射与搜索
 
-状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试，共 181 项。测试全绿**不等于** M0 整体验收：`DESIGN.md` §9 的集成验证需要 GGML 构建环境，`ACCEPTANCE.md` §7 的六条要逐条有交代。日期：2026-09-25。
+状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试，共 181 项。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)。日期：2026-09-25。
+
+测试全绿**不等于** M0 整体验收，所以验收按 `ACCEPTANCE.md` §7.6 要求分三类留了证据。`DESIGN.md` §9:285 的集成验证「编译 → 导出 → 模拟/搜索」已从零走通：编译腿在全新空目录 configure + build（32.7 s + 37.6 s），导出腿用这个新二进制重导出四张图，产物与已入库文件**逐字节相同**，`tests.test_ggml` 13 项零 skip。剩下的环境限制只有一条：`--wall-time-limit-s` 在本机因时钟粒度（15.625 ms）无法端到端验证，详见验证报告 3.2。
 
 目标：给定 GGML 小计算图、硬件资源、固定动作成本和受限动作空间，检查一种执行映射是否合法，计算其执行时间，并搜索最短的合法映射。
 
@@ -43,6 +45,7 @@ mapping/
 ├── README.md
 ├── DESIGN.md
 ├── ACCEPTANCE.md
+├── M0_VERIFICATION.md          ✓ §7.6 要求的验证报告（自动测试 / 人工核对 / 未运行项）
 ├── pyproject.toml
 ├── ggml/                       ✓ 建图、导出程序与独立构建入口（见 ggml/README.md）
 │   ├── CMakeLists.txt          ✓ 以 GGML_SOURCE_DIR 参数接本地 ggml，不写死路径
