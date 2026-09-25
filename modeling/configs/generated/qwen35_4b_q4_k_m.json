@@ -1,0 +1,234 @@
+{
+  "name": "Qwen3.5-4B-Q4_K_M-gguf-structure-v0.3",
+  "notes": "Layer/global bytes and SSM/attention classification come from the GGUF tensor directory. Compute uses 2*n_elements matvec proxies with Qwen3.5-9B-Q4_K_M.gguf total layer matvec proxy calibrated to 48 ms/token; attention KV and recurrent-state geometry come from GGUF metadata with F16 KV and FP32 recurrent-state storage; H2D bandwidth, workspace, and VRAM capacity remain template assumptions.",
+  "layers": [
+    {
+      "name": "blk.0",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.1",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.2",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.3",
+      "kind": "attention",
+      "weight_bytes": 67237888,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.4",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.5",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.6",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.7",
+      "kind": "attention",
+      "weight_bytes": 61155328,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.8",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.9",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.10",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.11",
+      "kind": "attention",
+      "weight_bytes": 61155328,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.12",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.13",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.14",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.15",
+      "kind": "attention",
+      "weight_bytes": 67237888,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.16",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.17",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.18",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.19",
+      "kind": "attention",
+      "weight_bytes": 60479488,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.20",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.21",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.22",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.23",
+      "kind": "attention",
+      "weight_bytes": 60479488,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.24",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.25",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.26",
+      "kind": "ssm",
+      "weight_bytes": 67664640,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.27",
+      "kind": "attention",
+      "weight_bytes": 67237888,
+      "flops": 214958080
+    },
+    {
+      "name": "blk.28",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.29",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.30",
+      "kind": "ssm",
+      "weight_bytes": 73747200,
+      "flops": 225837056
+    },
+    {
+      "name": "blk.31",
+      "kind": "attention",
+      "weight_bytes": 66562048,
+      "flops": 214958080
+    }
+  ],
+  "hardware": {
+    "gpu_effective_flops": 288303786666.6667,
+    "cpu_effective_flops": null,
+    "h2d_bandwidth_bytes_per_s": 5660000000,
+    "h2d_latency_s": 2e-05,
+    "vram_capacity_bytes": 8589934592,
+    "global_bytes": 521482240,
+    "kv_bytes": 0,
+    "workspace_bytes": 1124073472,
+    "activation_transfer_bytes": 79872
+  },
+  "policy": {
+    "window_size": 4,
+    "static_gpu_layers": 4,
+    "state_placement": "roundtrip",
+    "token_state_roundtrip_s": 0.0
+  },
+  "provenance": {
+    "source_file": "Qwen3.5-4B-Q4_K_M.gguf",
+    "manifest_schema_version": 1,
+    "compute_calibration": "Qwen3.5-9B-Q4_K_M.gguf total layer matvec proxy calibrated to 48 ms/token",
+    "template_name": "historical-9b-approximate-boundary"
+  },
+  "state": {
+    "context_tokens": 0,
+    "sequence_count": 1,
+    "attention_kv_head_count": 4,
+    "attention_key_length": 256,
+    "attention_value_length": 256,
+    "ssm_conv_kernel": 4,
+    "ssm_state_size": 128,
+    "ssm_group_count": 16,
+    "ssm_inner_size": 4096,
+    "kv_element_bytes": 2,
+    "recurrent_element_bytes": 4
+  }
+}

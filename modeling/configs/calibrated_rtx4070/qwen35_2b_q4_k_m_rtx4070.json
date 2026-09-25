@@ -1,0 +1,219 @@
+{
+  "name": "Qwen3.5-2B-Q4_K_M-gguf-structure-v0.3-rtx4070-calibrated-v0.8",
+  "notes": "Layer/global bytes and SSM/attention classification come from the GGUF tensor directory. Compute uses 2*n_elements matvec proxies with Qwen3.5-9B-Q4_K_M.gguf total layer matvec proxy calibrated to 48 ms/token; attention KV and recurrent-state geometry come from GGUF metadata with F16 KV and FP32 recurrent-state storage; H2D bandwidth, workspace, and VRAM capacity remain template assumptions. Calibrated on RTX 4070 Laptop: resident decode 124.398259 token/s; streamed-weight lane uses B=5.075507 GB/s and L=1.483770 ms/layer; the measured fixed pipeline-path delta is 54.453311 ms/token, including a directly traced token_embd.weight D2H service of 33.909377 ms/token and state/cache copy service of 3.265534 ms/token. State traffic uses B=12.372539 GB/s. Host staging uses B=13.021965 GB/s with full overlap assumed at K>=4. Small-window attention KV backing-file I/O uses a fitted cache knee of 145.12 MiB one-way, B_cached=3.648 GB/s, and B_uncached=0.598 GB/s.",
+  "layers": [
+    {
+      "name": "blk.0",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.1",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.2",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.3",
+      "kind": "attention",
+      "weight_bytes": 29779968,
+      "flops": 104857600
+    },
+    {
+      "name": "blk.4",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.5",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.6",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.7",
+      "kind": "attention",
+      "weight_bytes": 29779968,
+      "flops": 104857600
+    },
+    {
+      "name": "blk.8",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.9",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.10",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.11",
+      "kind": "attention",
+      "weight_bytes": 33024000,
+      "flops": 104857600
+    },
+    {
+      "name": "blk.12",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.13",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.14",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.15",
+      "kind": "attention",
+      "weight_bytes": 29509632,
+      "flops": 104857600
+    },
+    {
+      "name": "blk.16",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.17",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.18",
+      "kind": "ssm",
+      "weight_bytes": 35312256,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.19",
+      "kind": "attention",
+      "weight_bytes": 29509632,
+      "flops": 104857600
+    },
+    {
+      "name": "blk.20",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.21",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.22",
+      "kind": "ssm",
+      "weight_bytes": 38556288,
+      "flops": 117620736
+    },
+    {
+      "name": "blk.23",
+      "kind": "attention",
+      "weight_bytes": 33024000,
+      "flops": 104857600
+    }
+  ],
+  "hardware": {
+    "gpu_effective_flops": 341637283350.08563,
+    "cpu_effective_flops": null,
+    "h2d_bandwidth_bytes_per_s": 5075506911.370469,
+    "h2d_latency_s": 0.0014837701633356164,
+    "vram_capacity_bytes": 8585740288,
+    "global_bytes": 417185792,
+    "kv_bytes": 0,
+    "workspace_bytes": 1124073472,
+    "activation_transfer_bytes": 79872,
+    "host_staging_bandwidth_bytes_per_s": 13021964748.216803,
+    "state_transfer_bandwidth_bytes_per_s": 12372538640.37446,
+    "kv_storage_cached_bandwidth_bytes_per_s": 3648055278.915635,
+    "kv_storage_uncached_bandwidth_bytes_per_s": 597693881.5961457,
+    "kv_storage_cache_bytes": 152171841
+  },
+  "policy": {
+    "window_size": 4,
+    "static_gpu_layers": 4,
+    "state_placement": "roundtrip",
+    "token_state_roundtrip_s": 0.003265533870967744,
+    "token_pipeline_overhead_s": 0.05445331112237097,
+    "token_embedding_fallback_s": 0.03390937729032258,
+    "embedding_fallback_scale": 1.0,
+    "staging_overlap_window": 4,
+    "layer_scheduler_overhead_s": 0.0
+  },
+  "provenance": {
+    "source_file": "Qwen3.5-2B-Q4_K_M.gguf",
+    "manifest_schema_version": 1,
+    "compute_calibration": "Qwen3.5-9B-Q4_K_M.gguf total layer matvec proxy calibrated to 48 ms/token",
+    "template_name": "historical-9b-approximate-boundary"
+  },
+  "state": {
+    "context_tokens": 0,
+    "sequence_count": 1,
+    "attention_kv_head_count": 2,
+    "attention_key_length": 256,
+    "attention_value_length": 256,
+    "ssm_conv_kernel": 4,
+    "ssm_state_size": 128,
+    "ssm_group_count": 16,
+    "ssm_inner_size": 2048,
+    "kv_element_bytes": 2,
+    "recurrent_element_bytes": 4
+  },
+  "calibration": {
+    "measurement_file": "measurements_rtx4070_20260821.json",
+    "resident_avg_tokens_per_second": 124.398259,
+    "pipeline_avg_tokens_per_second": 4.724722,
+    "pipeline_window_size": 4,
+    "effective_bandwidth_bytes_per_s": 5075506911.370469,
+    "effective_layer_latency_s": 0.0014837701633356164,
+    "token_pipeline_overhead_s": 0.05445331112237097,
+    "nsys_decomposition_file": "qwen35_2b_k24_decomposition.json",
+    "token_embedding_fallback_s": 0.03390937729032258,
+    "token_state_roundtrip_s": 0.003265533870967744,
+    "state_transfer_bandwidth_bytes_per_s": 12372538640.37446,
+    "host_staging_bandwidth_bytes_per_s": 13021964748.216803,
+    "staging_overlap_window": 4,
+    "legacy_layer_scheduler_overhead_s": 0.002268887963432124,
+    "kv_storage_fit": {
+      "equation": "T_storage = 2 * [min(M_kv,C)/B_cached + max(M_kv-C,0)/B_uncached]",
+      "cached_fit_max_context_tokens": 8192,
+      "kv_storage_cached_bandwidth_bytes_per_s": 3648055278.915635,
+      "kv_storage_uncached_bandwidth_bytes_per_s": 597693881.5961457,
+      "kv_storage_cache_bytes": 152171841
+    }
+  }
+}

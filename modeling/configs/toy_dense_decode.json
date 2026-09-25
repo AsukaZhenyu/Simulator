@@ -1,0 +1,24 @@
+{
+  "name": "toy-dense-decode",
+  "notes": "Synthetic 8-layer workload for unit tests and intuition building.",
+  "layers": {
+    "count": 8,
+    "uniform_weight_bytes": 134217728,
+    "uniform_flops": 2000000000
+  },
+  "hardware": {
+    "gpu_effective_flops": 2000000000000,
+    "cpu_effective_flops": 100000000000,
+    "h2d_bandwidth_bytes_per_s": 6000000000,
+    "h2d_latency_s": 0.00001,
+    "vram_capacity_bytes": 671088640,
+    "global_bytes": 67108864,
+    "kv_bytes": 33554432,
+    "workspace_bytes": 33554432,
+    "activation_transfer_bytes": 2097152
+  },
+  "policy": {
+    "window_size": 4,
+    "static_gpu_layers": 4
+  }
+}
