@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.1",
+  "id": "matvec-cap160",
+  "workload_file": "matvec.workload.json",
+  "comment": "The smallest possible scenario: one copy, one compute. Optimal is 3 ms for the copy plus 2 ms for the compute.",
+  "architecture": {
+    "dram_capacity_bytes": null,
+    "vram_capacity_bytes": 160,
+    "runtime_reserved_bytes": 0,
+    "allocation_alignment_bytes": 1,
+    "gpu_compute_slots": 1,
+    "h2d_copy_slots": 1
+  },
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {"duration_ns": 2000000, "workspace_bytes": 0}
+    },
+    "h2d": {
+      "W": {"duration_ns": 3000000}
+    }
+  },
+  "mapspace": {
+    "compute_device": "gpu",
+    "copy_tensor_ids": ["W"],
+    "allow_copy_compute_overlap": true,
+    "allow_eviction": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

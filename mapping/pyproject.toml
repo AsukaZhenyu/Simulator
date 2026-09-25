@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tensor-mapping"
+version = "0.1.0"
+description = "Exact mapping search for small GGML compute graphs under limited VRAM"
+readme = "README.md"
+requires-python = ">=3.10"
+# 核心（spec / engine / mapper）只用标准库，因此运行时依赖保持为空。
+# 这既是 modeling/ 的既有纪律，也是 DESIGN.md §2 的明确要求：
+# 「不为 M0 引入求解器、网络服务或 GPU 运行依赖」。
+# 任何新增依赖都会破坏「零安装即可跑测试」这一属性。
+dependencies = []
+
+[project.optional-dependencies]
+# 本轮没有可选的第三方依赖。GGML 导出器是独立的 C/C++ 前端
+# （DESIGN.md §3），不经由 Python 侧导入，所以也不会出现在这里。
+dev = []
+
+[tool.setuptools]
+packages = ["tensor_mapping"]

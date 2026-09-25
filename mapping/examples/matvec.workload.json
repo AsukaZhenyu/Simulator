@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.1",
+  "id": "matvec",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "rectangular MUL_MAT: y = W*x with in=3, out=4"
+  },
+  "comment": "DESIGN.md 3 requires a rectangular MUL_MAT. A square weight makes a transposed or swapped operand pair produce identical numbers, so it cannot catch a ne/nb convention error; 3x4 can.",
+  "tensors": [
+    {
+      "id": "W",
+      "name": "blk.0.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [3, 4, 1, 1],
+      "nb": [4, 12, 48, 48],
+      "storage_bytes": 48,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [3, 1, 1, 1],
+      "nb": [4, 12, 12, 12],
+      "storage_bytes": 12,
+      "initial_locations": ["vram"]
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W", "x"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}
