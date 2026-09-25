@@ -41,7 +41,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from .engine import (
+from llm_infer_model.tensor.engine import (
     Action,
     EvaluationResult,
     State,
@@ -52,7 +52,7 @@ from .engine import (
     legal_actions,
     transition,
 )
-from .spec import InitialCapacityExceeded, Scenario, scenario_fingerprint, workload_fingerprint
+from llm_infer_model.tensor.spec import InitialCapacityExceeded, Scenario, scenario_fingerprint, workload_fingerprint
 
 __all__ = [
     "STATUS_FEASIBLE",

@@ -8,11 +8,18 @@ version = "0.1.0"
 description = "Exact mapping search for small GGML compute graphs under limited VRAM"
 readme = "README.md"
 requires-python = ">=3.10"
-# 核心（spec / engine / mapper）只用标准库，因此运行时依赖保持为空。
-# 这既是 modeling/ 的既有纪律，也是 DESIGN.md §2 的明确要求：
-# 「不为 M0 引入求解器、网络服务或 GPU 运行依赖」。
-# 任何新增依赖都会破坏「零安装即可跑测试」这一属性。
-dependencies = []
+# 唯一的依赖是本仓库的 modeling 包，因为它持有张量模拟内核
+# （llm_infer_model.tensor）。搜索不再自己实现时间推进与显存记账，
+# 而是导入同一份规则——两边只有一套语义，差异只会变成 bug。
+#
+# 这是**本地**包依赖，不是第三方依赖：DESIGN.md §2 的
+# 「不为 M0 引入求解器、网络服务或 GPU 运行依赖」依然成立，
+# 两个包都只用标准库。但「在 mapping 目录下零安装即可跑测试」的旧说法
+# 已不成立，取而代之的是仓库根目录的一次开发安装：
+#     python -m pip install -e ./modeling -e ./mapping
+# 两个 -e 必须一起给：pip 先汇总要求再解析，单装 ./mapping 会去 PyPI 找
+# llm-infer-model 而失败。安装后 tensor_mapping 的公开导入路径不变。
+dependencies = ["llm-infer-model"]
 
 [project.optional-dependencies]
 # 本轮没有可选的第三方依赖。GGML 导出器是独立的 C/C++ 前端

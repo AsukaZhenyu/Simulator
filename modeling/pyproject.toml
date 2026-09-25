@@ -21,4 +21,7 @@ gguf = ["gguf>=0.19.0", "numpy>=1.26"]
 llm-infer-model = "llm_infer_model.cli:main"
 
 [tool.setuptools]
-packages = ["llm_infer_model"]
+# tensor 是张量模拟内核（spec / engine / layer_costs），窗口策略与搜索策略共用它。
+# 显式列出而非 find，是为了让「多了一个子包却没被打包」在安装时就暴露，
+# 而不是等到 mapping 导入时报 ModuleNotFoundError。
+packages = ["llm_infer_model", "llm_infer_model.tensor"]

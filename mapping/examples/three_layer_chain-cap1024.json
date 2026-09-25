@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1",
+  "id": "three-layer-chain-cap1024",
+  "workload_file": "three_layer_chain.workload.json",
+  "comment": "ALIGNMENT_IMPLEMENTATION.md 6-B: three 4x4 F32 weights of 64 B, activations of 16 B, 3 ms per H2D and 2 ms per compute, 1024 B of VRAM. The costs here are the same numbers the LayerSpec bridge produces from measured overrides, so this fixture can be replayed from the command line; the demo re-derives them through llm_infer_model.tensor.layer_costs and asserts the two agree.",
+  "architecture": {
+    "dram_capacity_bytes": null,
+    "vram_capacity_bytes": 1024,
+    "runtime_reserved_bytes": 0,
+    "allocation_alignment_bytes": 1,
+    "gpu_compute_slots": 1,
+    "h2d_copy_slots": 1
+  },
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {"duration_ns": 2000000, "workspace_bytes": 0},
+      "c2": {"duration_ns": 2000000, "workspace_bytes": 0},
+      "c3": {"duration_ns": 2000000, "workspace_bytes": 0}
+    },
+    "h2d": {
+      "W1": {"duration_ns": 3000000},
+      "W2": {"duration_ns": 3000000},
+      "W3": {"duration_ns": 3000000}
+    }
+  },
+  "mapspace": {
+    "compute_device": "gpu",
+    "copy_tensor_ids": ["W1", "W2", "W3"],
+    "allow_copy_compute_overlap": true,
+    "allow_eviction": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

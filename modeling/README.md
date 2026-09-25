@@ -126,6 +126,24 @@ HOST_STAGING_EXPOSED on aggregate critical path when K < K_o
 
 因此模拟结果应位于解析下界和无重叠上界之间。
 
+## 张量级内核（`llm_infer_model/tensor/`）
+
+上面那套是**逐层、浮点秒**的 v0.8 模型。另有一个**张量级、整数纳秒**的内核，服务 `mapping/` 的映射与搜索：
+
+| 模块 | 职责 |
+|---|---|
+| `tensor/spec.py` | 不可变契约对象、输入校验与指纹；M0 不建模的东西直接拒收，不做近似 |
+| `tensor/engine.py` | 状态、四个动作（`COPY_H2D` / `COMPUTE` / `EVICT` / `ADVANCE`）、固定计划回放 |
+| `tensor/layer_costs.py` | 把上面的逐层成本方法桥接成内核要的 `Costs` |
+
+三条边界值得记住：
+
+- **单位**：内核一律整数纳秒，本目录其余部分一律浮点秒。转换只发生在 `layer_costs` 里，按 `round(seconds * 1_000_000_000)`；旧 API 的秒单位不变。
+- **方向**：`tensor_mapping → llm_infer_model` 单向。本包不导入 `mapping`，所以它能在没装 `mapping` 的条件下独立导入并回放一份计划。
+- **`layer_costs` 不是 `ModelConfig` → GGML 图的转换器**：真实一层含多个算子，把整层成本摊给其中一个小矩阵乘会得到看起来合理但没有物理含义的数，所以「哪个算子就是这个计算节点、哪份权重就是这份权重张量」必须由调用方显式给出，它只负责核对（ID、覆盖范围、权重字节数）而不猜。旧模型独有的 KV 分层存储、SSM 状态往返、每 token 控制开销、host staging 等本轮**未迁移**，遇到非零值逐项点名并拒绝。
+
+测试在 `tests/test_tensor_layer_costs.py`（19 项），其中一项把整个场景在**屏蔽 `tensor_mapping`** 的子进程里重建，用来证明内核确实不依赖 `mapping`。
+
 ## 安装
 
 只需要 Python ≥3.10 和 pip，不需要 conda 或 uv。
@@ -145,13 +163,29 @@ python -m venv .venv
 
 下面所有命令里的 `python` 都指 `.venv\Scripts\python`（或先激活 `.venv`）。
 
+### 和 `mapping/` 一起装
+
+`mapping/` 依赖本包的张量内核 `llm_infer_model.tensor`（`spec` / `engine` /
+`layer_costs`：图与资源的校验、状态与合法动作、以及把本目录的闭式层成本换算成整数
+纳秒）。**两个包要在同一次 pip 调用里一起装**，在 Simulator 根目录执行：
+
+```powershell
+python -m pip install -e ./modeling -e ./mapping
+```
+
+单装 `./mapping` 会让 pip 去 PyPI 找 `llm-infer-model` 然后失败。这是本仓库的本地包
+依赖，不是第三方依赖：`modeling/pyproject.toml` 的 `dependencies` 仍为空，张量内核
+也**只用标准库**。整套张量执行规则只有一份实现，就在本包里，`mapping/` 侧不保留副本
+（`tensor_mapping/spec.py` / `engine.py` 只剩转出名字的兼容层）。
+
 跑测试：
 
 ```powershell
-.venv\Scripts\python -m unittest discover -s tests
+.venv\Scripts\python -m unittest discover -s tests    # 57 项
 ```
 
-不需要 GPU、不需要 1.28 GB 的模型文件，也不需要预先生成 `outputs/`。
+不需要 GPU、不需要 1.28 GB 的模型文件，也不需要预先生成 `outputs/`。装了 `.[gguf]`
+时 57 项全跑；只装核心包时 GGUF 相关项带原因跳过。
 
 ## 运行
 

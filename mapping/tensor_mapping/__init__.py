@@ -46,7 +46,7 @@ called complete.
 
 from __future__ import annotations
 
-from .engine import (
+from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE,
     ACTION_COMPUTE,
     ACTION_COPY_H2D,
@@ -69,7 +69,7 @@ from .engine import (
 )
 from .mapper import STATUS_FEASIBLE, STATUS_INFEASIBLE, STATUS_OPTIMAL, STATUS_UNKNOWN
 from .mapper import SearchResult, search
-from .spec import (
+from llm_infer_model.tensor.spec import (
     SCHEMA_VERSION,
     Architecture,
     ComputeCost,

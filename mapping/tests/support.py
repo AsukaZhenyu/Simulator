@@ -36,7 +36,13 @@ from tensor_mapping.engine import (
     MappingError,
     initial_state,
 )
-from tensor_mapping.spec import ComputeCost, H2DCost, load_and_validate
+from tensor_mapping.spec import (
+    LOC_VRAM,
+    ROLE_WEIGHT,
+    ComputeCost,
+    H2DCost,
+    load_and_validate,
+)
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
@@ -99,6 +105,33 @@ def with_overlap(scenario: Scenario, allowed: bool) -> Scenario:
 def with_eviction(scenario: Scenario, allowed: bool) -> Scenario:
     return dataclasses.replace(
         scenario, mapspace=dataclasses.replace(scenario.mapspace, allow_eviction=allowed)
+    )
+
+
+def with_resident_weights(scenario: Scenario, tensor_ids: tuple[str, ...] | None = None) -> Scenario:
+    """The same scenario with those weights already in VRAM.
+
+    ``simulate_decode`` has a dedicated "everything resident" branch
+    (``window_size >= layer_count``, ``simulator.py:90``) that charges no transfer
+    at all. The tensor kernel has no such shortcut: residency is a property of the
+    workload, so this is how the equivalent new-side scenario is written. Without
+    an explicit ``tensor_ids`` every weight in the workload is made resident.
+    """
+    if tensor_ids is None:
+        tensor_ids = tuple(
+            tensor.id for tensor in scenario.workload.tensors if tensor.role == ROLE_WEIGHT
+        )
+    chosen = set(tensor_ids)
+    tensors = tuple(
+        dataclasses.replace(tensor, initial_locations=(LOC_VRAM,))
+        if tensor.id in chosen
+        else tensor
+        for tensor in scenario.workload.tensors
+    )
+    return dataclasses.replace(
+        scenario,
+        id=f"{scenario.id}-resident",
+        workload=dataclasses.replace(scenario.workload, tensors=tensors),
     )
 
 

@@ -1,6 +1,8 @@
 # mapping：GGML 计算图的执行映射与搜索
 
-状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试，共 181 项。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)。日期：2026-09-25。
+状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试，共 202 项。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)（该报告记录验收当时的 181 项；此后新增的 21 项见下）。日期：2026-09-25。
+
+其后一轮「对照轮」把旧的窗口规则接进了 `modeling` 的张量内核（[ALIGNMENT_IMPLEMENTATION.md](ALIGNMENT_IMPLEMENTATION.md)）：`modeling` 侧新增 `llm_infer_model.tensor` 子包（`spec` / `engine` / `layer_costs`），本目录新增 `tensor_mapping/policies.py`（窗口策略）与 `tools/demo_window_vs_search.py`（三份结果并排对照）。新加的 21 项测试落在 `tests/test_policies.py`，`modeling/tests/test_tensor_layer_costs.py` 另有 19 项。
 
 测试全绿**不等于** M0 整体验收，所以验收按 `ACCEPTANCE.md` §7.6 要求分三类留了证据。`DESIGN.md` §9:285 的集成验证「编译 → 导出 → 模拟/搜索」已从零走通：编译腿在全新空目录 configure + build（32.7 s + 37.6 s），导出腿用这个新二进制重导出四张图，产物与已入库文件**逐字节相同**，`tests.test_ggml` 13 项零 skip。剩下的环境限制只有一条：`--wall-time-limit-s` 在本机因时钟粒度（15.625 ms）无法端到端验证，详见验证报告 3.2。
 
@@ -12,9 +14,12 @@
 
 1. [DESIGN.md](DESIGN.md)：首版范围、数据契约、状态转移、搜索和实现边界。
 2. [ACCEPTANCE.md](ACCEPTANCE.md)：带明确数字和推导的验收例子、错误用例和交付要求。
-3. 有需要时阅读 [资产梳理](../ASSET_MAP_AND_START_PLAN.md) 与 [中期规划](../PROJECT_PLAN_2026-09-25.md)。首版具体语义以本目录为准。
+3. [ALIGNMENT_IMPLEMENTATION.md](ALIGNMENT_IMPLEMENTATION.md)：**当前的模块分工与安装方式**，以及旧窗口规则接进张量内核的范围。它与本 README 一起优先于更早的架构简报；`DESIGN.md` / `ACCEPTANCE.md` 里的 M0 动作语义和验收数字继续有效。
+4. 有需要时阅读 [资产梳理](../ASSET_MAP_AND_START_PLAN.md) 与 [中期规划](../PROJECT_PLAN_2026-09-25.md)——那是立项期的计划文本，模块分工以第 3 条为准，语义以本目录为准。
 
 ## 给 Claude 的实施任务
+
+> 下面这段是 M0 立项时的任务书，**M0 已完成**，保留它是为了让后来的人看得到当初定下的边界。当前该做什么，看 [ALIGNMENT_IMPLEMENTATION.md](ALIGNMENT_IMPLEMENTATION.md)。
 
 请按 DESIGN.md 和 ACCEPTANCE.md 实现 M0：GGML 小图导出、固定成本状态模型、固定 mapping 回放、小图精确搜索及验收测试。
 
@@ -55,17 +60,36 @@ mapping/
 ├── tensor_mapping/
 │   ├── __init__.py             ✓
 │   ├── __main__.py             ✓ python -m tensor_mapping
-│   ├── spec.py                 ✓ 图、资源、成本、mapping 与输入校验
-│   ├── engine.py               ✓ 状态、合法动作、转移、固定 mapping 评价
+│   ├── spec.py                 ⟳ 兼容层：只是转出 llm_infer_model.tensor.spec 的名字
+│   ├── engine.py               ⟳ 兼容层：只是转出 llm_infer_model.tensor.engine 的名字
 │   ├── mapper.py               ✓ uniform-cost 精确搜索与状态去重
 │   ├── artifacts.py            ✓ 结果对象 → stats/events/states/mapping 四份产物
-│   └── cli.py                  ✓ model / search：参数、退出码、错误映射
+│   ├── cli.py                  ✓ model / search：参数、退出码、错误映射
+│   └── policies.py             ✓ 旧窗口 K 规则 → 新内核的动作序列（对照轮新增）
 ├── examples/                   ✓ 小图、scenario、固定 mapping
+│   ├── three_layer_chain*      ✓ 三链对照场景（窗口策略与 demo 的输入）
 │   └── ggml/                   ✓ 真实导出产物与其 scenario（与同名 fixture 逐字段等价）
-└── tests/                      ✓ 语义、搜索、导入、导出验证与 CLI 端到端
+├── tools/
+│   ├── plot_results.py         读产物出瀑布图与显存曲线（**包外、不计入 M0 验收**）
+│   └── demo_window_vs_search.py 旧模型 / 新窗口策略 / 搜索三份结果并排对照（包外）
+└── tests/                      ✓ 语义、搜索、导入、导出验证、CLI 端到端与窗口策略
 ```
 
-模块可随实现小幅调整，但保持上述职责。核心 Python 包不导入 llama.cpp 或 GPU 库；GGML 导出是独立前端，缺构建环境时导出器相关测试 skip 并注明未验证。
+模块可随实现小幅调整，但保持上述职责。张量级内核（`spec` / `engine` / `layer_costs`）在对照轮迁到了 `modeling/llm_infer_model/tensor/`，本目录的 `spec.py` / `engine.py` 只剩兼容层——**它们只是转出名字，不保留第二份实现**（两份同名数据类会让 `isinstance` 与 `dataclasses.replace` 悄悄失效）。`tensor_mapping` 自己的模块直接从 `llm_infer_model.tensor` 导入，所以兼容层没有调用方之后可以整个删掉。
+
+核心 Python 包不导入 llama.cpp 或 GPU 库；GGML 导出是独立前端，缺构建环境时导出器相关测试 skip 并注明未验证。
+
+## 安装（开发）
+
+两个包**一起**从本地安装，在 Simulator 根目录执行一次：
+
+```powershell
+python -m pip install -e ./modeling -e ./mapping
+```
+
+**两个 `-e` 必须在同一次 pip 调用里给出**：pip 先汇总要求再解析，只装 `./mapping` 会去 PyPI 找 `llm-infer-model` 然后失败。`llm-infer-model` 是本仓库的 `modeling/` 包，不是第三方依赖——它持有张量模拟内核 `llm_infer_model.tensor`，本目录的搜索与窗口策略导入的是同一份规则，所以两边只有一套时间推进和显存记账。
+
+装完就可以直接跑 `python -m tensor_mapping` 和 `tests/`，不需要设 `PYTHONPATH`。本目录**不再支持「零安装即可跑测试」**：那是两个目录各自独立时期的说法，现在 `tensor_mapping/__init__.py` 直接导入 `llm_infer_model.tensor`，必须先装。只跑旧模型时的单包装法保留在 `modeling/README.md` 的「安装」一节。
 
 ## 命令行
 
@@ -102,8 +126,10 @@ python -m tensor_mapping search --scenario examples/ggml/chain-cap160.json \
 ### 跑测试
 
 ```bash
-cd mapping && python -m unittest discover -s tests -t .
+cd mapping && python -m unittest discover -s tests -t .    # 202 项
 ```
+
+这里的 `python` 指装好两个包的开发环境（见上文「安装（开发）」）；本仓库自用的那个在 `modeling/.venv`。没装就只会跑到 6 个 import 错误，报 `No module named 'llm_infer_model'`。
 
 **必须带 `-t .`**。`DESIGN.md:260` 写的是 `python -m unittest discover -s tests`，但本目录的 `tests/` 是一个包（有 `__init__.py`、用相对 import），少了 `-t .` 时发现器只找到 5 个用例且全部报错。冻结契约不改，所以把差异记在这里。
 
@@ -131,6 +157,61 @@ cd mapping && python -m unittest discover -s tests -t .
 - `limits` 是限制（数字，从 scenario 推导，改 scenario 就跟着变，不会过期）；`assumptions` 是假设（散文，每句只在它断言的事实成立时才出现）。两者在 §8 里合称「限制与假设」。
 - **`mapping.json` 里没有状态字段**——`load_mapping` 的 allow-list 会拒绝多余键。判断一份 mapping 是否已证最优，必须读 `stats.json` 的 `search.optimality_proven`。`search` 写出的 `mapping.json` 会把这句话写进自己的 `comment`（最优/未证最优 + 终止原因 + 生效预算），因为这份文件最容易被单独复制出去被别人回放。
 
+### 看结果：瀑布图与显存曲线
+
+```bash
+cd mapping
+python tools/plot_results.py outputs/chain-search               # 文本视图（无依赖）
+python tools/plot_results.py outputs/chain-search --png         # 另出两张 PNG
+python tools/plot_results.py outputs/chain-search --png --out fig --dpi 160
+```
+
+读一个结果目录里的 `stats.json` / `events.json` / `states.json`，给出两样东西：
+
+- **瀑布图**：按资源泳道排的甘特图——什么时候搬运、什么时候计算、**是否重叠**。`events.json` 的 `resource` 决定泳道，`start_ns`/`end_ns` 决定区间。文本版还会直接报出两条资源道的重叠毫秒数（`零重叠` 说明容量卡死、装不下预取）。
+- **显存曲线**：`states.json` 的 `used_vram_bytes` 对时间画阶梯，容量上限画虚线、超出的区域涂红。文本版另附**逐状态**的 `action_index / t_ns / used_vram / Δ` 表，能直接看出哪一步分配、哪一步释放。
+- **一致性检查**：顺手核 7 条产物自洽性（`peak ≤ cap`、每个状态不超容量、`t_ns` 单调、`action_index` 连续、`len(states) == len(events)+1`、最晚事件不超 makespan），任一失败**退出码 1**。
+
+**默认只打印文本**，因为文本可 diff、可入库、可贴进验收报告，而 PNG 都不能。PNG 是 `--png` 按需加的。
+
+**`tools/` 在 `tensor_mapping/` 包外，也不被 `tests/` 导入**——`pyproject.toml` 的 `dependencies` 只有本仓库的 `llm-infer-model`、`dev` 是空列表，两边都**不引入第三方运行库**（这正是「文本视图只用标准库」能成立的原因，也是 `modeling/llm_infer_model/tensor` 必须只用标准库的原因），所以 matplotlib 只在 `--png` 分支里按需导入：没有 matplotlib 时文本视图照常工作，`--png` 报一句提示并退出 3。本脚本**只读产物**，不写任何结果文件、不碰 `DESIGN.md` §8 的任何语义。
+
+### 看对照：旧窗口模型 / 新窗口策略 / 搜索
+
+```bash
+cd mapping
+python tools/demo_window_vs_search.py                       # 五段对照，全对才退出 0
+python tools/demo_window_vs_search.py --windows 1 2 3       # 换个窗口集合
+```
+
+把三份结果并排打出来：左边是 `llm_infer_model.simulator.simulate_decode`（v0.8 的窗口规则），右边是 `tensor_mapping.policies.window_mapping` + `llm_infer_model.tensor.evaluate_mapping`（新内核），最后一段是 `tensor_mapping.mapper.search` 的通用解。五段依次是：成本桥接（示例里写死的成本必须等于经旧层模型闭式求值再换算出来的值）、窗口 K 逐行对照、K 小于初始驻留份数时由策略自己拒绝、哪些图形状窗口策略读不了、搜索结果与它的独立回放。
+
+任何一项对不上就以非零码退出，所以它也可以直接当验收命令跑。和 `plot_results.py` 一样**只读**、包外、不被 `tests/` 导入。四处对照口径（成本走公式不走实测覆盖、权重峰值要单独数、K = 层数对应旧模型的「全部常驻」分支、拒绝类型 `WindowPolicyFailed` 与 `Unsupported` 都不是 `infeasible`）写在脚本自己的 docstring 里。
+
+### 窗口策略（`tensor_mapping/policies.py`）
+
+旧 v0.8 的「窗口 K」规则现在有了一条接进新内核的路径：
+
+```python
+from tensor_mapping.policies import window_mapping
+from llm_infer_model.tensor import evaluate_mapping
+
+actions = window_mapping(scenario, window_size=2)   # 只决定「先做哪一件」
+result = evaluate_mapping(scenario, actions)        # 合法性与时间推进一律问内核
+```
+
+策略**不解释结果**：makespan、峰值显存、搬运量全部由 `evaluate_mapping` 产生，所以本模块没有第二套容量或依赖规则。它只支持**显式线性链**（每环恰好一份独有权重 + 一个激活输入），残差、分叉、共享权重明确拒绝（`Unsupported`）。拒绝分三类，调用方必须区别对待：
+
+| 异常 | 含义 | 是不是「场景无解」 |
+|---|---|---|
+| `Unsupported` | 图的形状不在窗口策略范围内 | 不是；通用搜索照常支持 |
+| `InvalidInput` | `window_size` 本身不合法 | 不是 |
+| `WindowPolicyFailed` | 图形状没问题，但这条策略走不下去（含容量不够） | **不是**，请改用 `search` 拿结论 |
+
+最后一条是刻意留的余地：策略走不下去只说明**这条策略**被自己的限制挡住了，`mapper.search` 可能仍然找得到可行计划，所以调用方不得把它当成 `infeasible`。
+
+本轮只做「窗口 K」这一条策略，**未迁移**的仍是旧模型独有的那些服务：KV 分层存储、SSM 状态往返、每 token 控制开销、host staging、静态卸载、CPU 数学、D2H。成本桥接 `llm_infer_model.tensor.layer_costs` 遇到这些非零值会**逐项点名并拒绝**，而不是静默丢弃——静默丢弃会让时延偏小且不留痕迹。
+
 ### 命令行上的已知限制
 
 - **`search.wall_time_s` 在本机被时钟粒度量化**：Windows 上 `time.monotonic()` 实测是 `GetTickCount64()`，分辨率 **15.625 ms**，连续 2000 次调用返回同一个值。所以小图搜索的 `wall_time_s` 常常正好是 `0.0`（不是搜索瞬时的意思），`--wall-time-limit-s` 小于一个 tick 时**永远不会触发**。这不影响任何 M0 验收数字（那些全是模拟时间 `_ns`），但用时间预算时要心里有数。要修得动 `mapper.WallClock` 的时钟源（`perf_counter`），属核心改动，留待后续。
@@ -141,3 +222,5 @@ cd mapping && python -m unittest discover -s tests -t .
 M0 小图语义与精确搜索 → M1 小图实机校准与异构资源 → M2 Transformer block / dense → M3 可扩展搜索与论文验证 → MoE → 多请求/Agent。
 
 完成 M0 不等于已实现真实 GPU 调度执行器，也不等于已验证硬件性能预测。
+
+对照轮（把旧窗口规则接进张量内核）的范围**到此为止**：不开发 GUI，不扩展 MoE、多请求、多 GPU、CPU 计算、D2H 或完整 dense，不改 GGML 算子支持范围，不重做指纹/状态码/产物格式。已有的绘图脚本与 demo 继续可用即可。下一条策略（KV 分层存储、每 token 控制开销等）各自进来时，都应像窗口 K 这样只决定动作顺序、把合法性与时间推进留给内核。

@@ -44,7 +44,9 @@ GGML 构图 → 导出逻辑 workload → 输入校验
 
 建议 Python >=3.10，核心采用标准库、JSON 和 unittest；不为 M0 引入求解器、网络服务或 GPU 运行依赖。图前端为独立 C/C++ 可执行程序。
 
-复用旧代码的事件队列、配置校验与数据记录经验；旧 `simulate_decode()` 的 next_layer、窗口驱逐、聚合 staging/KV/控制开销不进入新核心。第一版不强制抽取共享库或改造旧目录。
+**模块归属（对照轮更新）**：张量级内核 `spec` / `engine` / `layer_costs` 现位于 `../modeling/llm_infer_model/tensor/`，本目录只保留策略侧（`mapper` 精确搜索、`policies` 窗口策略）与产物/入口。依赖方向单向：`tensor_mapping → llm_infer_model`。理由见 `ALIGNMENT_IMPLEMENTATION.md` §3——规则不该隶属其中任何一个策略。因此两个包要在同一次 pip 调用里一起装（`python -m pip install -e ./modeling -e ./mapping`）；`../modeling/` 仍然是本地包而不是第三方依赖，两边都只用标准库。
+
+复用旧代码的事件队列、配置校验与数据记录经验；旧 `simulate_decode()` 的 next_layer、窗口驱逐、聚合 staging/KV/控制开销不进入新核心。第一版不强制抽取共享库，这一点在对照轮被改掉了：内核已抽到 `modeling` 侧共用，但旧目录本身（`simulator.py` 等）仍原样保留、未被改写。
 
 ## 3. GGML 前端
 
@@ -292,6 +294,8 @@ model 的 valid 不表示最优。失败输出包含动作索引、模拟时间�
 
 - Timeloop 本地分析及 mapper 文档：workload/architecture/mapping 与 evaluator/search 分离；搜索停止条件影响最优性。
 - `../modeling/llm_infer_model/simulator.py`：事件、在途容量和 trace 的参考；不继承其固定层序与经验补偿。
+- `../modeling/llm_infer_model/tensor/`：现在也是**本目录的核心依赖**（不再是「参考」）——`spec` / `engine` / `layer_costs` 里的状态转移与显存记账是全仓库唯一一份，`mapper` 与 `policies` 都导入它。
+- `../modeling/llm_infer_model/model.py`：`LayerSpec.compute_seconds` / `transfer_seconds` 是成本桥接的求值入口；窗口、KV、控制开销等旧服务不在本轮范围内。
 - `../../visualization-llama.cpp-tensor/collector/llama-export-graph-json.cpp`：张量与输入关系提取的参考；注意 scheduled 图与逻辑图差异。
 - `../../llama.cpp-implement/release-b8705/llama.cpp-b8705/ggml/include/ggml.h`：当前本地接口依据；实际构建必须核对所锁版本。
 

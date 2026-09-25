@@ -46,7 +46,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .engine import (
+from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE,
     ACTION_COMPUTE,
     Action,
@@ -55,7 +55,7 @@ from .engine import (
     StateSnapshot,
 )
 from .mapper import SearchResult
-from .spec import (
+from llm_infer_model.tensor.spec import (
     ORIGIN_GGML,
     SCHEMA_VERSION,
     Architecture,

@@ -68,7 +68,7 @@ from .artifacts import (
     states_document,
     write_json,
 )
-from .engine import (
+from llm_infer_model.tensor.engine import (
     MappingDocument,
     MappingIdentityError,
     REASON_INITIAL_CAPACITY_EXCEEDED,
@@ -77,7 +77,7 @@ from .engine import (
     load_mapping,
 )
 from .mapper import STATUS_FEASIBLE, STATUS_OPTIMAL, SearchResult, search
-from .spec import (
+from llm_infer_model.tensor.spec import (
     InitialCapacityExceeded,
     Scenario,
     SpecError,

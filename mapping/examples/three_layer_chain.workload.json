@@ -1,0 +1,108 @@
+{
+  "schema_version": "0.1",
+  "id": "three-layer-chain",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "three-layer chain: h1 = W1*x; h2 = W2*h1; y = W3*h2"
+  },
+  "tensors": [
+    {
+      "id": "W1",
+      "name": "blk.0.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "W2",
+      "name": "blk.1.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "W3",
+      "name": "blk.2.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["vram"]
+    },
+    {
+      "id": "h1",
+      "name": "blk.0.out",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "h2",
+      "name": "blk.1.out",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W1", "x"],
+      "output": "h1"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W2", "h1"],
+      "output": "h2"
+    },
+    {
+      "id": "c3",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W3", "h2"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

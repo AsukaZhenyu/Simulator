@@ -37,6 +37,8 @@ OK
 | `tests/test_ggml.py` | 真实导出产物、与 fixture 逐字段等价、导出器逐字节重现 |
 | `tests/test_cli.py` | 两个入口、退出码、四份产物、M0.4 回放一致 |
 
+> **此后新增**：对照轮（`ALIGNMENT_IMPLEMENTATION.md`）加了 `tests/test_policies.py` 21 项（窗口策略、旧模型与新内核的逐行/逐事件对照、成本桥接、拒绝路径），`modeling/tests/test_tensor_layer_costs.py` 另有 19 项。全量现在是 **202 项**。本节上面的 181 与「Ran 181 tests」是**验收当时**的记录，按 §7「保留 M0 规则和数字」原样留着；新增项不动本报告的任何一条 M0 结论，链式 160 B / 96 B / 95 B 三个场景仍分别是 8 ms / 10 ms / 不可行。
+
 ### 1.2 导出腿（真实 GGML 二进制）
 
 ```bash
@@ -267,9 +269,9 @@ Windows 上 `time.monotonic()` 实测是 `GetTickCount64()`，分辨率 **15.625
 |---|---|---|---|
 | 1 | 可以独立构建的小图导出器，支持 chain/residual/fork，记录 GGML 版本与构建方法 | 具备 | `mapping/ggml/`，`CMakeLists.txt` 以 `GGML_SOURCE_DIR` 接入；`ggml/README.md` 记构建方法与版本；覆盖 chain/residual/fork/matvec 四张正图 + 四张负图；**本轮从零构建通过，见 3.1** |
 | 2 | 三个图的实际导出产物 + 对应 scenario + 至少一个固定 mapping | 具备 | `examples/ggml/` 下四张图各一组（导出产物、scenario、mapping）；`examples/` 另有四组 fixture 版本；产物出处见 3.1 |
-| 3 | Python 核心、model/search 两个入口和语义/搜索测试 | 具备 | `spec.py`/`engine.py`/`mapper.py`/`cli.py`/`__main__.py`；`tests/` 181 项；见 1.1 |
+| 3 | Python 核心、model/search 两个入口和语义/搜索测试 | 具备 | `spec.py`/`engine.py`/`mapper.py`/`cli.py`/`__main__.py`；`tests/` 181 项（对照轮后 202 项，见 1.1 的注）；见 1.1 |
 | 4 | 输出最优计划、状态/事件、指标、求解预算与终止原因 | 具备 | 四份产物 `stats.json`/`events.json`/`states.json`/`mapping.json`；预算与终止原因在 `stats.search`，实际生效预算在 `limits`；见 2.1--2.5 |
-| 5 | 无 GPU 情况下可运行核心示例；GGML 前端用 CPU 构建依赖，不要求 CUDA | 具备 | 核心纯标准库，无需安装；`GGML_CUDA:BOOL=OFF` 且导出全程 `no_alloc`，见 3.1 |
+| 5 | 无 GPU 情况下可运行核心示例；GGML 前端用 CPU 构建依赖，不要求 CUDA | 具备 | 核心纯标准库、无第三方依赖，但要先装本仓库的两个本地包（`python -m pip install -e ./modeling -e ./mapping`，对照轮起 `tensor_mapping` 导入 `llm_infer_model.tensor`）；`GGML_CUDA:BOOL=OFF` 且导出全程 `no_alloc`，见 3.1 |
 | 6 | 实际执行命令和验证报告，区分自动测试、人工核对、未运行项与环境限制 | 本文件 | — |
 
 第 1～5 条中「具备」的含义是「组件存在且有本轮实测证据」。第 1、5 条依赖的构建环节已在 3.1 从零走通；剩下唯一未经本轮验证的是**上游 ggml 源码树之外的任意环境**（见 3.1 末段），这是环境边界而非本仓库的未完成项。
@@ -287,8 +289,8 @@ cmake -S ggml -B <全新空目录> -G "Visual Studio 17 2022" -A x64 \
 cmake --build <全新空目录> --config Release --target ggml-export-workload
 "<全新空目录>/bin/Release/ggml-export-workload.exe" --graph all --out-dir <临时目录>
 
-# 自动测试
-python -m unittest discover -s tests -t .        # 181 项
+# 自动测试（需先按 README「安装（开发）」装好两个本地包）
+python -m unittest discover -s tests -t .        # 202 项（验收当时 181）
 python -m unittest tests.test_ggml               # 13 项，零 skip
 TENSOR_MAPPING_GGML_EXPORTER="<全新空目录>/bin/Release/ggml-export-workload.exe" \
   python -m unittest tests.test_ggml             # 13 项，零 skip（指向新构建的 exe）
