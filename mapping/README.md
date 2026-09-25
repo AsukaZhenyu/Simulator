@@ -1,6 +1,6 @@
 # mapping：GGML 计算图的执行映射与搜索
 
-状态：基础设计，尚无实现。日期：2026-09-25。
+状态：M0 核心（数据契约、状态转移、固定 mapping 评价、精确搜索）与 GGML 导出器已实现并有测试；`cli.py` / `__main__.py` 与 stats/events/states/mapping 产物落盘未做，**M0 尚未整体完成**（`ACCEPTANCE.md` §7）。日期：2026-09-25。
 
 目标：给定 GGML 小计算图、硬件资源、固定动作成本和受限动作空间，检查一种执行映射是否合法，计算其执行时间，并搜索最短的合法映射。
 
@@ -36,7 +36,7 @@
 
 ## 计划结构
 
-以下代码文件由后续实现创建，本次仅交付三份 Markdown 文档：
+现状（✓ 已实现，· 未做）：
 
 ```text
 mapping/
@@ -44,19 +44,24 @@ mapping/
 ├── DESIGN.md
 ├── ACCEPTANCE.md
 ├── pyproject.toml
-├── ggml/                       建图、导出程序与独立构建入口
+├── ggml/                       ✓ 建图、导出程序与独立构建入口（见 ggml/README.md）
+│   ├── CMakeLists.txt          ✓ 以 GGML_SOURCE_DIR 参数接本地 ggml，不写死路径
+│   └── src/
+│       ├── graphs.h/.cpp       ✓ 四张正图 + 四个只用于验证拒绝路径的负图
+│       └── export_workload.cpp ✓ 闭包遍历、布局校验、JSON 落盘、CLI
 ├── tensor_mapping/
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── spec.py                 图、资源、成本、mapping 与输入校验
-│   ├── engine.py               状态、合法动作、转移、固定 mapping 评价
-│   ├── mapper.py               uniform-cost 精确搜索与状态去重
-│   └── cli.py                  model / search
-├── examples/                   小图、scenario、固定 mapping
-└── tests/                      语义、搜索、导入和输出验证
+│   ├── __init__.py             ✓
+│   ├── __main__.py             ·
+│   ├── spec.py                 ✓ 图、资源、成本、mapping 与输入校验
+│   ├── engine.py               ✓ 状态、合法动作、转移、固定 mapping 评价
+│   ├── mapper.py               ✓ uniform-cost 精确搜索与状态去重
+│   └── cli.py                  · model / search
+├── examples/                   ✓ 小图、scenario、固定 mapping
+│   └── ggml/                   ✓ 真实导出产物与其 scenario（与同名 fixture 逐字段等价）
+└── tests/                      ✓ 语义、搜索、导入与导出验证
 ```
 
-模块可随实现小幅调整，但保持上述职责。核心 Python 包不导入 llama.cpp 或 GPU 库；GGML 导出是独立前端。
+模块可随实现小幅调整，但保持上述职责。核心 Python 包不导入 llama.cpp 或 GPU 库；GGML 导出是独立前端，缺构建环境时导出器相关测试 skip 并注明未验证。
 
 ## 后续路线
 

@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1",
+  "scenario_id": "chain-cap160",
+  "comment": "The DESIGN.md 4.3 worked mapping (the 8 ms optimum for chain at 160 B), bound to the scenario that reads the real GGML export. It is byte-identical to examples/chain.mapping.json on purpose: the same action list has to be legal and optimal for both, which is the sharpest statement that the export and the fixture describe the same workload. Hand-written, so it carries no fingerprints and replays as fingerprint_verified=false.",
+  "actions": [
+    {"kind": "COPY_H2D", "tensor_id": "W1"},
+    {"kind": "ADVANCE"},
+    {"kind": "COMPUTE", "operation_id": "c1"},
+    {"kind": "COPY_H2D", "tensor_id": "W2"},
+    {"kind": "ADVANCE"},
+    {"kind": "EVICT", "tensor_id": "W1"},
+    {"kind": "EVICT", "tensor_id": "x"},
+    {"kind": "ADVANCE"},
+    {"kind": "COMPUTE", "operation_id": "c2"},
+    {"kind": "ADVANCE"}
+  ]
+}

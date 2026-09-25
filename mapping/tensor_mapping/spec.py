@@ -649,9 +649,11 @@ def _read_json(path: Path) -> Any:
 
 def _parse_workload(raw: Any, where: str) -> Workload:
     block = _require_mapping(raw, where)
-    # "comment" is allowed at every level of every M0 document: these files are
-    # hand-maintained contract examples, and an explanation that has nowhere to
-    # live ends up in a commit message nobody reads. It carries no semantics.
+    # "comment" is allowed at the top level of each M0 document -- here, in a
+    # scenario (spec.py), and in a mapping (engine.py) -- and on a mapping's
+    # action entries; nowhere deeper. These files are hand-maintained contract
+    # examples, and an explanation that has nowhere to live ends up in a commit
+    # message nobody reads. It carries no semantics.
     _reject_unknown_keys(
         block, {"schema_version", "id", "origin", "tensors", "operations", "outputs", "comment"}, where
     )
