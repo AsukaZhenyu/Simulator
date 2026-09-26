@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tensor Mapping 查看器</title>
+<!-- 下面这一行和文件末尾的 app.js 那一行是**字面**标签：服务模式下服务器原样把它发
+     出去，浏览器自己去取那两件；导出快照时 render_snapshot() 按字面把它们换成内联的样式
+     块与内容脚本。所以这两个标签的写法一个字都不能改，也不能加属性——自检 D 组断言它们
+     各出现**恰好一次**，并断言快照里内联样式块恰好一个、脚本恰好两段（载荷 + app.js）。
+     本注释里因此不写出完整的那两个字符串，也不写出样式块的标签。 -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="ident">
+    <h1 id="scenario-id">…</h1>
+    <!-- 「换计算图」：名单由服务端按**当前这一份所在的目录**扫出来（`payload.scenarios`），
+         前端只负责如实画出来。只有一份可换时整格收起来；导出的快照里它是禁用的——那边
+         没有 Python 侧可以对话，换图这件事在死拷贝上不可能发生。 -->
+    <label class="pick" id="scenario-pick-wrap" hidden>
+      <span>换计算图</span>
+      <select id="scenario-pick"></select>
+    </label>
+    <p class="sub">
+      <span id="scenario-path" class="mono"></span>
+      <span id="mode-badge" class="badge">…</span>
+    </p>
+  </div>
+  <dl class="headline" id="headline"></dl>
+</header>
+
+<!-- 每个标签下面挂一行「这一屏属于哪一侧」。一排光秃秃的名词看不出这一点，而
+     「时长来源是哪两个东西之间的、时间线是谁的时间线」正是这个工具要回答的第一个问题。
+     副标题里的 mapping / modeling 是用户自己的词汇，不翻译。
+
+     这一栏**不是标签页，是跳转条**：五块屏全部常驻在同一页上（原先用 `hidden` 切显隐，
+     而 `.pane` 是 `display:flex`、`style.css` 里又没有 `[hidden]` 规则——作者样式压过浏览器
+     默认的 `[hidden]{display:none}`，所以那个属性一直是失效的，屏幕上从来就是五块并排、
+     其中四块空着）。现在点一下就 `scrollIntoView`，`aria-current` 跟着滚动位置走。 -->
+<nav class="tabs" id="tabs" aria-label="跳到某一屏">
+  <button class="tab" data-tab="tree" aria-current="false">
+    <span class="tab-name">搜索树</span><span class="tab-scope">mapping 搜索</span>
+  </button>
+  <button class="tab" data-tab="graph" aria-current="true">
+    <span class="tab-name">计算图</span><span class="tab-scope">两侧共用</span>
+  </button>
+  <button class="tab" data-tab="timeline" aria-current="false">
+    <span class="tab-name">时间线</span><span class="tab-scope">mapping 执行</span>
+  </button>
+  <button class="tab" data-tab="source" aria-current="false">
+    <span class="tab-name">时长来源</span><span class="tab-scope">modeling → mapping</span>
+  </button>
+  <button class="tab" data-tab="params" aria-current="false">
+    <span class="tab-name">参数</span><span class="tab-scope">改完重跑</span>
+  </button>
+</nav>
+
+<main>
+  <div class="stage">
+    <div class="banner" id="banner" hidden></div>
+
+    <section class="pane" id="pane-tree" data-pane="tree">
+      <div class="pane-head">
+        <h2>搜索树</h2>
+        <p class="hint">每个节点是一个状态；实线是入堆的边，点线是被支配剪掉的边。<strong>点任一节点</strong>，下面的计算图与时间线一起跟着它走。</p>
+      </div>
+      <div class="canvas-wrap tall"><svg id="tree-svg" role="img" aria-label="状态空间搜索树"></svg></div>
+      <div class="legend" id="tree-legend"></div>
+    </section>
+
+    <section class="pane" id="pane-graph" data-pane="graph">
+      <div class="pane-head">
+        <h2>计算图</h2>
+        <p class="hint" id="graph-hint">横轴是<strong>拓扑层</strong>，纵轴是<strong>先后</strong>。琥珀是张量，蓝是算子，与时间线的两条泳道同色。</p>
+      </div>
+      <div class="canvas-wrap"><svg id="graph-svg" role="img" aria-label="计算图"></svg></div>
+      <div class="legend" id="graph-legend"></div>
+    </section>
+
+    <section class="pane" id="pane-timeline" data-pane="timeline">
+      <div class="pane-head">
+        <h2>时间线</h2>
+        <p class="hint" id="timeline-hint"></p>
+      </div>
+      <div class="canvas-wrap"><svg id="gantt-svg" role="img" aria-label="执行时间线"></svg></div>
+      <div class="canvas-wrap"><svg id="vram-svg" role="img" aria-label="显存占用曲线"></svg></div>
+      <div class="canvas-wrap"><svg id="states-svg" role="img" aria-label="状态时间线"></svg></div>
+      <div id="refused-body"></div>
+    </section>
+
+    <section class="pane" id="pane-source" data-pane="source">
+      <div class="pane-head">
+        <h2>时长来源</h2>
+        <p class="hint">这条时间线上的每一根柱子是怎么算出来的——以及这一份到底用的是推导值还是声明值。</p>
+      </div>
+      <div id="bridge-body"></div>
+    </section>
+
+    <section class="pane" id="pane-params" data-pane="params">
+      <div class="pane-head">
+        <h2>参数</h2>
+        <p class="hint">改完点「重跑搜索」，服务端会用同一套代码重建两份载荷，然后逐项对比。</p>
+      </div>
+      <div id="params-body"></div>
+    </section>
+  </div>
+
+  <aside class="inspector" id="inspector"></aside>
+</main>
+
+<footer class="transport" id="transport">
+  <div class="modes" role="group" aria-label="游标模式">
+    <button class="mode" data-mode="replay" aria-pressed="true">回放计划</button>
+    <button class="mode" data-mode="step" aria-pressed="false">单步探索</button>
+  </div>
+  <div class="scrub">
+    <button id="back" title="后退一步">◀</button>
+    <button id="play" title="播放/暂停">▶</button>
+    <button id="fwd" title="前进一步">▶</button>
+    <input type="range" id="scrub" min="0" max="0" value="0" aria-label="当前步">
+    <button id="reset" title="回到起点">⏮</button>
+    <output id="step-label" class="mono"></output>
+  </div>
+  <div class="actions" id="actions"></div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

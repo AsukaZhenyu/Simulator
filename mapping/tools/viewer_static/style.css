@@ -1,0 +1,450 @@
+/* Tensor Mapping 查看器 —— 全部样式。
+ *
+ * 两条纪律：
+ * 1. **不引任何外部资源**。导出的快照要能离线双击打开，所以字体只用系统栈，
+ *    图标只用文字符号。引一个 CDN 就会让快照在没网时掉样式。
+ * 2. **颜色只走变量**。三个主题状态都要能解析：显式 light、显式 dark、以及
+ *    什么都不盖的「跟随系统」——最后一种最常见，所以 `:root` 里必须给全浅色。
+ *    颜色只在 [data-theme] 或 media 块里定义，正是那种「一个主题的文字配另一个
+ *    主题的底」的经典 bug。
+ *
+ * 主题分两套语义色，对应两个「宇宙」：--ns 是 mapping 的整数纳秒，--s 是 modeling
+ * 的浮点秒。它们全程不混用，因为混用就等于宣称了一个只在逐算子层面建立的等价。
+ */
+
+:root {
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+  --surface-3: #e3e8f0;
+  --line: #d3dae4;
+  --line-2: #bcc6d4;
+  --ink: #151a22;
+  --ink-2: #4b5666;
+  --ink-3: #78849a;
+  --accent: #0b62c4;
+  --accent-soft: #dce9fa;
+  --ns: #a55a05;
+  --ns-soft: #fbeed8;
+  --s: #0b6b82;
+  --s-soft: #d9eef3;
+  --ok: #146c37;
+  --ok-soft: #d9f0e1;
+  --warn: #96620a;
+  --warn-soft: #fbeed8;
+  --bad: #b3261e;
+  --bad-soft: #fbe2e0;
+  --ready: #0b62c4;
+  --reserved: #a55a05;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 12px rgba(16, 24, 40, .05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1218;
+    --surface: #151b24;
+    --surface-2: #1c242f;
+    --surface-3: #253040;
+    --line: #2b3646;
+    --line-2: #3c4a5e;
+    --ink: #e4eaf2;
+    --ink-2: #a2aec0;
+    --ink-3: #6d7a8f;
+    --accent: #4c9ff0;
+    --accent-soft: #16304d;
+    --ns: #eda23f;
+    --ns-soft: #3a2c14;
+    --s: #3bb6d2;
+    --s-soft: #10333c;
+    --ok: #4ec97f;
+    --ok-soft: #14301f;
+    --warn: #e0a63a;
+    --warn-soft: #33280f;
+    --bad: #f2796f;
+    --bad-soft: #3a1a18;
+    --ready: #4c9ff0;
+    --reserved: #eda23f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1218;
+  --surface: #151b24;
+  --surface-2: #1c242f;
+  --surface-3: #253040;
+  --line: #2b3646;
+  --line-2: #3c4a5e;
+  --ink: #e4eaf2;
+  --ink-2: #a2aec0;
+  --ink-3: #6d7a8f;
+  --accent: #4c9ff0;
+  --accent-soft: #16304d;
+  --ns: #eda23f;
+  --ns-soft: #3a2c14;
+  --s: #3bb6d2;
+  --s-soft: #10333c;
+  --ok: #4ec97f;
+  --ok-soft: #14301f;
+  --warn: #e0a63a;
+  --warn-soft: #33280f;
+  --bad: #f2796f;
+  --bad-soft: #3a1a18;
+  --ready: #4c9ff0;
+  --reserved: #eda23f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  padding-block: 0 0;
+}
+
+.mono, output, code, kbd {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", "SF Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3 { margin: 0; text-wrap: balance; font-weight: 600; }
+h1 { font-size: 17px; letter-spacing: -.01em; }
+h2 { font-size: 14px; }
+p { margin: 0; }
+
+/* ---------- 顶栏 ---------- */
+
+.bar {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.ident { min-width: 0; }
+.ident .sub { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; }
+#scenario-path { font-size: 12px; color: var(--ink-3); word-break: break-all; }
+
+/* 「换计算图」那一格。它挨着这份载荷的名字站，因为它是这一屏上唯一一个**换掉整份载荷**
+   的入口——放在参数页里就成了「一个旋钮」，而它换的是整张图。
+   只有一份可换时整格收起来。``hidden`` 在这里**必须配一条 ``[hidden]`` 规则**，和
+   ``.pane[hidden]`` 同一个道理：这个文件里一旦给某个选择器写了 ``display``，浏览器默认的
+   ``[hidden]{display:none}`` 就压不过它，``hidden`` 会变成一句谎话（本文件已经因此吃过一次
+   亏，见 ``.pane[hidden]`` 上面那段）。 */
+.pick {
+  display: flex; align-items: center; gap: 6px; margin-top: 4px;
+  font-size: 11px; color: var(--ink-3); letter-spacing: .02em;
+}
+.pick[hidden] { display: none; }
+.pick select {
+  font: inherit; font-size: 12px; padding: 2px 5px; max-width: 100%;
+  border-radius: 5px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+}
+.pick select:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.pick select:disabled { color: var(--ink-3); cursor: not-allowed; }
+
+.badge {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  background: var(--surface-2); color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.badge.live    { background: var(--s-soft);   color: var(--s);   border-color: transparent; }
+.badge.snapshot{ background: var(--warn-soft);color: var(--warn);border-color: transparent; }
+.badge.ok      { background: var(--ok-soft);  color: var(--ok);  border-color: transparent; }
+.badge.warn    { background: var(--warn-soft);color: var(--warn);border-color: transparent; }
+.badge.bad     { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+
+.headline { display: flex; gap: 22px; margin: 0; flex-wrap: wrap; }
+.headline div { display: flex; flex-direction: column; gap: 1px; }
+.headline dt { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); cursor: help; }
+.headline dd { margin: 0; font-size: 16px; font-weight: 600; }
+.headline dd .unit { font-size: 11px; font-weight: 500; color: var(--ink-3); margin-left: 2px; }
+.headline .delta { font-size: 11px; font-weight: 600; }
+.headline .delta.up   { color: var(--bad); }
+.headline .delta.down { color: var(--ok); }
+
+/* ---------- 跳转条 ---------- */
+
+.tabs {
+  display: flex; gap: 2px; padding: 0 18px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.tab {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 7px 13px 8px; font: inherit; font-size: 13px; font-weight: 500;
+  color: var(--ink-3); border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tab:hover { color: var(--ink); }
+/* 高亮跟着**滚动位置**走（aria-current），不跟着「最后点了谁」——这一栏是跳转条不是标签页，
+   五块屏同时在场，所以「哪一屏是当前」只可能由视口回答。 */
+.tab[aria-current="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 副标题：这一屏属于哪一侧。字要小到不抢标题，但要读得出来——它存在的理由就是
+   「一排名词看不出在说谁」。选中时跟着变蓝，否则整条标签只有上半截是活的。 */
+.tab .tab-name { line-height: 1.25; }
+.tab .tab-scope { font-size: 10.5px; font-weight: 500; line-height: 1.2; color: var(--ink-3); }
+.tab[aria-current="true"] .tab-scope { color: var(--accent); }
+.tab:hover .tab-scope { color: var(--ink-2); }
+
+/* ---------- 主区 ---------- */
+
+main {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px; padding: 14px 18px; align-items: start;
+}
+@media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.pane {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px; display: flex; flex-direction: column; gap: 11px;
+  box-shadow: var(--shadow);
+  /* 跳转条的落点。底部那条走带是 fixed 的，所以顶层还要多让一条 —— 否则跳到最后一屏
+     时它的下半截会永远压在走带底下。 */
+  scroll-margin-top: 12px; scroll-margin-bottom: 76px;
+}
+.pane-head { display: flex; flex-direction: column; gap: 2px; }
+.pane-head .hint { font-size: 12px; color: var(--ink-3); }
+/* 屏不再靠 ``hidden`` 切换（五块常驻），但这条规则必须留着：``.pane`` 是 ``display:flex``，
+   而浏览器默认的 ``[hidden]{display:none}`` 特异性更低（同是一个类，谁在后谁赢）——
+   所以本文件里 ``hidden`` 曾经是**失效**的，五块屏一直并排、其中四块空着，正是「第一次
+   打开很鸡肋」的来源。写在这里就是让 ``hidden`` 以后是真话。 */
+.pane[hidden] { display: none; }
+
+.banner {
+  border-radius: 8px; padding: 9px 12px; font-size: 12.5px;
+  background: var(--bad-soft); color: var(--bad);
+  border: 1px solid transparent; font-weight: 500;
+}
+.banner.info { background: var(--s-soft); color: var(--s); }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
+
+.canvas-wrap { overflow-x: auto; }
+.canvas-wrap.tall { max-height: 62vh; overflow: auto; }
+.canvas-wrap svg { display: block; max-width: 100%; height: auto; }
+/* 时间线那三张图上下叠着，各自的标注又都贴着自家画布的边（甘特图底下一行时刻、显存曲线上头
+   「容量 xxx」）——只靠 ``.pane`` 的 11px 间距，上下的字会挤成一片。只给同一块屏里**相邻**的
+   两张图加，屏头与第一张图之间不加（那里本来就不挤）。 */
+#pane-timeline .canvas-wrap + .canvas-wrap { margin-top: 10px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+/* 边的图例：一根横线而不是方块，形状本身就说明「这是条线」。三条要和 svg 里的画法逐项对上，
+   否则图例就成了另一种意义上的「意义不明」。 */
+.legend i.edge { width: 22px; height: 0; border-radius: 0; border-top: 1.3px solid var(--ink-3); }
+.legend i.edge.weight { border-top-width: 1.9px; border-color: var(--ns); }
+.legend i.edge.out { border-top-width: 1.9px; border-color: var(--accent); }
+
+/* 搜索树的命中圈：可见圆点只有 r=3，点不中。透明圈接点击。
+   ``fill: transparent`` 而不是 ``none``——SVG 的 ``pointer-events`` 默认是
+   ``visiblePainted``，``fill:none`` 根本不算被画过，收不到事件。 */
+.tree-hit { fill: transparent; cursor: pointer; }
+.tree-hit:hover { fill: var(--accent-soft); fill-opacity: .75; }
+
+/* 「从这一步出发被拒的候选」。默认收起：理由经常十几条，展开着会把时间线顶下去。 */
+.refused {
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2);
+  padding: 8px 11px; font-size: 12.5px;
+}
+.refused > summary { cursor: pointer; color: var(--ink-2); font-weight: 500; }
+.refused > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.refused-list { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; }
+.refused-list > div {
+  display: grid; grid-template-columns: 34px minmax(56px, auto) minmax(0, 1fr);
+  gap: 8px; align-items: baseline;
+}
+.refused-list .kind { font-size: 10.5px; font-weight: 700; color: var(--bad); }
+.refused-list .mono { font-size: 11.5px; color: var(--ink); }
+.refused-list .why { color: var(--ink-2); }
+
+/* ---------- 检查器 ---------- */
+
+.inspector {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 13px; box-shadow: var(--shadow);
+  position: sticky; top: 14px; display: flex; flex-direction: column; gap: 11px;
+  max-height: calc(100vh - 28px); overflow-y: auto;
+}
+.inspector h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink-3); font-weight: 600;
+}
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.5px; }
+.kv dt { color: var(--ink-3); }
+.kv dd { margin: 0; text-align: right; font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font-size: 11px; padding: 1.5px 6px; border-radius: 4px;
+  background: var(--surface-2); color: var(--ink-2);
+  border: 1px solid var(--line); font-family: ui-monospace, Consolas, monospace;
+}
+.chip.ready    { background: var(--accent-soft); color: var(--ready);    border-color: transparent; }
+.chip.reserved { background: var(--ns-soft);     color: var(--reserved); border-color: transparent; }
+.chip.done     { background: var(--ok-soft);     color: var(--ok);       border-color: transparent; }
+.chip.running  { background: var(--ns-soft);     color: var(--ns);       border-color: transparent; font-weight: 600; }
+
+/* ---------- 底部走带 ---------- */
+
+.transport {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+  padding: 9px 18px calc(9px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.modes { display: flex; gap: 2px; background: var(--surface-2); padding: 2px; border-radius: 6px; }
+.mode {
+  appearance: none; border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: 12px; padding: 4px 10px; border-radius: 4px; color: var(--ink-2);
+}
+.mode[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
+
+.scrub { display: flex; align-items: center; gap: 7px; }
+.scrub button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12px;
+  width: 28px; height: 26px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+}
+.scrub button:hover { border-color: var(--line-2); }
+.scrub button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#scrub { width: clamp(90px, 22vw, 260px); accent-color: var(--accent); }
+#step-label { font-size: 12px; color: var(--ink-2); min-width: 92px; }
+
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+
+/* 动作按钮：合法/非法两种形态，非法的一律可点开看理由但不可执行 */
+.act {
+  appearance: none; cursor: pointer; font: inherit;
+  font-size: 11.5px; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.act .kind { font-size: 9.5px; letter-spacing: .04em; color: var(--ink-3); }
+.act:hover { border-color: var(--accent); }
+.act:disabled { cursor: not-allowed; opacity: .5; border-style: dashed; }
+.act.planned { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.act.taken   { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- 表格 ---------- */
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 5px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+td.num, th.num { text-align: right; font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
+tr.off td { color: var(--ink-3); }
+tbody tr:hover { background: var(--surface-2); }
+.agree  { color: var(--ok); }
+.disagree { color: var(--bad); font-weight: 600; }
+
+/* ---------- 成本桥 ---------- */
+
+.gate {
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  background: var(--surface); box-shadow: var(--shadow);
+}
+.gate-head {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line);
+}
+.gate-head h3 { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.gate-num {
+  font-family: ui-monospace, Consolas, monospace; font-size: 11px; font-weight: 700;
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: var(--surface); flex: none;
+}
+.gate.done .gate-num { background: var(--ok); }
+.gate.blocked .gate-num { background: var(--bad); }
+.gate-body { padding: 11px 12px; display: flex; flex-direction: column; gap: 9px; }
+
+.reason {
+  font-family: ui-monospace, Consolas, monospace; font-size: 11.5px;
+  background: var(--surface-2); border-left: 3px solid var(--bad);
+  padding: 8px 10px; border-radius: 0 5px 5px 0; white-space: pre-wrap; word-break: break-word;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.reason.unsupported { border-left-color: var(--warn); }
+.reason.invalid     { border-left-color: var(--bad); }
+.reason.value       { border-left-color: var(--accent); }
+/* 配置没载入：最实打实的一种坏——不是「某项没迁移」，是这一屏的输入根本不在。写出来而不是
+   靠 .reason 的默认色，默认值将来一改就变成「看着像没事」。 */
+.reason.config      { border-left-color: var(--bad); }
+
+.toggle {
+  display: flex; align-items: center; gap: 9px; padding: 5px 7px;
+  border-radius: 5px; font-size: 12.5px; cursor: pointer; border: 0; background: none;
+  width: 100%; text-align: left; font-family: inherit; color: inherit;
+}
+.toggle:hover { background: var(--surface-2); }
+.toggle:disabled { cursor: not-allowed; opacity: .65; }
+.toggle .box {
+  width: 14px; height: 14px; border-radius: 3px; flex: none;
+  border: 1.5px solid var(--line-2); display: grid; place-items: center;
+  font-size: 10px; color: var(--surface); background: var(--bad);
+}
+.toggle.done .box { background: var(--ok); }
+.toggle .field { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-2); }
+.toggle.done .label { text-decoration: line-through; color: var(--ink-3); }
+
+.note {
+  font-size: 12px; color: var(--ink-2); background: var(--surface-2);
+  padding: 8px 10px; border-radius: 5px; border-left: 3px solid var(--accent);
+}
+.note strong { color: var(--ink); }
+
+/* ---------- 参数表单 ---------- */
+
+.knobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 11px; }
+.knob { display: flex; flex-direction: column; gap: 3px; }
+.knob label { font-size: 11.5px; color: var(--ink-2); }
+.knob .field { font-family: ui-monospace, Consolas, monospace; font-size: 10px; color: var(--ink-3); }
+.knob input[type="number"], .knob input[type="text"], .knob select {
+  font: inherit; font-size: 12.5px; padding: 5px 7px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums;
+}
+.knob input:focus-visible, .knob select:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.knob .check { display: flex; align-items: center; gap: 7px; font-size: 12.5px; padding-top: 4px; }
+
+.run-row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.run {
+  appearance: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  padding: 7px 15px; border-radius: 6px; border: 0;
+  background: var(--accent); color: #fff;
+}
+.run:hover { filter: brightness(1.08); }
+.run:disabled { cursor: not-allowed; opacity: .5; }
+.run.ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+.run:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.diff { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 11px; }
+.diff div { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.diff .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }
+.diff .v { font-family: ui-monospace, Consolas, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.diff .b { font-size: 11px; color: var(--ink-3); font-family: ui-monospace, Consolas, monospace; }
+
+.empty { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
+
+/* ---------- SVG 里的通用类 ---------- */
+
+.node-label { font-size: 11px; fill: var(--ink); font-family: ui-monospace, Consolas, monospace; }
+.node-sub   { font-size: 9.5px; fill: var(--ink-3); font-family: ui-monospace, Consolas, monospace; }
+.node-box   { fill: var(--surface-2); stroke: var(--line-2); }
+.grid-line  { stroke: var(--line); }
+.cut-edge   { stroke: var(--line-2); stroke-dasharray: 2 3; fill: none; }
+.solution   { stroke: var(--ok); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
