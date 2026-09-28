@@ -1,0 +1,175 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-spill",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance G: h = relu(x); b = W*z; y = h + b, so h stays live across an unrelated matvec"
+  },
+  "comment": "M1_ACCEPTANCE.md 8. h is produced first and consumed last, with a matvec in between that needs the whole DRAM budget on its own; the only way through is to snapshot h to the SSD, drop it, and read it back. The relu intermediate is a stand-in for a long-lived activation, not a claim about KV state.",
+  "tensors": [
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "z",
+      "name": "inp_pos",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "W",
+      "name": "blk.0.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        64,
+        64
+      ],
+      "storage_bytes": 64,
+      "initial_locations": [
+        "ssd"
+      ]
+    },
+    {
+      "id": "h",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "b",
+      "name": "blk.0.attn_out",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": [
+        "x"
+      ],
+      "output": "h"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W",
+        "z"
+      ],
+      "output": "b"
+    },
+    {
+      "id": "c3",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "h",
+        "b"
+      ],
+      "output": "y"
+    }
+  ],
+  "outputs": [
+    "y"
+  ]
+}

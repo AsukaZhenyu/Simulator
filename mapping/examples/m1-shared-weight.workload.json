@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-shared-weight",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance 8 (recovery): a = W*x; b = W*z; y = a + b, one weight used by two operations"
+  },
+  "comment": "M1_ACCEPTANCE.md 8 asks for a shared weight whose DRAM cache is released and then re-read from SSD. One weight with two consumers is the smallest graph where releasing it is legal at all -- with a single consumer the release would only ever be legal after that consumer is done, which is a different case.",
+  "tensors": [
+    {
+      "id": "W",
+      "name": "blk.0.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["ssd"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "z",
+      "name": "inp_pos",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "a",
+      "name": "blk.0.attn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "b",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W", "x"],
+      "output": "a"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W", "z"],
+      "output": "b"
+    },
+    {
+      "id": "add",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["a", "b"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

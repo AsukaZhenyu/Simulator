@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-c-two-outputs",
+  "workload_file": "m1-two-outputs.workload.json",
+  "comment": "M1_ACCEPTANCE.md 4, second half. a is asked for in VRAM and b in DRAM, so the two outputs have different delivery targets. The optimum is 6 ms and needs the two PCIe moves to queue rather than overlap: one shared slot, and both sit on the critical path.",
+  "architecture": {
+    "dram_capacity_bytes": 256,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"a": "vram", "b": "dram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "ca": {
+        "gpu": {"duration_ns": 1000000, "workspace_bytes": 0}
+      },
+      "cb": {
+        "cpu": {"duration_ns": 1000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {"u": {"duration_ns": 3000000}},
+      "vram_to_dram": {"v": {"duration_ns": 2000000}},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"ca": ["gpu"], "cb": ["cpu"]},
+    "allowed_transfers": {
+      "dram_to_vram": ["u"],
+      "vram_to_dram": ["v"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

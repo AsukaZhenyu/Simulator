@@ -537,6 +537,18 @@ export function collect(root) {
   return out;
 }
 
+/** 字节数的写法，**故意与 `app.js` 的 `fmtBytes` 各写一份**。
+ *  `app.js` 那份决定**画成什么**，这份决定**该不该是那个**——合成一份就是自己验自己。
+ *  两份同时改错才会一起放过，而它们在不同的文件里、由不同的网盯着。 */
+export function fmtBytes(b) {
+  if (b == null) return '—';
+  const n = Number(b);
+  if (!isFinite(n)) return '—';
+  if (n >= 1024 * 1024) return (n / 1048576).toFixed(2) + ' MiB';
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KiB';
+  return n + ' B';
+}
+
 /** 扫整棵子树：任何属性值或文字里出现 `NaN` 就是失败。
  *  这是**通用网**——不针对某个坐标写断言，将来任何一处算错都会落在这里。 */
 export function scanNaN(document) {
@@ -878,6 +890,12 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   // 「先后」从**载荷的动作表**现推（第 i 步出现的实体），不读画出来的东西：图上没有别的地方
   // 写着谁先谁后，能读的只有这个，而它正是排布该服从的东西。开局就在显存里的记 −1（最上）。
   const actions = (payload.solution && payload.solution.actions) || [];
+  // 只有「被搬进来」（``COPY_H2D``）与「被算出来」（``COMPUTE``）算这一步碰到的东西。
+  // **0.2 的 ``COPY`` / ``READ_SSD`` / ``WRITE_SSD`` 不补进来，是判过之后不留的**：这三样搬的
+  // 都是**已经在某个域里**的张量，所以它必然在下一支里已经有落脚点。补进来不会「多认一个」，
+  // 只会把下面那支**盖掉**——开局就在 DRAM 的权重变成「第 i 步才到位」，排在它前面的
+  // ``when[...] != null`` 会先截住它。那不是补漏，是换判据，而换完这一列的顺序约束就既不由
+  // 「加载先后」定、也不由「开局在哪」定，两头都测不出来了。留一份、说清留的是哪一份。
   const when = {};
   actions.forEach((action, index) => {
     const target = action.kind === 'COPY_H2D' ? action.tensor_id
@@ -886,12 +904,22 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   });
   const producedBy = {};
   for (const link of graph.links) if (link.kind === 'output') producedBy[link.to] = link.from;
+  // 「开局就在那儿」的判据要**分版本**，这不是将就：
+  //   · 0.1 里 ``initial_locations = ["dram"]`` 对权重意味着「在主机上」，而 0.1 的设备读不了
+  //     主机内存——所以权重不算到位，必须有 ``COPY_H2D``（没有就是 1000）；非权重（输入）在
+  //     ``["vram"]`` 里才算到位（``chain-cap160`` 的 ``x``）。
+  //   · 0.2 里 CPU 计算**直接读 DRAM**，所以「开局有落点」就是到位，权重与非权重一个算法。
+  //     ``m1-a-cpu6`` 的 ``W`` 正是这样：``initial_locations=["dram"]``、整条计划里零搬运，
+  //     与同样在 DRAM 开局的 ``x`` 是**同时**就位的（两个都是 −1，相等不构成先后约束）。
+  //     旧写法把 ``W`` 判成 1000，于是它被排到 ``x`` 下面——红在这条上，改的是判据不是画法。
+  const startsInPlace = entity =>
+    (entity.initial_locations || []).length > 0 && (!entity.is_weight || !!payload.m1);
   const firstSeen = {};
   for (const entity of graph.tensors.concat(graph.operations)) {
     if (when[entity.id] != null) firstSeen[entity.id] = when[entity.id];
     else if (producedBy[entity.id] != null && when[producedBy[entity.id]] != null) {
       firstSeen[entity.id] = when[producedBy[entity.id]];
-    } else if ((entity.initial_locations || []) && !entity.is_weight) firstSeen[entity.id] = -1;
+    } else if (startsInPlace(entity)) firstSeen[entity.id] = -1;
     else firstSeen[entity.id] = 1000;
   }
   // 比的是**被加载进来的那些张量**（每张图的输入与权重），不比算子和激活：算子的行由
@@ -992,15 +1020,112 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   // 甘特与状态时间线也**卡相等**。`> 0` 在「画了一根柱子就停」的版本里照样过。
   // 首帧是回放模式，所以 `currentEvents()` 就是 `payload.log.events`——正是内核给的计划，
   // 不必在垫片里重算一遍走查（那会变成自己给自己出题）。
-  const bars = document.getElementById('gantt-svg').querySelectorAll('rect')
-    .filter(rect => rect.hasAttribute('stroke')).length;
-  const laneEvents = payload.log.events
-    .filter(event => event.resource === 'h2d_copy' || event.resource === 'gpu_compute').length;
-  report.check(tag + '甘特柱数 == 有 resource 的事件数', bars === laneEvents,
-    bars + ' vs ' + laneEvents);
+  //
+  // **泳道名单从载荷来**，不写死：0.2 的四条资源在 `payload.m1.resources` 里（屏上的泳道与
+  // 产物里的槽位因此是同一份名单），0.1 没有那一块，退回它唯一的两条。写死两条的版本在 0.2
+  // 上会把「PCIe 与 SSD 的柱子一根都不画」判成通过——它们的 resource 不在那个过滤条件里。
+  const laneKeys = payload.m1
+    ? payload.m1.resources.map(resource => resource.id)
+    : ['h2d_copy', 'gpu_compute'];
+  const laneBars = document.getElementById('gantt-svg').querySelectorAll('rect')
+    .filter(rect => rect.hasAttribute('stroke'));
+  const laneEvents = payload.log.events.filter(event => laneKeys.indexOf(event.resource) >= 0);
+  report.check(tag + '甘特柱数 == 有 resource 的事件数', laneBars.length === laneEvents.length,
+    laneBars.length + ' vs ' + laneEvents.length);
+
+  // 逐根核对：每根柱子上的四个数据戳就是它自己的读数（`start`/`end`/`kind`/`target`），
+  // 与载荷里那个事件**逐字**对上才算认领回来。总数相等会漏掉「两根柱子的时长互换了」这类错，
+  // 而「柱子的起止 == 内核报的起止」正是这一屏唯一要保证的事（前端不许自己算时长）。
+  const barStamps = laneBars.map(bar => [
+    bar.dataset.kind, bar.dataset.target, bar.dataset.nsStart, bar.dataset.nsEnd,
+  ].join('|')).sort();
+  const eventStamps = laneEvents.map(event => [
+    event.kind, event.target_id == null ? '' : String(event.target_id),
+    String(event.start_ns == null ? event.t_ns : event.start_ns),
+    String(event.end_ns == null ? event.t_ns : event.end_ns),
+  ].join('|')).sort();
+  const mismatched = barStamps.filter((stamp, index) => stamp !== eventStamps[index]);
+  report.check(tag + '每根甘特柱的起止/动作/目标都 == 载荷里那个事件（前端没自己算时长）',
+    barStamps.length === eventStamps.length && mismatched.length === 0,
+    mismatched.length
+      ? '对不上 ' + mismatched.length + ' 根，例如 屏上=' + mismatched.slice(0, 3).join('　') +
+        '　载荷=' + eventStamps.filter(stamp => mismatched.indexOf(stamp) < 0).slice(0, 3).join('　')
+      : laneBars.length + ' 根逐根对上');
+
+  // 泳道本身：**条数与载荷里的资源数相等**，且每条泳道恰好一个底板。
+  const laneRects = document.getElementById('gantt-svg').querySelectorAll('rect')
+    .filter(rect => !rect.hasAttribute('stroke'));
+  report.check(tag + '甘特泳道数 == 载荷里的资源数', laneRects.length === laneKeys.length,
+    laneRects.length + ' vs ' + laneKeys.length + '（' + laneKeys.join(',') + '）');
+  // 泳道名：左边那一列每一条都得有字。
+  // 条数是**资源数 + 1**——多出来的那条是画在最下面的「释放/推进」细带，它也是这一列的
+  // 一条标签。所以这里不是「恰好等于资源数」，而是「资源那几条一条不少、且一个字都不是空的」。
+  //
+  // **左列要靠 x 认，不能只靠 `text-anchor`**：末尾那个时间轴刻度（「8 ms」）也是
+  // `text-anchor="end"`，它贴在绘图区**右沿**（x = padL + plotW）。只按 anchor 筛就会把它
+  // 当成一条泳道，计数变成「资源 + 2」，验的是个假的数（第一版就是这么写的，红在这条上）。
+  // 判据换成「这一列里 x 最小的那些」——左列的 x 比右沿小一个绘图区宽，两者不会撞上。
+  const endAnchored = collect(document.getElementById('gantt-svg'))
+    .filter(el => el.tagName === 'text' && el.getAttribute('text-anchor') === 'end');
+  const labelLeft = Math.min(...endAnchored.map(el => Number(el.getAttribute('x'))));
+  const labelColumn = endAnchored
+    .filter(el => Number(el.getAttribute('x')) === labelLeft)
+    .map(el => String(el.textContent));
+  report.check(tag + '甘特左边那一列的每一条泳道都有名字',
+    labelColumn.length === laneKeys.length + 1 && labelColumn.every(text => text.trim().length > 0),
+    labelColumn.length + ' 条（资源 ' + laneKeys.length + ' + 释放/推进 1）：' + labelColumn.join(' / '));
+
+  // ---- 0.2 才有的两件事：**SSD 是一条泳道但两个方向**，以及「没有第三条容量曲线」。
+  if (payload.m1) {
+    const ssdBars = laneBars.filter(bar => bar.dataset.resource === 'ssd_io');
+    const ssdEvents = laneEvents.filter(event => event.resource === 'ssd_io');
+    // 「一条泳道」要连**柱数**一起说，否则它只数标签：把 SSD 那一条 `flatMap` 成两条同名泳道，
+    // 屏上就多出一列「SSD 写」，读/写各自成了「一台设备」——这是要抓的那个 bug 本身。
+    // 柱数那一半**留在这里、不留给方向网**：一张网一个活。方向网也带上它就变成「泳道拆开」
+    // 一次红四张（泳道名、柱数、方向、事件对不上），那时它抓到的到底是哪一个就说不清了。
+    const ssdLanes = labelColumn.filter(text => text.indexOf('SSD') >= 0);
+    report.check(tag + 'SSD 只有一条泳道（读/写不分家，一次 SSD 访问一根柱）',
+      ssdLanes.length === 1 && ssdBars.length === ssdEvents.length,
+      ssdLanes.length + ' 条泳道：' + ssdLanes.join(' / ') +
+      '，柱 ' + ssdBars.length + ' 根 / 事件 ' + ssdEvents.length + ' 个');
+    // 方向由柱子自己说，**两处都要说**：`<title>` 里的 `src → dst`（鼠标停上去才看得到），
+    // 以及看得见的那两样——读实线 / 写虚线、文字前面挂 ↓ / ↑。只验 title 不够：把
+    // `ssdDirection` 的两个方向改成同一个，屏上就分不出读写了，而 title 还是对的。
+    //
+    // **虚线那一条要等游标走完再看**（放在下面单步那一帧）：还没走到的柱一律是「未到达」的
+    // `3 2`，与读/写无关——在这里顺带验就成了验游标。箭头与 title 两态都在，所以留在这。
+    const titleOf = bar => {
+      const title = collect(bar).filter(el => el.tagName === 'title')[0];
+      return title ? String(title.textContent) : '';
+    };
+    const arrowOf = bar => {
+      const barX = Number(bar.getAttribute('x'));
+      const barRight = barX + Number(bar.getAttribute('width'));
+      const barY = Number(bar.getAttribute('y'));
+      // **必须连 y 一起认。** 泳道共用同一条横轴，所以另一个泳道里同一时间段的柱子，它的
+      // 居中标签 x 与这一根一样——只按 x 找就会认到别人家的标签，读出个 `c1` 的头一个字
+      // （第一版就是这样，「箭头=c」）。标签贴在**这一根**的下沿：`y + barH`。
+      const label = collect(document.getElementById('gantt-svg')).filter(el =>
+        el.tagName === 'text' && el.getAttribute('text-anchor') === 'middle' &&
+        Number(el.getAttribute('y')) === barY + 15 &&
+        Number(el.getAttribute('x')) > barX && Number(el.getAttribute('x')) < barRight + 1)[0];
+      return label ? String(label.textContent).trim().charAt(0) : '';
+    };
+    const wrongWay = ssdBars.filter(bar => {
+      const reading = bar.dataset.kind === 'READ_SSD';
+      return titleOf(bar).indexOf(reading ? 'ssd → dram' : 'dram → ssd') < 0
+        || arrowOf(bar) !== (reading ? '↓' : '↑');
+    });
+    report.check(tag + 'SSD 泳道里的每根柱都写明了读/写方向（读 ssd→dram 挂 ↓，写 dram→ssd 挂 ↑）',
+      wrongWay.length === 0,
+      ssdBars.length + ' 根柱，认不出方向的 ' + wrongWay.length + ' 根' +
+      (wrongWay.length ? '：' + wrongWay.slice(0, 2).map(bar =>
+        titleOf(bar).replace(/\n/g, ' ') + '｜箭头=' + (arrowOf(bar) || '无')).join('　') : ''));
+  }
   const rows = document.getElementById('states-svg').querySelectorAll('rect').length;
   report.check(tag + '状态时间线行数 == log.states.length', rows === payload.log.states.length,
     rows + ' vs ' + payload.log.states.length);
+
 
   // ---- 时间线那三张图的**文字**。两条性质，都是用户看出来的，都不是计数能抓的。
   //
@@ -1013,7 +1138,7 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   // 而 `style.css` 里没有任何规则改过 SVG 文字的字号。
   const EDGE_TOP = 12, EDGE_BOTTOM = 4;
   const pinned = [];
-  for (const id of ['gantt-svg', 'vram-svg', 'states-svg']) {
+  for (const id of ['gantt-svg', 'vram-svg', 'dram-svg', 'states-svg']) {
     const svg = document.getElementById(id);
     const h = Number(svg.getAttribute('height'));
     for (const text of collect(svg).filter(el => el.tagName === 'text')) {
@@ -1082,6 +1207,90 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   const vram = document.getElementById('vram-svg');
   report.check(tag + '#vram-svg 非空', !!vram && vram.childNodes.length > 0,
     vram ? vram.childNodes.length + ' 个子节点' : '找不到元素');
+
+  // ---- 容量曲线：**显存一条，0.2 再加内存一条，SSD 一条都不画**。
+  // 这三句都要验，因为漏掉任何一句都会长成同一类错误：把 SSD 也画成一条有上限的曲线，
+  // 屏幕上就凭空多出一个「SSD 容量」，而它在这个模型里根本不存在（`used_bytes` 的文档）。
+  const dramWrap = document.getElementById('dram-wrap');
+  const dram = document.getElementById('dram-svg');
+  report.check(tag + '内存容量曲线只有 0.2 才露出来', !!dramWrap && dramWrap.hidden === !payload.m1,
+    dramWrap ? 'hidden=' + dramWrap.hidden + ' m1=' + !!payload.m1 : '找不到 #dram-wrap');
+  if (payload.m1) {
+    report.check(tag + '#dram-svg 非空（0.2 有内存这本账）',
+      !!dram && dram.childNodes.length > 0,
+      dram ? dram.childNodes.length + ' 个子节点' : '找不到元素');
+  }
+  {
+    const states = payload.log.states;
+    const limits = payload.source.limits || {};
+    // 横轴的换算基准，与 `app.js` 同一句：`makespan = max(1, solution.makespan_ns || 1)`。
+    const makespan = Math.max(1, payload.solution.makespan_ns || 1);
+    // **每个折点都得落在账本算出来的地方。** 这条网把「里面画的是不是那本账」验到底：
+    // 自己按几何反算每个状态应有的 `(x, y)`，与画出来那条浅色全程线的 `d` 逐个比。
+    //
+    // 为什么不看顶上一格（当初写的就是那个）：`peak = max(上限, 用到的最大值, 1)`，而账本
+    // **永远不可能超过上限**（容量就是个约束），所以有上限时顶上那一格恒等于上限——账本换错
+    // 一行它照样是绿的。那条网在证伪里因此一直不变红，是装饰。几何反算才咬得住。
+    //
+    // 几何常量与 `app.js` 的 `drawMemoryCurve` **各写一份**：那份决定画在哪，这份决定画得对不对。
+    // 0.1 只有显存那一本账（`#dram-svg` 整格是空的），所以这一栏本身也分版本。
+    const curves = [
+      { id: 'vram-svg', usedOf: state => state.used_vram_bytes, limit: limits.vram_capacity_bytes },
+    ];
+    if (payload.m1) {
+      curves.push({ id: 'dram-svg', usedOf: state => state.used_dram_bytes, limit: limits.dram_capacity_bytes });
+    }
+    const offCurve = [];
+    // 无解那两份载荷的 `states` 是空的（`log.states` 与 `log.events` 都是 0 条），折线退化成
+    // 一句光秃秃的 `M `——**没有折点可对**。这不是「验过了」，所以不装成通过也不当成失败：
+    // 空账本这一支与「每块屏都要有画出来的东西」那条断言是两回事。
+    const curvesToCheck = states.length ? curves : [];
+    for (const curve of curvesToCheck) {
+      const svg = document.getElementById(curve.id);
+      const faint = collect(svg).filter(el => el.tagName === 'path')[0];
+      if (!faint) { offCurve.push('#' + curve.id + ' 没有那条全程折线'); continue; }
+      const vpadL = 78, vplotW = 900 - 78 - 18, vpadT = 26, vplotH = 170 - 26 - 22;
+      const peak = Math.max(curve.limit || 0, ...states.map(s => curve.usedOf(s) || 0), 1);
+      const drawn = String(faint.getAttribute('d')).replace(/^M\s*/, '').split(/\s*L\s*/)
+        .map(pair => pair.trim().split(/\s+/).map(Number));
+      if (drawn.length !== states.length) {
+        offCurve.push('#' + curve.id + ' 折点 ' + drawn.length + ' 个，状态 ' + states.length + ' 条');
+        continue;
+      }
+      states.forEach((state, index) => {
+        const wantX = vpadL + (state.t_ns / makespan) * vplotW;
+        const wantY = vpadT + vplotH - ((curve.usedOf(state) || 0) / peak) * vplotH;
+        const [gotX, gotY] = drawn[index];
+        if (Math.abs(gotX - wantX) > 0.01 || Math.abs(gotY - wantY) > 0.01) {
+          offCurve.push('#' + curve.id + ' 第 ' + index + ' 个状态（' + state.t_ns + ' ns，' +
+            (curve.usedOf(state) || 0) + ' B）画在 (' + gotX.toFixed(1) + ',' + gotY.toFixed(1) +
+            ')，账本算出来是 (' + wantX.toFixed(1) + ',' + wantY.toFixed(1) + ')');
+        }
+      });
+    }
+    report.check(tag + '两条容量曲线的每个折点都落在账本算出来的坐标上（显存那条对显存账、内存那条对内存账）',
+      offCurve.length === 0, offCurve.slice(0, 3).join('　'));
+
+    const capacityLine = collect(dram).filter(el => el.tagName === 'text')
+      .map(el => String(el.textContent)).filter(text => text.indexOf('容量') >= 0);
+    const dramLimit = limits.dram_capacity_bytes;
+    report.check(tag + '内存曲线上的容量标注 == limits 里那个数',
+      dramLimit == null
+        ? capacityLine.length === 0
+        : capacityLine.length === 1 && capacityLine[0] === '容量 ' + fmtBytes(dramLimit),
+      'limits.dram_capacity_bytes=' + dramLimit + '，标注=' + capacityLine.join(' / '));
+  }
+  // SSD 那条**不能有**：§11 明说 SSD 不画成一条有容量上限的存储曲线——它在这个模型里
+  // 根本没有容量（``used_ssd_bytes`` 不存在）。判据扫**整块时间线屏**，不只扫两块画布：
+  // 曲线也可以长成第三格画布＋它自己那行 `.curve-name`，只扫 SVG 就漏掉一半。
+  const timelinePane = document.querySelector('.pane[data-pane="timeline"]');
+  const ssdLike = collect(timelinePane)
+    .filter(el => (el.tagName === 'text' || el.tagName === 'P') &&
+      /SSD\s*容量|容量[^。]{0,6}SSD/.test(String(el.textContent)))
+    .map(el => String(el.textContent).slice(0, 30));
+  report.check(tag + '没有把 SSD 画成一条有容量上限的曲线', ssdLike.length === 0,
+    ssdLike.join('、'));
+
   for (const id of ['bridge-body', 'params-body']) {
     const box = document.getElementById(id);
     report.check(tag + '#' + id + ' 非空', box.childNodes.length > 0,
@@ -1113,6 +1322,62 @@ function caseChecks(report, name, document, payload, errors, thrown) {
   report.check(tag + '点树上的节点 → 游标往前走（不是停在 0）',
     Number.isFinite(index) && index >= 1, before + ' → ' + after);
   report.check(tag + '点完仍然没有 NaN', scanNaN(document).length === 0);
+
+  // ---- **单步这一帧的时长与资源也来自内核。** 这是「CPU/GPU 本地访存成本不能又被前端
+  // 额外算一次」在屏幕上唯一可验的形式：回放那一帧读的是 `log.events`（上面那张逐根对戳的
+  // 网已经盯住了），单步这一帧读的是节点上 `running[].remaining_ns`——**两条路都不许前端
+  // 自己乘除**。把泳道名换成 `action.kind` 推出来的资源（COMPUTE 一律算 GPU、不看 `device`），
+  // 或者把 `end - start` 换成「字节 ÷ 带宽」，这条就红。
+  //
+  // 判据不重走路径：每根柱子必须能在载荷里找到**某个**内核任务与它三元组相同
+  // （`target_id` + `resource` + 时长 == `remaining_ns`）。找到就说明这三样都是内核给的。
+  const kernelTriples = new Set();
+  for (const node of payload.explore.nodes) {
+    for (const task of (node.running || [])) {
+      kernelTriples.add([task.target_id == null ? '' : String(task.target_id),
+        task.resource, String(task.remaining_ns)].join('|'));
+    }
+  }
+  const stepBars = document.getElementById('gantt-svg').querySelectorAll('rect')
+    .filter(rect => rect.hasAttribute('stroke'));
+  const invented = stepBars.filter(bar => {
+    const span = Number(bar.dataset.nsEnd) - Number(bar.dataset.nsStart);
+    return !kernelTriples.has([bar.dataset.target || '', bar.dataset.resource, String(span)].join('|'));
+  });
+  report.check(tag + '单步这一帧的每根柱子都是内核给的（目标 + 资源 + 时长三样都对得上）',
+    stepBars.length > 0 && invented.length === 0,
+    stepBars.length ? '柱子 ' + stepBars.length + ' 根，载荷里找不到出处 ' + invented.length + ' 根' +
+      (invented.length ? '：例如 ' + invented.slice(0, 2).map(bar =>
+        bar.dataset.kind + '@' + bar.dataset.resource + ' ' + bar.dataset.nsStart + '→' + bar.dataset.nsEnd).join('　') : '')
+      : '这一帧一根柱子都没有');
+
+  // ---- SSD 那条可见的方向线：**读实线、写虚线**。刻意放在这里而不是上面，因为还没走到的
+  // 柱一律画成「未到达」的 `3 2`（与读/写无关），在那时候验等于在验游标。游标已经走到底，
+  // 这一帧每根柱都是 `walked`，虚线只剩一个来源：它是不是一次写。
+  if (payload.m1) {
+    const ssdAll = document.getElementById('gantt-svg').querySelectorAll('rect')
+      .filter(rect => rect.hasAttribute('stroke') && rect.dataset.resource === 'ssd_io');
+    const dashed = ssdAll.filter(bar => {
+      const reading = bar.dataset.kind === 'READ_SSD';
+      const dash = bar.getAttribute('stroke-dasharray');
+      return reading ? !!dash : dash !== '4 2';
+    });
+    // 纯 CPU / 不用 SSD 的两张图，这一泳道本来就是空的——**没有柱子就没有线型可验**，
+    // 记成跳过而不是通过（`report.skip` 不进总数，这一条不能装成跑过了）。
+    // 次数只用来决定「跳过还是验」，**不进判据**：一次 SSD 访问画成两根柱（泳道被 `flatMap`
+    // 成两条）是那两张计数网的活，这里再验一遍，一张网红了四张网跟着红，就分不清是谁抓到的。
+    const ssdEventCount = payload.log.events.filter(event => event.resource === 'ssd_io').length;
+    if (ssdEventCount === 0) {
+      report.skip(tag + '走完后 SSD 泳道里读是实线、写是虚线（本图计划里没有 SSD 访问）');
+    } else {
+      report.check(tag + '走完后 SSD 泳道里读是实线、写是虚线（同一条泳道靠线型分方向）',
+        dashed.length === 0,
+        ssdAll.length + ' 根柱，线型不对 ' + dashed.length + ' 根' +
+        (dashed.length ? '：' + dashed.slice(0, 2).map(bar =>
+          bar.dataset.kind + ' 虚线=' + (bar.getAttribute('stroke-dasharray') || '无')).join('　') : ''));
+    }
+  }
+  document.querySelector('.mode[data-mode="replay"]').fire('click');
 
   // ---- 焦点守卫：`renderParams()` 每帧都跑，正在填的表单不能被冲掉。
   const body = document.getElementById('params-body');

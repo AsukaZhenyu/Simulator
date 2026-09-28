@@ -21,7 +21,21 @@
  *    「已经离开计划分叉出去」这件事，所以单步用数组。混同这两种模式正是这类工具
  *    开始骗人的起点。
  *
- * 4. **图上的左右是拓扑层，上下是先后。** 这一条改过两次，最后是用户拍的板：先是
+ * 4. **0.2（M1）的载荷只是多几块数据，不是另一套前端。** 泳道从
+ *    ``payload.m1.resources`` 来（0.1 没有那一块，退回写死的两条），每个张量在**三个域**
+ *    各有自己的副本状态（``copy_status`` 一直是显存那一本，``dram_status``/``ssd_status``
+ *    是另两本），SSD 只有**一条**泳道、读与写在同一条里靠箭头与虚线分开。三个不变量：
+ *
+ *    * **时长一律来自内核。** 甘特柱的起止就是内核报的 ``start_ns``/``end_ns``（回放直接
+ *      用 ``log.events``，单步从节点上的 ``running`` 任务读 ``remaining_ns``）。前端**不
+ *      按字节和带宽重算任何一笔**——CPU 的本地 DRAM 访问已经算在 CPU 算子成本里、GPU 的
+ *      本地 VRAM 访问同理（``M1_DESIGN.md`` §5），前端再加一笔就是重复计费，而屏上多出来
+ *      的那一截看起来会像内核算错了。
+ *    * **0.1 的载荷一个键都不多**：``payload.m1 == null`` 就是「这是 M0」这一件事的唯一判据。
+ *    * 前端不认识任何 field 名：容量/域/资源/目标全从载荷读，所以 0.1 与 0.2 的字段拼法
+ *      差异不需要在这里再写一遍。
+ *
+ * 5. **图上的左右是拓扑层，上下是先后。** 这一条改过两次，最后是用户拍的板：先是
  *    「x = 执行顺序、y = 拓扑秩」，被他否掉（同一个算子的父张量被拆到两列、箭头一长一短，
  *    纵轴还按层各占一行，图又高又散）；现在 x = 拓扑层（张量贴到消费它的算子左边一列），
  *    y = 先后（先加载的在上、算子与它的输出同一行）。规则、例外与它掉出来的紧凑度都在
@@ -43,12 +57,78 @@ const S = {
   treeDisabled: false, // 走查与 search() 对不上：不画一棵可能是错的树
 };
 
+/* 动作 kind → 屏上那三个字母。**0.2 的三个新 kind 必须在这里**：`renderActions()` 与
+ * `renderRefused()` 都是 `ACTION_LABEL[kind]`，少一个就是屏上印出「undefined」——
+ * 不报错、不留痕，只是那一格读不了。 */
 const ACTION_LABEL = {
   COPY_H2D: 'COP',
+  COPY: 'CPY',
+  READ_SSD: 'RSD',
+  WRITE_SSD: 'WSD',
   COMPUTE: 'CMP',
   EVICT: 'EV',
   ADVANCE: 'ADV',
 };
+
+/* 资源 → 泳道的样子。0.1 的两条与 0.2 的四条都在这里，靠**载荷给没给 resources** 分流，
+ * 不靠猜 kind。颜色只走已有变量，且守住文件头那条纪律：计算一族 = `--accent`（蓝）、
+ * 搬运一族 = `--ns`（琥珀），SSD 用 `--ok`（绿）——**不用 `--s`**，那个变量是 modeling
+ * 的浮点秒专用色，借它过来就等于在屏上宣称了两者等价。 */
+const LANE_STYLE = {
+  h2d_copy: { label: 'H2D 搬运', color: 'var(--ns)', soft: 'var(--ns-soft)' },
+  pcie_copy: { label: 'PCIe 搬运', color: 'var(--ns)', soft: 'var(--ns-soft)' },
+  cpu_compute: { label: 'CPU 计算', color: 'var(--accent)', soft: 'var(--accent-soft)' },
+  gpu_compute: { label: 'GPU 计算', color: 'var(--accent)', soft: 'var(--accent-soft)' },
+  ssd_io: { label: 'SSD 读/写', color: 'var(--ok)', soft: 'var(--ok-soft)' },
+};
+
+/** 这一份载荷有哪几条泳道。0.2 从 `payload.m1.resources` 读（屏上的泳道与产物里的槽位
+ *  因此是同一份名单）；0.1 没有那一块，退回它唯一的两条，**顺序保持原样**（搬运在上、
+ *  计算在下），别让 0.1 那一屏因为这次改动换了样子。 */
+function lanesFor(payload) {
+  const m1 = payload.m1;
+  if (!m1) {
+    return [
+      { key: 'h2d_copy', slots: null },
+      { key: 'gpu_compute', slots: null },
+    ].map(lane => Object.assign({}, LANE_STYLE[lane.key], lane));
+  }
+  return (m1.resources || []).map(resource => Object.assign(
+    { key: resource.id, slots: resource.slots, kind: resource.kind },
+    LANE_STYLE[resource.id] || { label: resource.id, color: 'var(--ink-3)', soft: 'var(--surface-2)' },
+  ));
+}
+
+/** 一个动作占的是哪条资源，以及它有没有方向。
+ *
+ *  这张表就是「动作 → 泳道」的**全部**规则，前端不从这里推任何时长。COMPUTE 的 `device`
+ *  在 0.1 里不存在，于是 0.1 一律落到 `gpu_compute`——正是它唯一的计算资源。 */
+function resourceOfAction(action) {
+  if (!action) return null;
+  if (action.kind === 'COMPUTE') return action.device === 'cpu' ? 'cpu_compute' : 'gpu_compute';
+  if (action.kind === 'COPY_H2D') return 'h2d_copy';
+  if (action.kind === 'COPY') return 'pcie_copy';
+  if (action.kind === 'READ_SSD' || action.kind === 'WRITE_SSD') return 'ssd_io';
+  return null;   // EVICT / ADVANCE 是瞬时的，没有资源
+}
+
+/** SSD 那一条泳道里读与写的方向。同一条资源、两个方向，所以只能靠**形状**分开：
+ *  ↓ 进内存（读），↑ 出门（写）。返回 null 表示这个动作没有 SSD 方向。 */
+function ssdDirection(action) {
+  if (!action) return null;
+  if (action.kind === 'READ_SSD') return { arrow: '↓', text: 'SSD→DRAM 读' };
+  if (action.kind === 'WRITE_SSD') return { arrow: '↑', text: 'DRAM→SSD 写' };
+  return null;
+}
+
+/** 这一步从哪搬到哪 / 在哪台机器上算。全部从动作自己的字段读，**不查表、不按张量猜**。 */
+function routeText(action) {
+  if (!action) return '';
+  if (action.src && action.dst) return action.src + ' → ' + action.dst;
+  if (action.device) return '设备 ' + action.device;
+  if (action.location) return '释放 ' + action.location;
+  return '';
+}
 
 /* ------------------------------------------------------------------ 小工具 */
 
@@ -117,12 +197,17 @@ function textWidth(text) {
   return em * TEXT_FONT_PX;
 }
 
-/* 动作字典 → 一行标签。target 是算子 id 或张量 id，两者不会同名（内核保证）。 */
+/* 动作字典 → 一行标签。target 是算子 id 或张量 id，两者不会同名（内核保证）。
+ *
+ * 0.2 的动作带上设备/路线/释放的域：`CMP c1@cpu`、`CPY h dram→vram`、`EV x@dram`。
+ * 「操作设备可见」在数据上就是这一句——动作字典里**有**这几个字段，屏上不写出来等于
+ * 把它们丢了。 */
 function actionLabel(action) {
   if (!action) return '（起点）';
   const kind = action.kind;
   const target = action.operation_id || action.tensor_id || '';
-  return ACTION_LABEL[kind] + (target ? ' ' + target : '');
+  const where = routeText(action);
+  return ACTION_LABEL[kind] + (target ? ' ' + target : '') + (where ? ' @' + where : '');
 }
 
 function actionKey(action) {
@@ -492,6 +577,36 @@ function isRunning(snap, id) {
   return !!snap && (snap.running || []).some(task => task.target_id === id);
 }
 
+/** 0.2 的算子有**每台设备一套**时长（``compute_ns_devices``），0.1 只有一套（``compute_ns``）。
+ *  两个键在另一个版本里都是 ``null``——``graph_block`` 刻意不共用一个「有时是数、有时是字典」
+ *  的键，前端这里也不猜：有哪个用哪个。 */
+function durationText(op, device) {
+  if (op.compute_ns_devices) {
+    // 排到过就用**这台设备**的那个数，没排到就把两套都摆出来。两个数常常不同——那正是
+    // 「CPU/GPU 混合」这件事本身；只显一个数，读的人会以为另一台也能这么快。
+    if (device && op.compute_ns_devices[device] != null) {
+      return device + ' ' + fmtNs(op.compute_ns_devices[device]);
+    }
+    return Object.keys(op.compute_ns_devices)
+      .map(key => key + ' ' + fmtNs(op.compute_ns_devices[key])).join(' / ');
+  }
+  return fmtNs(op.compute_ns);
+}
+
+function durationTitle(op, device) {
+  if (op.compute_ns_devices) {
+    const lines = ['各设备时长：'];
+    for (const key of Object.keys(op.compute_ns_devices)) {
+      lines.push('  ' + key + ' ' + op.compute_ns_devices[key] + ' ns'
+        + (op.workspace_bytes_devices ? '，工作区 ' + fmtBytes(op.workspace_bytes_devices[key]) : '')
+        + (device === key ? '　← 这条计划选的就是它' : ''));
+    }
+    if (!device) lines.push('  （这条计划还没排到这台算子）');
+    return lines.join('\n');
+  }
+  return '计算 ' + op.compute_ns + ' ns\n工作区 ' + fmtBytes(op.workspace_bytes);
+}
+
 function renderGraph() {
   const payload = S.payload;
   const svg = byId('graph-svg');
@@ -602,6 +717,15 @@ function renderGraph() {
   const copyStatus = (snap && snap.copy_status) || {};
   const opStatus = (snap && snap.op_status) || {};
 
+  // **这台算子在哪台机器上算，是搜索给的结果，不是前端挑的**（``M1_DESIGN.md`` §11）。
+  // 来源就是时间线那同一个 ``currentEvents()``：它的事件带 ``device``（回放读内核写出的事件、
+  // 单步读任务的 ``resource``），所以「图上的设备」与「时间线上的柱」在定义上是同一份数据。
+  // 0.1 的事件没有 ``device``，这张表也就空着，屏上一个字都不多。
+  const deviceOfOp = {};
+  for (const event of currentEvents()) {
+    if (event.kind === 'COMPUTE' && event.device) deviceOfOp[event.target_id] = event.device;
+  }
+
   // **两族色**（常量在文件上方）：张量与算子各自一个色系，状态在族内用深浅与虚实表达。
   for (const tensor of graph.tensors) {
     const p = pos[tensor.id];
@@ -643,10 +767,10 @@ function renderGraph() {
     g.appendChild(svgEl('text', { x: p.x + 10, y: p.y + 17, class: 'node-label' },
       (op.ggml_op || op.semantic_op || op.unary_op || '?') + ' · ' + op.id));
     g.appendChild(svgEl('text', { x: p.x + 10, y: p.y + 31, class: 'node-sub' },
-      fmtNs(op.compute_ns) + ' · ' + status));
+      durationText(op, deviceOfOp[op.id]) + ' · ' + status));
     const title = svgEl('title', null, op.id + '\n语义 ' + op.semantic_op +
       '\n输入 ' + (op.inputs || []).join(', ') + '\n输出 ' + op.output +
-      '\n计算 ' + op.compute_ns + ' ns\n工作区 ' + fmtBytes(op.workspace_bytes));
+      '\n' + durationTitle(op, deviceOfOp[op.id]));
     g.appendChild(title);
     svg.appendChild(g);
   }
@@ -686,11 +810,19 @@ function renderGraph() {
 
 /* ------------------------------------------------------------- 时间线屏 */
 
-/** 回放：直接用烤好的事件；单步：从路径的边现推。
+/** 当前要画的事件序列。回放：直接用烤好的 ``log.events``；单步：从路径的边现推。
  *
- * 单步事件为什么能推出来：动作 COPY_H2D / COMPUTE 在**起步的那一刻**就把任务
- * 放进 running，而只有 ADVANCE 动时钟，所以起点是该步的 t_ns、时长就是下一步
- * running 里那个任务的 remaining_ns（刚入队，还没被推进过）。EVICT 是瞬时的。
+ * 单步事件为什么推得出来：带资源的动作（搬运 / 计算）在**起步的那一刻**就把任务放进
+ * ``running``，而只有 ADVANCE 动时钟，所以起点是该步的 ``t_ns``、时长就是紧随那个状态里
+ * 任务的 ``remaining_ns``（刚入队，还没被推进过）。EVICT / ADVANCE 是瞬时的，没有资源。
+ *
+ * **时长一个字都不在前端算。** 这里读的是内核放进状态的 ``remaining_ns``，回放那条路读的
+ * 是内核写出的事件——两条路都是内核的数。前端**没有**「字节 ÷ 带宽」这一步：CPU 的本地
+ * DRAM 访问已经算在 CPU 算子成本里、GPU 的本地 VRAM 访问同理（``M1_DESIGN.md`` §5），
+ * 这里再补一笔就是重复计费，而屏上多出来的那一截看起来只会像内核算错了。
+ *
+ * 同一个函数也供计算图屏读「这台算子在谁身上跑」（0.2 的事件带 ``device``），所以
+ * 「屏上的设备」与「时间线上的柱」在定义上就是同一份数据，不存在第二份判断。
  */
 function currentEvents() {
   const payload = S.payload;
@@ -698,53 +830,168 @@ function currentEvents() {
 
   const nodes = payload.explore.nodes;
   const events = [];
-  let previousRunning = {};
+  let previousByTarget = {};
   for (let i = 0; i < S.path.length; i++) {
     const node = nodes[S.path[i]];
-    const running = {};
-    for (const task of (node.running || [])) running[task.resource + '|' + task.target_id] = task;
+    // 按目标索引就够：同一时刻一个目标最多一个任务——一个张量的副本在飞时它自己就是
+    // RESERVED，不能再被搬一次；算子 id 与张量 id 也不会同名。所以不会撞车，
+    // 「哪条泳道」直接从任务自己的 ``resource`` 读。
+    const byTarget = {};
+    for (const task of (node.running || [])) byTarget[task.target_id] = task;
 
     if (i > 0) {
       const action = node.action;
       const prev = nodes[S.path[i - 1]];
-      if (action) {
-        if (action.kind === 'COMPUTE' && action.operation_id) {
-          const task = running['gpu_compute|' + action.operation_id];
-          const duration = task ? task.remaining_ns
-            : (previousRunning['gpu_compute|' + action.operation_id] || {}).remaining_ns;
-          events.push({
-            kind: 'COMPUTE', resource: 'gpu_compute', target_id: action.operation_id,
-            t_ns: prev.t_ns, start_ns: prev.t_ns,
-            end_ns: prev.t_ns + (duration || 0),
-          });
-        } else if (action.kind === 'COPY_H2D' && action.tensor_id) {
-          const task = running['h2d_copy|' + action.tensor_id];
-          const duration = task ? task.remaining_ns
-            : (previousRunning['h2d_copy|' + action.tensor_id] || {}).remaining_ns;
-          events.push({
-            kind: 'COPY_H2D', resource: 'h2d_copy', target_id: action.tensor_id,
-            t_ns: prev.t_ns, start_ns: prev.t_ns,
-            end_ns: prev.t_ns + (duration || 0),
-          });
-        } else if (action.kind === 'EVICT' && action.tensor_id) {
-          events.push({
-            kind: 'EVICT', resource: null, target_id: action.tensor_id,
-            t_ns: prev.t_ns, start_ns: prev.t_ns, end_ns: prev.t_ns,
-          });
-        }
+      const target = action ? (action.operation_id || action.tensor_id || null) : null;
+      if (action && target) {
+        // 资源**先问任务自己**：任务的 ``resource`` 是内核排的（0.2 的搬运带 route、
+        // 计算带 device），动作那张表只是「任务已经不在 running 里」时的退路。两者不一致
+        // 说明有一边写错了，而屏上没有第二个地方能发现这件事——所以先信内核。
+        const found = byTarget[target] || previousByTarget[target] || null;
+        const resource = (found && found.resource) || resourceOfAction(action);
+        const duration = found ? (found.remaining_ns || 0) : 0;
+        events.push({
+          kind: action.kind,
+          resource: resource,                 // null = EVICT / ADVANCE 这类瞬时动作
+          target_id: target,
+          t_ns: prev.t_ns,
+          start_ns: prev.t_ns,
+          end_ns: prev.t_ns + (resource ? duration : 0),
+          // 0.2 的四个字段照抄动作，**不加解释**：柱子的悬停提示与「哪台设备算的」那格
+          // 都从这里读，回放那条路（``log.events``）给的也是这四个名字。
+          device: action.device || null,
+          src: action.src || null,
+          dst: action.dst || null,
+          location: action.location || null,
+        });
       }
     }
-    previousRunning = running;
+    previousByTarget = byTarget;
   }
   return events;
+}
+
+/** 一根柱子的悬停提示。字段全部来自事件本身——回放（``log.events``）与单步（现推）
+ *  给的是**同一批名字**，所以这里不判版本、不问载荷，只把有的逐个写出来。 */
+function actionTitle(event, lane) {
+  const lines = [
+    (ACTION_LABEL[event.kind] || event.kind) + ' ' + (event.target_id || ''),
+    '泳道 ' + (lane ? lane.label : '（无）'),
+  ];
+  const where = routeText(event);          // device / src→dst / location，事件与动作同名
+  if (where) lines.push(where);
+  const start = event.start_ns == null ? event.t_ns : event.start_ns;
+  const end = event.end_ns == null ? event.t_ns : event.end_ns;
+  lines.push(fmtNs(start) + ' → ' + fmtNs(end) + '（时长 ' + fmtNs(end - start) + '）');
+  if (event.bytes_transferred) lines.push('搬运 ' + fmtBytes(event.bytes_transferred));
+  if (event.workspace_bytes) lines.push('工作区 ' + fmtBytes(event.workspace_bytes));
+  if (event.bytes_released) lines.push('释放 ' + fmtBytes(event.bytes_released));
+  return lines.join('\n');
+}
+
+/** 一条**容量曲线**：阶梯 + 容量虚线 + 超限带 + 游标。
+ *
+ *  VRAM 与 DRAM 共用这一个函数，只换「用哪本账、上限是多少、画到哪个 svg」。
+ *  **SSD 不画**：它没有容量上限（``used_bytes`` 的文档写着向它要用量就是在要一个设计里
+ *  没定义的数），画一条没有上限的曲线，读的人只会以为上限在画布外面。SSD 那点信息在
+ *  甘特那条泳道上（读/写方向）。
+ *
+ *  ``usedOf`` 读的那本账来自**内核**：0.1 与 0.2 的显存那本都叫 ``used_vram_bytes``，
+ *  DRAM 那本（``used_dram_bytes``）只有 0.2 有。前端不自己把各域加起来算总量——
+ *  各域各有各的对齐与预留，加起来那个数在模型里不存在。
+ */
+function drawMemoryCurve(svg, spec) {
+  clear(svg);
+  const states = spec.states;
+  const nowNs = spec.nowNs;
+  const makespan = spec.makespan;
+  const limit = spec.limit;
+  const usedOf = spec.usedOf;
+  const width = 900;
+  // `vpadT` 是 26 而不是 14，只为「容量 xxx」这行字：容量线画在**顶上那格**（`peak` 取的就是
+  // 容量上限，所以 `vy(limit)` 正好落在绘图区上沿），它的标注只能放在线上方——而中文在 14px 下
+  // 从基线往上要占约 12.3px，`ly - 6` 的基线因此至少要离画布上边 12px 才不被裁。14 的时候基线在
+  // y=9，**「容量」两个字的上半截被画布切掉了**（用户报的「被第一张图覆盖了」）。
+  // SVG 裁掉就是裁掉，不报错——所以这条要靠几何留够，另有一条网盯着「没有一行字贴着画布上下边」。
+  const vh = 170, vpadL = 78, vpadR = 18, vpadT = 26, vpadB = 22;
+  const vw = width;
+  const vplotW = vw - vpadL - vpadR;
+  const vplotH = vh - vpadT - vpadB;
+  svg.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+  svg.setAttribute('width', vw);
+  svg.setAttribute('height', vh);
+
+  // 纵轴的上限取「容量上限」与「实际用到的最大值」里大的那个，最小的 1 只为不除零。
+  const peak = Math.max(limit || 0, ...states.map(s => usedOf(s) || 0), 1);
+  const vx = ns => vpadL + (ns / makespan) * vplotW;
+  const vy = bytes => vpadT + vplotH - (bytes / peak) * vplotH;
+
+  for (let i = 0; i <= 4; i++) {
+    const value = (peak / 4) * i;
+    const y = vy(value);
+    svg.appendChild(svgEl('line', { x1: vpadL, y1: y, x2: vpadL + vplotW, y2: y, class: 'grid-line' }));
+    svg.appendChild(svgEl('text', { x: vpadL - 9, y: y + 3.5, class: 'axis', 'text-anchor': 'end' },
+      fmtBytes(value)));
+  }
+
+  // 超限带：沿用 plot_results.py 的视觉语言（容量线以上整片淡红）。
+  if (limit != null) {
+    const ly = vy(limit);
+    if (ly > vpadT + 0.5) {
+      svg.appendChild(svgEl('rect', {
+        x: vpadL, y: vpadT, width: vplotW, height: Math.max(0, ly - vpadT),
+        fill: 'var(--bad)', opacity: 0.09,
+      }));
+    }
+    svg.appendChild(svgEl('line', {
+      x1: vpadL, y1: ly, x2: vpadL + vplotW, y2: ly,
+      stroke: 'var(--bad)', 'stroke-width': 1.3, 'stroke-dasharray': '5 3',
+    }));
+    svg.appendChild(svgEl('text', { x: vpadL + vplotW - 4, y: ly - 6, class: 'axis', 'text-anchor': 'end', fill: 'var(--bad)' },
+      '容量 ' + fmtBytes(limit)));
+  }
+
+  const path = states.map(s => (vx(s.t_ns)) + ' ' + vy(usedOf(s) || 0)).join(' L ');
+  svg.appendChild(svgEl('path', {
+    d: 'M ' + path, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.1, opacity: 0.5,
+  }));
+  // 已走过的段落实线加粗，未走到的淡出。
+  const walked = states.filter(s => s.t_ns <= nowNs);
+  if (walked.length) {
+    svg.appendChild(svgEl('path', {
+      d: 'M ' + walked.map(s => vx(s.t_ns) + ' ' + vy(usedOf(s) || 0)).join(' L '),
+      fill: 'none', stroke: spec.color || 'var(--accent)', 'stroke-width': 2.2,
+    }));
+    const last = walked[walked.length - 1];
+    svg.appendChild(svgEl('circle', {
+      cx: vx(last.t_ns), cy: vy(usedOf(last) || 0), r: 4.4,
+      fill: spec.color || 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2,
+    }));
+    svg.appendChild(svgEl('title', null,
+      spec.label + '：现在 ' + fmtBytes(usedOf(last) || 0) +
+      (limit != null ? ' / 上限 ' + fmtBytes(limit) : '（没有容量上限）')));
+  }
+  svg.appendChild(svgEl('line', {
+    x1: vx(nowNs), y1: vpadT - 4, x2: vx(nowNs), y2: vpadT + vplotH,
+    stroke: 'var(--ink)', 'stroke-width': 1.4,
+  }));
 }
 
 function renderTimeline() {
   const payload = S.payload;
   const hint = byId('timeline-hint');
-  hint.textContent = isReplay()
+  // 这句话要说的三件事：**每根柱子的起止都是内核报的**（前端不按字节 ÷ 带宽补一笔——CPU 的
+  // 本地 DRAM 访问已经算在 CPU 算子成本里、GPU 的本地 VRAM 访问同理，再补就是重复计费）；
+  // **泳道就是载荷里那几条资源**；单步那条路的柱是从路径的边现推的、不是搜索出的计划。
+  const laneNames = lanesFor(payload).map(lane => lane.label).join(' / ');
+  hint.textContent = (isReplay()
     ? '正在重放搜索出的计划。'
-    : '正在探索这条分支：这不是搜索出的计划，柱是从路径的边现推的。';
+    : '正在探索这条分支：这不是搜索出的计划，柱是从路径的边现推的。') +
+    '　泳道 = 载荷里的资源（' + laneNames + '）；每根柱的起止与「在哪台机器上」都直接来自内核' +
+    '给的事件/任务，前端不加任何一笔本地访存成本。' +
+    (payload.m1 ? '　SSD 只有一条泳道：实线是读（SSD→DRAM）、虚线是写（DRAM→SSD）。' : '') +
+    '　搜索预算有限：' + num((payload.explore.budget || {}).max_expanded_states || 0) + ' 个状态 / ' +
+    (payload.explore.budget || {}).wall_time_limit_s + ' 秒（0 = 不限）。';
 
   const events = currentEvents();
   const states = S.payload.log.states;
@@ -752,13 +999,11 @@ function renderTimeline() {
   const nowNs = snap ? snap.t_ns : 0;
   const makespan = Math.max(1, payload.solution.makespan_ns || 1);
 
-  // --- 甘特：两条泳道（搬运 / 计算），加上 EVICT / ADVANCE 的点标记
+  // --- 甘特：**泳道从载荷来**（0.2 有四条、0.1 两条），加上 EVICT / ADVANCE 的点标记
   const gantt = byId('gantt-svg');
   clear(gantt);
-  const lanes = [
-    { key: 'h2d_copy', label: 'H2D 搬运', color: 'var(--ns)' },
-    { key: 'gpu_compute', label: 'GPU 计算', color: 'var(--accent)' },
-  ];  const padL = 78, padR = 18, padT = 16, padB = 26, laneH = 30, barH = 15;
+  const lanes = lanesFor(payload);
+  const padL = 78, padR = 18, padT = 16, padB = 26, laneH = 30, barH = 15;
   const width = 900;
   const plotW = width - padL - padR;
   const height = padT + lanes.length * laneH + padB;
@@ -770,7 +1015,11 @@ function renderTimeline() {
 
   lanes.forEach((lane, index) => {
     const y = padT + index * laneH;
-    gantt.appendChild(svgEl('text', { x: padL - 9, y: y + barH, class: 'axis', 'text-anchor': 'end' }, lane.label));
+    // 槽位数跟在名字后面。它**不是**一条泳道的分格：四条资源的槽位在设计里都锁死为 1
+    // （``Architecture.__post_init__`` 对任何非 1 的槽位直接拒绝），所以这里写出来只是把
+    // 载荷里那个数摆在屏上，等哪天不止 1 了，读的人第一眼就能看见。
+    const label = lane.label + (lane.slots && lane.slots !== 1 ? ' ×' + lane.slots : '');
+    gantt.appendChild(svgEl('text', { x: padL - 9, y: y + barH, class: 'axis', 'text-anchor': 'end' }, label));
     gantt.appendChild(svgEl('rect', {
       x: padL, y: y, width: plotW, height: barH + 4, fill: 'var(--surface-2)', rx: 3,
     }));
@@ -780,22 +1029,35 @@ function renderTimeline() {
       const end = event.end_ns == null ? event.t_ns : event.end_ns;
       const w = Math.max(1.5, x(end) - x(start));
       const walked = start < nowNs;
+      // SSD 只有**一条**泳道，读与写都在里面，所以方向得由柱子自己说：读用实线、写用虚线，
+      // 文字前面挂 ↓ / ↑。把它们拆成两条泳道会谎称这是两台设备——模型里是一个 ``ssd_io``。
+      const direction = ssdDirection(event);
+      const writing = !!direction && direction.arrow === '↑';
       // 柱子用**同族色描边 + 浅底**，不是实心块。实心同色柱挨在一起会糊成一根长条
       // （相邻两次搬运本来就是同色），而描边让每一根自己立得住。这样也正好和计算图
       // 用的是同一套写法：浅底 = 这块东西在场，族色边 = 它是张量还是算子。
       // 还没走到的段画成**空底虚线**，与计算图里 ABSENT 的写法一致。
-      gantt.appendChild(svgEl('rect', {
+      const bar = svgEl('rect', {
         x: x(start), y: y, width: w, height: barH + 4, rx: 3,
-        fill: walked ? (lane.key === 'h2d_copy' ? 'var(--ns-soft)' : 'var(--accent-soft)')
-                     : 'var(--surface)',
+        fill: walked ? (lane.soft || 'var(--surface-2)') : 'var(--surface)',
         stroke: lane.color, 'stroke-width': 1.2,
-        'stroke-dasharray': walked ? null : '3 2',
-      }));
-      if (w > 26) {
+        'stroke-dasharray': !walked ? '3 2' : (writing ? '4 2' : null),
+      });
+      // 数据戳：烟测用它核对「屏上这根柱 == 载荷里那个事件」，悬停提示也用它。
+      // **柱子的起止就是内核报的 ``start_ns``/``end_ns``**，没有第四种算法。
+      bar.dataset.nsStart = String(start);
+      bar.dataset.nsEnd = String(end);
+      bar.dataset.resource = lane.key;
+      bar.dataset.kind = event.kind;
+      bar.dataset.target = event.target_id || '';
+      bar.appendChild(svgEl('title', null,
+        actionTitle(event, lane)));
+      gantt.appendChild(bar);
+      if (w > 30) {
         gantt.appendChild(svgEl('text', {
           x: x(start) + w / 2, y: y + barH, class: 'axis',
           'text-anchor': 'middle', fill: 'var(--ink-2)',
-        }, event.target_id || ''));
+        }, (direction ? direction.arrow + ' ' : '') + (event.target_id || '')));
       }
     }
   });
@@ -809,11 +1071,15 @@ function renderTimeline() {
     if (event.resource != null) continue;
     const cx = x(event.t_ns);
     const isEvict = event.kind === 'EVICT';
-    gantt.appendChild(svgEl('circle', {
+    const dot = svgEl('circle', {
       cx: cx, cy: markY + 5, r: isEvict ? 3.4 : 2.4,
       fill: isEvict ? 'var(--bad)' : 'var(--ink-3)',
       opacity: event.t_ns >= nowNs ? 0.35 : 1,
-    }));
+    });
+    // 0.2 的 EVICT 带 ``location``（释放的是哪个域的副本）——这一格正是「锁定 / 释放」
+    // 那本账在时间线上的落点，不写出来就只能靠猜。
+    dot.appendChild(svgEl('title', null, actionTitle(event, null)));
+    gantt.appendChild(dot);
   }
   gantt.appendChild(svgEl('text', { x: padL - 9, y: markY + 9, class: 'axis', 'text-anchor': 'end' },
     '释放/推进'));
@@ -826,73 +1092,35 @@ function renderTimeline() {
     stroke: 'var(--ink)', 'stroke-width': 1.4,
   }));
 
-  // --- 显存曲线：阶梯 + 容量虚线。容量上限**只在 limits**，states 里没有。
-  const vram = byId('vram-svg');
-  clear(vram);
-  const limit = (payload.source.limits || {}).vram_capacity_bytes;
-  const peak = Math.max(limit || 0, ...states.map(s => s.used_vram_bytes || 0), 1);
-  // `vpadT` 是 26 而不是 14，只为「容量 xxx」这行字：容量线画在**顶上那格**（`peak` 取的就是
-  // 容量上限，所以 `vy(limit)` 正好落在绘图区上沿），它的标注只能放在线上方——而中文在 14px 下
-  // 从基线往上要占约 12.3px，`ly - 6` 的基线因此至少要离画布上边 12px 才不被裁。14 的时候基线在
-  // y=9，**「容量」两个字的上半截被画布切掉了**（用户报的「被第一张图覆盖了」）。
-  // SVG 裁掉就是裁掉，不报错——所以这条要靠几何留够，另有一条网盯着「没有一行字贴着画布上下边」。
-  const vh = 170, vpadL = 78, vpadR = 18, vpadT = 26, vpadB = 22;
-  const vw = width;
-  const vplotW = vw - vpadL - vpadR;
-  const vplotH = vh - vpadT - vpadB;
-  vram.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
-  vram.setAttribute('width', vw);
-  vram.setAttribute('height', vh);
+  // --- 容量曲线：显存一本账，0.2 再加内存一本。上限**只在 limits**，states 里没有。
+  const limits = payload.source.limits || {};
+  drawMemoryCurve(byId('vram-svg'), {
+    states: states, nowNs: nowNs, makespan: makespan,
+    limit: limits.vram_capacity_bytes,
+    usedOf: state => state.used_vram_bytes,
+    label: '显存 VRAM', color: 'var(--accent)',
+  });
+  byId('vram-name').textContent = '显存 VRAM · 上限 ' +
+    (limits.vram_capacity_bytes == null ? '不设' : fmtBytes(limits.vram_capacity_bytes)) +
+    ' · 预留 ' + fmtBytes(limits.vram_runtime_reserved_bytes || 0);
 
-  const vx = ns => vpadL + (ns / makespan) * vplotW;
-  const vy = bytes => vpadT + vplotH - (bytes / peak) * vplotH;
-
-  for (let i = 0; i <= 4; i++) {
-    const value = (peak / 4) * i;
-    const y = vy(value);
-    vram.appendChild(svgEl('line', { x1: vpadL, y1: y, x2: vpadL + vplotW, y2: y, class: 'grid-line' }));
-    vram.appendChild(svgEl('text', { x: vpadL - 9, y: y + 3.5, class: 'axis', 'text-anchor': 'end' },
-      fmtBytes(value)));
+  // 内存那条只有 0.2 有：0.1 压根没有 DRAM 这本账（``State`` 的文档写着），屏上也就没有
+  // 这个格子。SSD **两条都不画**——它没有容量。
+  const dramWrap = byId('dram-wrap');
+  const m1 = payload.m1;
+  dramWrap.hidden = !m1;
+  if (m1) {
+    drawMemoryCurve(byId('dram-svg'), {
+      states: states, nowNs: nowNs, makespan: makespan,
+      limit: limits.dram_capacity_bytes,
+      usedOf: state => state.used_dram_bytes,
+      label: '内存 DRAM', color: 'var(--ns)',
+    });
+    byId('dram-name').textContent = '内存 DRAM · 上限 ' +
+      (limits.dram_capacity_bytes == null ? '不设' : fmtBytes(limits.dram_capacity_bytes)) +
+      ' · 预留 ' + fmtBytes(limits.dram_runtime_reserved_bytes || 0) +
+      '　·　SSD 不画容量曲线：它没有容量上限，只在上面那条甘特里分读/写';
   }
-
-  // 超限带：沿用 plot_results.py 的视觉语言（容量线以上整片淡红）。
-  if (limit != null) {
-    const ly = vy(limit);
-    if (ly > vpadT + 0.5) {
-      vram.appendChild(svgEl('rect', {
-        x: vpadL, y: vpadT, width: vplotW, height: Math.max(0, ly - vpadT),
-        fill: 'var(--bad)', opacity: 0.09,
-      }));
-    }
-    vram.appendChild(svgEl('line', {
-      x1: vpadL, y1: ly, x2: vpadL + vplotW, y2: ly,
-      stroke: 'var(--bad)', 'stroke-width': 1.3, 'stroke-dasharray': '5 3',
-    }));
-    vram.appendChild(svgEl('text', { x: vpadL + vplotW - 4, y: ly - 6, class: 'axis', 'text-anchor': 'end', fill: 'var(--bad)' },
-      '容量 ' + fmtBytes(limit)));
-  }
-
-  const path = states.map(s => (vx(s.t_ns)) + ' ' + vy(s.used_vram_bytes || 0)).join(' L ');
-  vram.appendChild(svgEl('path', {
-    d: 'M ' + path, fill: 'none', stroke: 'var(--ink-3)', 'stroke-width': 1.1, opacity: 0.5,
-  }));
-  // 已走过的段落实线加粗，未走到的淡出。
-  const walked = states.filter(s => s.t_ns <= nowNs);
-  if (walked.length) {
-    vram.appendChild(svgEl('path', {
-      d: 'M ' + walked.map(s => vx(s.t_ns) + ' ' + vy(s.used_vram_bytes || 0)).join(' L '),
-      fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.2,
-    }));
-    const last = walked[walked.length - 1];
-    vram.appendChild(svgEl('circle', {
-      cx: vx(last.t_ns), cy: vy(last.used_vram_bytes || 0), r: 4.4,
-      fill: 'var(--accent)', stroke: 'var(--surface)', 'stroke-width': 2,
-    }));
-  }
-  vram.appendChild(svgEl('line', {
-    x1: vx(nowNs), y1: vpadT - 4, x2: vx(nowNs), y2: vpadT + vplotH,
-    stroke: 'var(--ink)', 'stroke-width': 1.4,
-  }));
 
   renderStateTimeline(states, nowNs);
   renderRefused();
@@ -992,10 +1220,22 @@ function renderStateTimeline(states, nowNs) {
     svg.appendChild(svgEl('text', {
       x: bx + w + GAP, y: y + 11, class: 'axis',
     }, labels[index]));
-    rect.appendChild(svgEl('title', null,
-      '状态 #' + index + '（产生它的动作 ' + (state.action_index == null ? '—' : '#' + state.action_index) +
-      '）\nt = ' + fmtNs(state.t_ns) + '\n已用 ' + fmtBytes(state.used_vram_bytes || 0) +
-      '\n算子 ' + JSON.stringify(state.op_status || {}) + '\n张量 ' + JSON.stringify(state.copy_status || {})));
+    const title = [
+      '状态 #' + index + '（产生它的动作 ' + (state.action_index == null ? '—' : '#' + state.action_index) + '）',
+      't = ' + fmtNs(state.t_ns),
+      '显存 ' + fmtBytes(state.used_vram_bytes || 0),
+    ];
+    // 0.2 的两本账各自写一行、**不合**：``copy_status`` 在 0.1 与 0.2 里都是**显存那一本**
+    // （``engine.State`` 的文档写着），内存与 SSD 是另两本。缺哪本就会把「在内存里」读成
+    // 「不在任何地方」。SSD 那一本只有状态（没有容量、没有用量），所以后面缀一句说明。
+    if (S.payload.m1) {
+      title.push('内存 ' + fmtBytes(state.used_dram_bytes || 0));
+      title.push('内存副本 ' + JSON.stringify(state.dram_status || {}));
+      title.push('SSD 副本 ' + JSON.stringify(state.ssd_status || {}) + '（SSD 没有容量与用量）');
+    }
+    title.push('算子 ' + JSON.stringify(state.op_status || {}));
+    title.push('显存副本 ' + JSON.stringify(state.copy_status || {}));
+    rect.appendChild(svgEl('title', null, title.join('\n')));
   });
 }
 
@@ -1567,13 +1807,30 @@ function renderParams() {
 
   /** 有些旋钮在 scenario 里是嵌套的（costs.compute.<op>.duration_ns），
    *  echo 给的是扁平的点分路径，这里只用于显示，回填走的仍是 edit_scenario 的键。 */
+  const m1 = payload.m1;
   const vram = document.createElement('input');
   vram.type = 'number'; vram.value = echo.vram_capacity_bytes;
   knob('VRAM 容量', 'architecture.vram_capacity_bytes', vram);
 
+  // **两个域的预留名字不同**，这不是笔误：0.1 只有一笔 ``runtime_reserved_bytes``，
+  // 0.2 的 VRAM 预留叫 ``vram_runtime_reserved_bytes``（``reserved_of(LOC_VRAM)`` 只在
+  // 后者为 ``None`` 时才回落到前者）。0.2 上把旧名字填进去会**静默无效**——服务端收下、
+  // 数字不动，而表单显示的是用户刚敲的那个数。所以按版本取名字。
   const reserved = document.createElement('input');
-  reserved.type = 'number'; reserved.value = echo.runtime_reserved_bytes;
-  knob('运行时预留', 'architecture.runtime_reserved_bytes', reserved);
+  reserved.type = 'number';
+  reserved.value = m1 ? echo.vram_runtime_reserved_bytes : echo.runtime_reserved_bytes;
+  knob('VRAM 运行时预留',
+    m1 ? 'architecture.vram_runtime_reserved_bytes' : 'architecture.runtime_reserved_bytes',
+    reserved);
+
+  const dram = document.createElement('input');
+  const dramReserved = document.createElement('input');
+  if (m1) {
+    dram.type = 'number'; dram.value = echo.dram_capacity_bytes;
+    knob('内存容量（DRAM）', 'architecture.dram_capacity_bytes', dram);
+    dramReserved.type = 'number'; dramReserved.value = echo.dram_runtime_reserved_bytes;
+    knob('内存运行时预留', 'architecture.dram_runtime_reserved_bytes', dramReserved);
+  }
 
   const budget = document.createElement('input');
   budget.type = 'number'; budget.value = echo.max_expanded_states;
@@ -1583,8 +1840,11 @@ function renderParams() {
   wall.type = 'number'; wall.step = 'any'; wall.value = echo.wall_time_limit_s;
   knob('时间预算（秒，0 = 不限）', 'mapper.wall_time_limit_s', wall);
 
-  for (const [field, label] of [['allow_copy_compute_overlap', '允许搬运/计算重叠'],
-                                ['allow_eviction', '允许驱逐']]) {
+  // 四个资源的槽位数**没有输入框**：``Architecture.__post_init__`` 对任何非 1 的槽位
+  // 直接拒绝（首版假设），给一个只会撞拒绝的输入框比不给更糟。真实槽位在甘特的泳道名上。
+  const flags = [['allow_copy_compute_overlap', '允许搬运/计算重叠'], ['allow_eviction', '允许驱逐']];
+  if (m1) flags.push(['allow_cpu_gpu_overlap', '允许 CPU / GPU 重叠']);
+  for (const [field, label] of flags) {
     const div = document.createElement('div');
     div.className = 'knob';
     const wrap = document.createElement('label');
@@ -1602,12 +1862,42 @@ function renderParams() {
     form.appendChild(div);
   }
 
-  for (const op of payload.graph.operations) {
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.value = op.compute_ns;
-    input.dataset.op = op.id;
-    knob('算子 ' + op.id + ' 时长', 'costs.compute.' + op.id + '.duration_ns', input);
+  if (m1) {
+    // 0.2 的时长是**两级**的：算子的按（算子，设备），搬运的按（路线，张量）。摊平成一行
+    // 就分不清哪台机器上的那个数——而那正是这一版要看的东西（同一台算子在 CPU 与 GPU 上
+    // 是两个数，改一个不该动另一个）。
+    const routeEnds = {};
+    for (const route of ((payload.m1 || {}).routes || [])) routeEnds[route.id] = route.src + '→' + route.dst;
+    for (const op of Object.keys(echo.compute_ns || {})) {
+      for (const device of Object.keys(echo.compute_ns[op])) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = echo.compute_ns[op][device];
+        input.dataset.op = op;
+        input.dataset.device = device;
+        knob('算子 ' + op + ' @' + device,
+          'costs.compute.' + op + '.' + device + '.duration_ns', input);
+      }
+    }
+    for (const route of Object.keys(echo.transfer_ns || {})) {
+      for (const tensor of Object.keys(echo.transfer_ns[route])) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = echo.transfer_ns[route][tensor];
+        input.dataset.route = route;
+        input.dataset.tensor = tensor;
+        knob('搬运 ' + (routeEnds[route] || route) + ' · ' + tensor,
+          'costs.transfer.' + route + '.' + tensor + '.duration_ns', input);
+      }
+    }
+  } else {
+    for (const op of payload.graph.operations) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = op.compute_ns;
+      input.dataset.op = op.id;
+      knob('算子 ' + op.id + ' 时长', 'costs.compute.' + op.id + '.duration_ns', input);
+    }
   }
 
   body.appendChild(form);
@@ -1621,15 +1911,41 @@ function renderParams() {
   run.addEventListener('click', () => {
     const params = {
       vram_capacity_bytes: Number(vram.value),
-      runtime_reserved_bytes: Number(reserved.value),
       max_expanded_states: Number(budget.value),
       wall_time_limit_s: Number(wall.value),
       allow_copy_compute_overlap: !!body.querySelector('[data-flag="allow_copy_compute_overlap"]').checked,
       allow_eviction: !!body.querySelector('[data-flag="allow_eviction"]').checked,
     };
+    if (m1) {
+      // **0.2 的预留键名与 0.1 不同**（见上面那个旋钮的注释）：这里写旧名字服务端会收下
+      // 但不生效，所以按版本给。
+      params.vram_runtime_reserved_bytes = Number(reserved.value);
+      params.dram_capacity_bytes = Number(dram.value);
+      params.dram_runtime_reserved_bytes = Number(dramReserved.value);
+      params.allow_cpu_gpu_overlap = !!body.querySelector('[data-flag="allow_cpu_gpu_overlap"]').checked;
+    } else {
+      params.runtime_reserved_bytes = Number(reserved.value);
+    }
     const compute = {};
-    for (const input of body.querySelectorAll('[data-op]')) compute[input.dataset.op] = Number(input.value);
+    for (const input of body.querySelectorAll('[data-op]')) {
+      const op = input.dataset.op;
+      if (input.dataset.device) {
+        // 两级：``{算子: {设备: ns}}``。缺了 ``device`` 那一级的写法在服务端会被整条跳过
+        // （``edit_scenario`` 不退化成「所有设备都改成这个数」），所以这里必须带上。
+        if (!compute[op]) compute[op] = {};
+        compute[op][input.dataset.device] = Number(input.value);
+      } else {
+        compute[op] = Number(input.value);
+      }
+    }
     if (Object.keys(compute).length) params.compute_ns = compute;
+    const transfer = {};
+    for (const input of body.querySelectorAll('[data-route]')) {
+      const route = input.dataset.route;
+      if (!transfer[route]) transfer[route] = {};
+      transfer[route][input.dataset.tensor] = Number(input.value);
+    }
+    if (Object.keys(transfer).length) params.transfer_ns = transfer;
     submitParams(params);
   });
   row.appendChild(run);
@@ -1638,15 +1954,29 @@ function renderParams() {
   reset.className = 'run ghost';
   reset.textContent = '恢复原值';
   reset.disabled = !live;
-  reset.addEventListener('click', () => submitParams({
-    vram_capacity_bytes: echo.vram_capacity_bytes,
-    runtime_reserved_bytes: echo.runtime_reserved_bytes,
-    max_expanded_states: echo.max_expanded_states,
-    wall_time_limit_s: echo.wall_time_limit_s,
-    allow_copy_compute_overlap: echo.allow_copy_compute_overlap,
-    allow_eviction: echo.allow_eviction,
-    compute_ns: Object.fromEntries(payload.graph.operations.map(op => [op.id, op.compute_ns])),
-  }));
+  reset.addEventListener('click', () => {
+    // 「原值」= 服务端这次装配时回显的那一份（``params_echo``）。表单本来就是从它生成的，
+    // 所以这里原样送回去，不另外拼一份——两份拼法迟早会不一致。
+    const params = {
+      vram_capacity_bytes: echo.vram_capacity_bytes,
+      max_expanded_states: echo.max_expanded_states,
+      wall_time_limit_s: echo.wall_time_limit_s,
+      allow_copy_compute_overlap: echo.allow_copy_compute_overlap,
+      allow_eviction: echo.allow_eviction,
+    };
+    if (m1) {
+      params.vram_runtime_reserved_bytes = echo.vram_runtime_reserved_bytes;
+      params.dram_capacity_bytes = echo.dram_capacity_bytes;
+      params.dram_runtime_reserved_bytes = echo.dram_runtime_reserved_bytes;
+      params.allow_cpu_gpu_overlap = echo.allow_cpu_gpu_overlap;
+      params.compute_ns = echo.compute_ns;
+      params.transfer_ns = echo.transfer_ns;
+    } else {
+      params.runtime_reserved_bytes = echo.runtime_reserved_bytes;
+      params.compute_ns = echo.compute_ns;
+    }
+    submitParams(params);
+  });
   row.appendChild(reset);
   body.appendChild(row);
 
@@ -1672,9 +2002,21 @@ function renderCompare(body) {
     ['makespan', before.solution.makespan_ns, after.solution.makespan_ns, fmtNs],
     ['峰值显存', before.solution.peak_vram_bytes, after.solution.peak_vram_bytes, fmtBytes],
     ['搬运', before.solution.h2d_bytes, after.solution.h2d_bytes, fmtBytes],
+  ];
+  if (after.m1) {
+    // 0.2 才有的几格。**换图前后那两张的版本可能不同**（0.1 ↔ 0.2），所以按 ``after`` 判，
+    // 并在缺 ``before`` 那一格时显示「—」——把 undefined 当成 0 会画出一条凭空的下降。
+    metrics.push(
+      ['峰值内存', before.solution.peak_dram_bytes, after.solution.peak_dram_bytes, fmtBytes],
+      ['D2H', before.solution.d2h_bytes, after.solution.d2h_bytes, fmtBytes],
+      ['SSD 读', before.solution.ssd_read_bytes, after.solution.ssd_read_bytes, fmtBytes],
+      ['SSD 写', before.solution.ssd_write_bytes, after.solution.ssd_write_bytes, fmtBytes],
+    );
+  }
+  metrics.push(
     ['动作数', before.solution.action_count, after.solution.action_count, num],
     ['展开状态', before.explore.verdict.expanded_states, after.explore.verdict.expanded_states, num],
-  ];
+  );
   const diff = document.createElement('div');
   diff.className = 'diff';
   for (const [label, b, a, fmt] of metrics) {
@@ -1862,41 +2204,151 @@ function renderInspector() {
     panel.appendChild(h);
   }
 
+  /** 一行 `名 · 状态` 的格子。带上「为什么是这个状态」的悬停说明。 */
+  function chips(entries) {
+    const box = document.createElement('div');
+    box.className = 'chips';
+    for (const item of entries) {
+      const span = document.createElement('span');
+      span.className = 'chip ' + (item.cls || '');
+      span.textContent = item.text;
+      if (item.note) span.title = item.note;
+      box.appendChild(span);
+    }
+    panel.appendChild(box);
+  }
+
   section('当前步');
   const kv = document.createElement('dl');
   kv.className = 'kv';
+  const step = isReplay()
+    ? ((payload.solution.actions || [])[snap.action_index == null ? -1 : snap.action_index] || null)
+    : (currentNode() ? currentNode().action : null);
   const rows = [
     ['时间 t', fmtNs(snap.t_ns)],
     ['累计代价 g', isReplay() ? fmtNs(snap.t_ns) : fmtNs(currentNode() ? currentNode().g_ns : null)],
     ['显存占用', fmtBytes(snap.used_vram_bytes)],
-    ['模式', isReplay() ? '回放计划' : '单步探索'],
   ];
+  if (payload.m1) rows.push(['内存占用', fmtBytes(snap.used_dram_bytes)]);
+  rows.push(['模式', isReplay() ? '回放计划' : '单步探索']);
+  // 「这一步在哪台机器上干的」：动作字典里**有** device/src/dst/location，屏上不写出来
+  // 就等于把它们丢了。0.1 的动作没有这几个字段，`routeText` 于是返回空串，这一行不出。
+  const stepWhere = routeText(step);
+  if (stepWhere) rows.push(['这一步', actionLabel(step) + '　@' + stepWhere]);
   for (const [k, v] of rows) {
     kv.innerHTML += '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>';
   }
   panel.appendChild(kv);
 
-  section('张量位置');
-  const chips = document.createElement('div');
-  chips.className = 'chips';
+  // 在飞的任务：**锁定这件事在模型里就是这个**——某个资源被某个任务占着，目标还没落地。
+  // 按目标索引，因为屏上要问的是「这个副本为什么还没好」。
+  const inFlight = {};
+  for (const task of (snap.running || [])) inFlight[task.target_id] = task;
   const graph = payload.graph;
-  for (const tensor of graph.tensors) {
-    const status = (snap.copy_status || {})[tensor.id] || (tensor.is_weight ? 'ABSENT' : 'READY');
-    const cls = status === 'READY' ? 'ready' : status === 'RESERVED_COPY' ? 'reserved' : '';
-    chips.innerHTML += '<span class="chip ' + cls + '">' + esc(tensor.name) + ' · ' +
-      esc(status) + '</span>';
+
+  /** 一个副本为什么停在这个状态。返回空串就是没有额外可说的事。
+   *
+   *  只报**状态里读得出的事实**（谁占着、哪条路线在飞），不推断内核的规则：规则写在内核
+   *  里，前端复述一遍就有第二个真相，而它错了没人会发现。
+   */
+  function chipNote(id, domain) {
+    const task = inFlight[id];
+    if (!task) return '';
+    // 写的那一格：``dram_to_ssd`` 的目标是**要写出去的那份副本**，而它读的是内存里已有的
+    // 那一份（没有第二个缓冲区），所以「在飞」在这本账上锁的是 DRAM 那格。同一件事在两个
+    // 域上的说法不一样，只能分开写，不能合成一句「这个张量在搬」。
+    if (task.route === 'dram_to_ssd' && domain === 'dram') {
+      return 'DRAM 副本被这次 SSD 写占着：写完之前它不能释放（写没有第二个缓冲区）';
+    }
+    if (domain === 'ssd') return '这次 SSD 读/写还没落地：SSD 上的那一份还不能用';
+    return (task.resource || '资源') + ' 上的任务还没结束（剩余 ' + fmtNs(task.remaining_ns) + '）';
   }
-  panel.appendChild(chips);
+
+  if (payload.m1) {
+    // **各域副本**：三个域各有一本账，各画各的。合成一张表会让人以为一个张量只能待在
+    // 一个地方——而「同一份权重在 DRAM 与 VRAM 各有一份」正是这一版要说清的事。
+    const ledger = {
+      vram: { status: () => snap.copy_status, used: () => snap.used_vram_bytes },
+      dram: { status: () => snap.dram_status, used: () => snap.used_dram_bytes },
+      // SSD 那格的用量是 ``null``，**不是漏了**：SSD 没有容量，也就没有用量
+      // （``used_bytes`` 的文档：向它要 SSD 的用量就是在要一个设计里没定义的数）。
+      ssd: { status: () => snap.ssd_status, used: () => null },
+    };
+    for (const place of (payload.m1.locations || [])) {
+      const entry = ledger[place.id];
+      if (!entry) continue;
+      const used = entry.used();
+      const limit = place.capacity_bytes;
+      section('副本 · ' + place.label + '（' + place.id + '）');
+      const line = document.createElement('p');
+      line.className = 'curve-name';
+      line.textContent = (used == null ? '没有用量这一说' : '已用 ' + fmtBytes(used)) +
+        (limit == null ? ' · 无容量上限' : ' / 上限 ' + fmtBytes(limit) + ' · 预留 ' + fmtBytes(place.reserved_bytes)) +
+        ' · 对齐 ' + fmtBytes(place.alignment_bytes) +
+        (place.device ? ' · 设备 ' + place.device : '') +
+        (place.can_evict ? ' · 可淘汰' : ' · 不可淘汰');
+      panel.appendChild(line);
+      const status = entry.status() || {};
+      chips(graph.tensors.map(tensor => {
+        const value = status[tensor.id] || (tensor.is_weight ? 'ABSENT' : 'READY');
+        return {
+          text: tensor.name + ' · ' + value,
+          cls: value === 'READY' ? 'ready' : (value.indexOf('RESERVED') === 0 ? 'reserved' : ''),
+          note: chipNote(tensor.id, place.id) || (tensor.name + ' 在 ' + place.label + '：' + value),
+        };
+      }));
+    }
+
+    // **输出是否已交付**：判据是 ``payload.m1.targets``（每个输出必须落在哪个域）与这一
+    // 状态里那个域的账本。两者都在载荷里，前端不自己判「算完了就算交付」。
+    section('输出交付');
+    const targets = payload.m1.targets || {};
+    chips((payload.m1.outputs || []).map(id => {
+      const want = targets[id];
+      const entry = ledger[want];
+      const tensor = graph.tensors.filter(item => item.id === id)[0];
+      const value = entry ? (entry.status() || {})[id] : null;
+      const delivered = value === 'READY';
+      return {
+        text: (tensor ? tensor.name : id) + ' → ' + (want || '?') + ' · ' +
+          (delivered ? '已交付' : value === 'RESERVED_COPY' ? '落地中' : '未交付'),
+        cls: delivered ? 'done' : (value === 'RESERVED_COPY' ? 'running' : ''),
+        note: '目标域 ' + want + '；这一状态里那个副本是 ' + (value || '（没有这本账）'),
+      };
+    }));
+
+    if ((snap.running || []).length) {
+      section('在飞的资源');
+      chips((snap.running || []).map(task => ({
+        text: (task.resource || '?') + ' · ' + (task.target_id || '?') + ' · 剩 ' + fmtNs(task.remaining_ns),
+        cls: 'running',
+        note: '设备/路线 ' + (task.device || task.route || '（0.1 的任务不带这两个字段）') +
+          '。四条资源的槽位都是 1，所以这一个任务就是这条资源的全部占用。',
+      })));
+    }
+  } else {
+    section('张量位置');
+    chips(graph.tensors.map(tensor => {
+      const value = (snap.copy_status || {})[tensor.id] || (tensor.is_weight ? 'ABSENT' : 'READY');
+      return {
+        text: tensor.name + ' · ' + value,
+        cls: value === 'READY' ? 'ready' : value === 'RESERVED_COPY' ? 'reserved' : '',
+      };
+    }));
+  }
 
   section('算子状态');
   const ops = document.createElement('div');
   ops.className = 'chips';
   for (const op of graph.operations) {
     const status = (snap.op_status || {})[op.id] || 'PENDING';
-    const running = (snap.running || []).some(t => t.target_id === op.id);
+    const task = inFlight[op.id];
+    const running = !!task || (snap.running || []).some(t => t.target_id === op.id);
     const cls = running ? 'running' : (status === 'DONE' ? 'done' : '');
-    ops.innerHTML += '<span class="chip ' + cls + '">' + esc(op.id) + ' · ' +
-      esc(running ? 'RUNNING' : status) + '</span>';
+    const device = task && task.device ? ' @' + task.device : '';
+    ops.innerHTML += '<span class="chip ' + cls + '" title="' +
+      esc(durationTitle(op, task ? task.device : null)) + '">' + esc(op.id) + ' · ' +
+      esc(running ? 'RUNNING' + device : status) + '</span>';
   }
   panel.appendChild(ops);
 

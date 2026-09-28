@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-two-weights-ssd",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance E: h = W1*x; y = W2*h, GPU-only, both weights on SSD and x in VRAM"
+  },
+  "comment": "M1_ACCEPTANCE.md 6. Both weights must be read from SSD and then copied to VRAM before anything can compute, so the case is a two-stage pipeline with one slot at each stage. It is the case where releasing a DRAM copy too early is not merely wasteful -- the source is locked for the whole H2D, and pretending otherwise is what would make 64 B look like 13 ms.",
+  "tensors": [
+    {
+      "id": "W1",
+      "name": "blk.0.ffn_gate.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["ssd"]
+    },
+    {
+      "id": "W2",
+      "name": "blk.0.ffn_down.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["ssd"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["vram"]
+    },
+    {
+      "id": "h",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W1", "x"],
+      "output": "h"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W2", "h"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-d-dram96",
+  "workload_file": "m1-two-weights-dram.workload.json",
+  "comment": "M1_ACCEPTANCE.md 5, the 96 B row. The graph is CPU-only, so nothing but DRAM capacity is in play: c1 needs 16+64+16 = 96 and the 64 B read of W2 has to wait for W1 and x to be released. 160 B buys 5 ms, 95 B is infeasible outright.",
+  "architecture": {
+    "dram_capacity_bytes": 96,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"y": "dram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "cpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      },
+      "c2": {
+        "cpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "ssd_to_dram": {"W2": {"duration_ns": 3000000}},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"c1": ["cpu"], "c2": ["cpu"]},
+    "allowed_transfers": {
+      "ssd_to_dram": ["W2"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

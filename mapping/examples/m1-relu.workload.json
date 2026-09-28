@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-relu",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance H: y = relu(x) with x starting in DRAM; the output is asked for on the SSD"
+  },
+  "comment": "M1_ACCEPTANCE.md 9. One operation and one output whose goal is not a memory domain at all: the only way to be done is to write the result to the SSD, so a plan that stops at the compute is incomplete.",
+  "tensors": [
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": [
+        "x"
+      ],
+      "output": "y"
+    }
+  ],
+  "outputs": [
+    "y"
+  ]
+}

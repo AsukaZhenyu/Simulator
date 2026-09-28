@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-matvec",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance A: y = W*x, W and x both start in DRAM, y is asked for in DRAM"
+  },
+  "comment": "M1_ACCEPTANCE.md 2. Both operands start in DRAM, so a GPU plan must pay for both H2D moves and a CPU plan pays for none -- that asymmetry is the whole point of the case.",
+  "tensors": [
+    {
+      "id": "W",
+      "name": "blk.0.attn_q.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W", "x"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

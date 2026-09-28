@@ -1,0 +1,58 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-e-dram128",
+  "workload_file": "m1-two-weights-ssd.workload.json",
+  "comment": "M1_ACCEPTANCE.md 6, the 128/160 row. Both weights come off SSD and go through DRAM into VRAM, so the case is a two-stage pipeline with one slot per stage. Its optimum is 13 ms and its DRAM=64 sibling is 16 ms, which is the difference between overlapping the two reads and having to serialise them.",
+  "architecture": {
+    "dram_capacity_bytes": 128,
+    "vram_capacity_bytes": 160,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"y": "vram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "gpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      },
+      "c2": {
+        "gpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "ssd_to_dram": {
+        "W1": {"duration_ns": 4000000},
+        "W2": {"duration_ns": 4000000}
+      },
+      "dram_to_vram": {
+        "W1": {"duration_ns": 3000000},
+        "W2": {"duration_ns": 3000000}
+      },
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"c1": ["gpu"], "c2": ["gpu"]},
+    "allowed_transfers": {
+      "ssd_to_dram": ["W1", "W2"],
+      "dram_to_vram": ["W1", "W2"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

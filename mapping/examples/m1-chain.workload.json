@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-chain",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance B: h = relu(x); y = relu(h), x starts in DRAM"
+  },
+  "comment": "M1_ACCEPTANCE.md 3. Two activations in a row and nothing else: cheap on one device, expensive on the other, in opposite directions. The hybrid split wins by handing h across the PCIe once, which is the case a single-device model cannot express at all.",
+  "tensors": [
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "h",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["x"],
+      "output": "h"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["h"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

@@ -10,6 +10,20 @@
     states.json   the initial state and the state after every action
     mapping.json  search only: the replayable action list
 
+``M1_DESIGN.md`` §8 extends the first three for 0.2 without changing the shape
+of the set::
+
+    stats.json    peak_dram_bytes, d2h_bytes, ssd_read_bytes, ssd_write_bytes,
+                  the four transfer directions' service times, the CPU/GPU
+                  compute service times, and each output's target domain
+    events.json   device, src, dst and evicted location
+    states.json   the DRAM usage and copy status, and the runtime SSD copies
+
+A 0.1 scenario produces exactly the 0.1 documents it always did: every extension
+is gated on ``scenario.is_m1``, so an old artefact stays byte-identical rather
+than gaining a field nobody asked it to have. That is what "0.1 产物保持兼容"
+means concretely (``M1_DESIGN.md`` §8).
+
 Everything here is a *rendering* of decisions the core already made. This module
 decides no legality, no timing and no optimality of its own: if a number is not
 already on an :class:`~tensor_mapping.engine.EvaluationResult` or a
@@ -35,8 +49,8 @@ only when the cost source really is synthetic. Flipping a scenario field
 therefore changes the artefact, which is testable; a hardcoded paragraph of
 caveats would silently go stale instead.
 
-All four documents carry ``"schema_version": "0.1"`` (``DESIGN.md`` §4), and are
-written with ``newline="\\n"`` -- see :func:`write_json`.
+All four documents carry the scenario's own ``schema_version`` -- ``"0.1"`` or
+``"0.2"`` -- and are written with ``newline="\\n"`` -- see :func:`write_json`.
 """
 
 from __future__ import annotations
@@ -49,6 +63,8 @@ from typing import Any
 from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE,
     ACTION_COMPUTE,
+    ACTION_COPY,
+    ACTION_EVICT,
     Action,
     EvaluationResult,
     Event,
@@ -56,8 +72,17 @@ from llm_infer_model.tensor.engine import (
 )
 from .mapper import SearchResult
 from llm_infer_model.tensor.spec import (
+    LOC_DRAM,
+    LOC_VRAM,
     ORIGIN_GGML,
-    SCHEMA_VERSION,
+    RESOURCE_CPU_COMPUTE,
+    RESOURCE_GPU_COMPUTE,
+    ROUTES,
+    ROUTE_DRAM_TO_SSD,
+    ROUTE_DRAM_TO_VRAM,
+    ROUTE_ENDS,
+    ROUTE_SSD_TO_DRAM,
+    ROUTE_VRAM_TO_DRAM,
     Architecture,
     Scenario,
     scenario_fingerprint,
@@ -67,13 +92,16 @@ from llm_infer_model.tensor.spec import (
 __all__ = [
     "MODE_MODEL",
     "MODE_SEARCH",
+    "SERVICE_BUCKETS",
     "action_to_dict",
     "assumptions",
     "events_document",
     "limits_block",
+    "m1_metrics",
     "mapping_document",
     "mapping_note",
     "search_block",
+    "service_block",
     "stats_document",
     "states_document",
     "write_json",
@@ -85,6 +113,25 @@ COST_SOURCE_SYNTHETIC = "synthetic_fixed"
 
 MODE_MODEL = "model"
 MODE_SEARCH = "search"
+
+# The buckets `service_block` reports, in a fixed order so that two runs of the
+# same command produce the same document. Compute is split by device and each
+# transfer direction stands alone: "pcie_copy" and "ssd_io" each serve two
+# directions, and a reader weighing a plan against a bandwidth wants the
+# direction, not the slot (M1_DESIGN.md §8).
+SERVICE_BUCKETS = (
+    RESOURCE_CPU_COMPUTE,
+    RESOURCE_GPU_COMPUTE,
+    ROUTE_DRAM_TO_VRAM,
+    ROUTE_VRAM_TO_DRAM,
+    ROUTE_SSD_TO_DRAM,
+    ROUTE_DRAM_TO_SSD,
+)
+
+# Direction of a transfer, from its endpoints rather than from its action kind:
+# `ROUTE_ENDS` is the engine's own table, so a mis-directed event cannot be
+# bucketed into a direction the model does not have.
+_ENDS_TO_BUCKET = {ends: route for route, ends in ROUTE_ENDS.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -166,8 +213,47 @@ def limits_block(
     passes the *effective* values -- for a search, the ones on its
     ``SearchResult`` -- so this block can never contradict the ``search`` block
     sitting next to it in ``stats.json``.
+
+    The 0.2 block is a different shape, not the same shape with more keys: 0.2
+    has two bounded domains with two independent reserves and alignments, four
+    resources, and an allowed set per operation and per route. Reporting
+    ``allocation_alignment_bytes`` for a scenario that has two of them would be
+    a limit that is silently only half true, so the two versions are written out
+    separately.
     """
     architecture: Architecture = scenario.architecture
+    common = {
+        "algorithm": scenario.mapper.algorithm,
+        "max_expanded_states": max_expanded_states,
+        "wall_time_limit_s": wall_time_limit_s,
+    }
+    if scenario.is_m1:
+        mapspace = scenario.mapspace
+        return {
+            "dram_capacity_bytes": architecture.dram_capacity_bytes,
+            "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,
+            "dram_alignment_bytes": architecture.alignment_of(LOC_DRAM),
+            "vram_capacity_bytes": architecture.vram_capacity_bytes,
+            "vram_runtime_reserved_bytes": architecture.reserved_of(LOC_VRAM),
+            "vram_alignment_bytes": architecture.alignment_of(LOC_VRAM),
+            "cpu_compute_slots": architecture.cpu_compute_slots,
+            "gpu_compute_slots": architecture.gpu_compute_slots,
+            "pcie_copy_slots": architecture.pcie_copy_slots,
+            "ssd_io_slots": architecture.ssd_io_slots,
+            "allowed_devices": {
+                op_id: list(devices) for op_id, devices in mapspace.allowed_devices.items()
+            },
+            "allowed_transfers": {
+                route: list(mapspace.tensors_for(route))
+                for route in ROUTES
+                if mapspace.tensors_for(route)
+            },
+            "allow_eviction": mapspace.allow_eviction,
+            "allow_copy_compute_overlap": mapspace.allow_copy_compute_overlap,
+            "allow_cpu_gpu_overlap": mapspace.allow_cpu_gpu_overlap,
+            "allow_recomputation": mapspace.allow_recomputation,
+            **common,
+        }
     return {
         "vram_capacity_bytes": architecture.vram_capacity_bytes,
         "runtime_reserved_bytes": architecture.runtime_reserved_bytes,
@@ -182,38 +268,79 @@ def limits_block(
         "allow_eviction": scenario.mapspace.allow_eviction,
         "allow_copy_compute_overlap": scenario.mapspace.allow_copy_compute_overlap,
         "allow_recomputation": scenario.mapspace.allow_recomputation,
-        "algorithm": scenario.mapper.algorithm,
-        "max_expanded_states": max_expanded_states,
-        "wall_time_limit_s": wall_time_limit_s,
+        **common,
     }
 
 
 def assumptions(scenario: Scenario) -> list[str]:
-    """M0's model caveats, each emitted only when it is true of this scenario.
+    """The model caveats, each emitted only when it is true of this scenario.
 
-    These are ``DESIGN.md`` §1's scope statements rather than anything derivable
-    from a single field, so they live here and are checked against the scenario
-    where they can be. M1 adds CPU math and bidirectional transfer; the sentences
-    about the single copy resource and about the missing CPU path must change
-    then, and the test that pins them will fail until they do.
+    These are ``DESIGN.md`` §1's and ``M1_DESIGN.md`` §1's scope statements
+    rather than anything derivable from a single field, so they live here and are
+    checked against the scenario where they can be.
+
+    The two versions build their own opening sentences rather than sharing one
+    with a word swapped in. 0.1 says "M0 has no bandwidth model" and names
+    ``peak_vram_bytes`` and ``allocation_alignment_bytes``; 0.2 names both
+    domains' peaks and both alignments and has no M0 to speak of. Those are two
+    different claims, not one claim with a parameter, and keeping them apart is
+    what lets a 0.1 ``stats.json`` stay byte-identical to the one the tool wrote
+    before 0.2 existed.
+
+    The M1 sentences name what was *not* modelled as carefully as what was: the
+    SSD is a duration per tensor standing in for an average effective read/write
+    speed, and its internals, its capacity and its eviction are absent by design
+    rather than by omission.
     """
     architecture = scenario.architecture
-    notes = [
-        "costs are fixed per-operation durations; M0 has no bandwidth model and "
-        "no calibration against hardware",
-        "peak_vram_bytes and allocation_alignment_bytes are this model's own "
-        "accounting, not a vendor allocator's",
-    ]
-    if architecture.dram_capacity_bytes is None:
+    if scenario.is_m1:
+        notes = [
+            "costs are fixed per-operation durations; this model has no "
+            "bandwidth model and no calibration against hardware",
+            "peak_dram_bytes, peak_vram_bytes and the alignment rules are this "
+            "model's own accounting, not a vendor allocator's",
+            "one CPU compute slot, one GPU compute slot, one PCIe slot shared by "
+            "both copy directions, and one ssd_io slot shared by SSD reads and "
+            "writes",
+        ]
+        if architecture.dram_capacity_bytes is None:
+            notes.append(
+                "DRAM is modelled as unbounded, which is a property of this "
+                "scenario document rather than of 0.2"
+            )
+        else:
+            notes.append(
+                "DRAM is a bounded store: a copy that does not fit is refused "
+                "rather than queued, and a released copy is only recoverable "
+                "from a source that still exists"
+            )
         notes.append(
-            "DRAM is modelled as an unbounded, read-only source store, which is "
-            "what makes a weight reloadable after EVICT"
+            "the SSD has no capacity, no alignment and no eviction; SSD traffic "
+            "is a fixed duration per tensor, standing in for an average "
+            "effective read and write speed, and the device's internals are not "
+            "simulated"
         )
-    if architecture.gpu_compute_slots == 1 and architecture.h2d_copy_slots == 1:
         notes.append(
-            "exactly one GPU compute resource and one H2D copy resource; no CPU "
-            "math, no device-to-host copy and no SSD"
+            "every requested output names the location it has to reach, and an "
+            "SSD target counts as delivered only once its write has completed"
         )
+    else:
+        notes = [
+            "costs are fixed per-operation durations; M0 has no bandwidth model "
+            "and no calibration against hardware",
+            "peak_vram_bytes and allocation_alignment_bytes are this model's own "
+            "accounting, not a vendor allocator's",
+        ]
+        if architecture.dram_capacity_bytes is None:
+            notes.append(
+                "DRAM is modelled as an unbounded, read-only source store, which "
+                "is what makes a weight reloadable after EVICT"
+            )
+        if architecture.gpu_compute_slots == 1 and architecture.h2d_copy_slots == 1:
+            notes.append(
+                "exactly one GPU compute resource and one H2D copy resource; no "
+                "CPU math, no device-to-host copy and no SSD"
+            )
     if scenario.costs.source == COST_SOURCE_SYNTHETIC:
         notes.append(
             "costs.source is synthetic_fixed: the durations were chosen for the "
@@ -221,7 +348,7 @@ def assumptions(scenario: Scenario) -> list[str]:
         )
     else:
         notes.append(
-            f"costs.source is {scenario.costs.source!r}; M0 accepts only "
+            f"costs.source is {scenario.costs.source!r}; this model accepts only "
             "externally supplied fixed durations"
         )
     origin = scenario.workload.origin
@@ -237,34 +364,141 @@ def assumptions(scenario: Scenario) -> list[str]:
     return notes
 
 
+def service_block(evaluation: EvaluationResult) -> dict[str, int]:
+    """Occupied nanoseconds per resource, folded out of the event log.
+
+    ``M1_DESIGN.md`` §8 asks 0.2 to report CPU/GPU compute time and each
+    direction's service time. Both are sums over the events of ``end_ns -
+    start_ns``, which is why this belongs here and not in the engine: it is
+    arithmetic over records the evaluator already produced, and by construction
+    it cannot disagree with ``events.json``, because that document carries the
+    very intervals being summed.
+
+    Buckets come from the event's own ``device``/``src``/``dst`` rather than from
+    its action kind, the same way ``_accumulate_transfer_bytes`` counts bytes:
+    the log is what a reader checks, so a mis-tagged event must not be able to
+    make this block look self-consistent. Events that occupy no resource -- an
+    ``ADVANCE``, an ``EVICT`` -- contribute nothing.
+
+    Every bucket is reported, including the ones that stayed at zero: an H2D
+    time that is absent and an H2D time that is zero are different claims, and a
+    reader comparing two plans should not have to infer which one they are
+    looking at.
+    """
+    service = dict.fromkeys(SERVICE_BUCKETS, 0)
+    for event in evaluation.events:
+        if event.start_ns is None or event.end_ns is None:
+            continue
+        if event.kind == ACTION_COMPUTE:
+            bucket = (
+                RESOURCE_CPU_COMPUTE
+                if event.device == "cpu"
+                else RESOURCE_GPU_COMPUTE
+                if event.device == "gpu"
+                else None
+            )
+        else:
+            bucket = _ENDS_TO_BUCKET.get((event.src, event.dst))
+        if bucket in service:
+            service[bucket] += event.end_ns - event.start_ns
+    return service
+
+
+def m1_metrics(
+    scenario: Scenario, evaluation: EvaluationResult | None
+) -> dict[str, Any]:
+    """The extra numbers a 0.2 ``stats.json`` carries, in document order.
+
+    One function rather than six more keyword arguments on
+    :func:`stats_document`: the set is emitted as a unit or not at all, and
+    keeping it in one place means the two entry points cannot disagree about
+    which fields a 0.2 run reports.
+
+    ``evaluation is None`` -- an ``infeasible`` search, where no plan was ever
+    replayed -- leaves every measured number ``None`` rather than ``0``. The
+    distinction is the one ``action_count`` already makes: a peak of zero bytes
+    is a claim about a run, and no run happened.
+
+    ``target_locations`` is the exception, because it is not measured: it is read
+    off the goal, so it is a fact about the question whether or not an answer was
+    found. The goal is the requirement, and a plan meeting a different one is a
+    plan for a different question.
+    """
+    if evaluation is None:
+        peak_dram_bytes = d2h_bytes = ssd_read_bytes = ssd_write_bytes = None
+        service: dict[str, int] | None = None
+    else:
+        peak_dram_bytes = evaluation.peak_dram_bytes
+        d2h_bytes = evaluation.d2h_bytes
+        ssd_read_bytes = evaluation.ssd_read_bytes
+        ssd_write_bytes = evaluation.ssd_write_bytes
+        service = service_block(evaluation)
+    return {
+        "peak_dram_bytes": peak_dram_bytes,
+        "d2h_bytes": d2h_bytes,
+        "ssd_read_bytes": ssd_read_bytes,
+        "ssd_write_bytes": ssd_write_bytes,
+        "target_locations": dict(scenario.goal.output_locations),
+        "service_ns": service,
+    }
+
+
 # ---------------------------------------------------------------------------
 # events / states
 # ---------------------------------------------------------------------------
 
 
-def action_to_dict(action: Action) -> dict[str, Any]:
+def action_to_dict(action: Action, *, m1: bool = False) -> dict[str, Any]:
     """One action in the JSON spelling ``load_mapping`` reads back.
 
     ``Action`` stores a single ``target_id`` whatever the kind, but the document
-    format splits it into ``tensor_id`` for COPY_H2D/EVICT and ``operation_id``
-    for COMPUTE (``engine._parse_action``). Emitting ``target_id`` would produce
-    a mapping this package cannot load.
+    format splits it into ``tensor_id`` for the copy/eviction kinds and
+    ``operation_id`` for COMPUTE (``engine._parse_action``). Emitting
+    ``target_id`` would produce a mapping this package cannot load.
+
+    ``m1`` writes the four 0.2 fields, and it is not optional in the sense that
+    matters: a 0.2 action written without its device or its ``src``/``dst`` is
+    rejected on load (``engine._parse_action_m1`` -- "there is no default"), so a
+    caller that forgets produces a file that no longer replays. The default is
+    ``False`` because this is a spelling helper and not every caller has a
+    scenario in hand; every caller that *does* must pass it, and the viewer's
+    recorder stores the scenario's own version for exactly that reason.
+    :func:`mapping_document` is the one that writes a file meant to be reloaded,
+    and it passes the scenario's own version too.
     """
     if action.kind == ACTION_ADVANCE:
         return {"kind": ACTION_ADVANCE}
     if action.kind == ACTION_COMPUTE:
-        return {"kind": ACTION_COMPUTE, "operation_id": action.target_id}
-    return {"kind": action.kind, "tensor_id": action.target_id}
+        document: dict[str, Any] = {
+            "kind": ACTION_COMPUTE,
+            "operation_id": action.target_id,
+        }
+        if m1:
+            document["device"] = action.device
+        return document
+    document = {"kind": action.kind, "tensor_id": action.target_id}
+    if m1:
+        if action.kind == ACTION_COPY:
+            document["src"] = action.src
+            document["dst"] = action.dst
+        elif action.kind == ACTION_EVICT:
+            document["location"] = action.location
+        # READ_SSD and WRITE_SSD name a tensor and nothing else: their direction
+        # is fixed, and writing ``src``/``dst`` for them would be a field the
+        # parser rejects rather than ignores.
+    return document
 
 
-def _event_to_dict(event: Event) -> dict[str, Any]:
+def _event_to_dict(event: Event, *, m1: bool) -> dict[str, Any]:
     """An event's fields, spelled out one by one.
 
     Not ``dataclasses.asdict``: the field names here are the contract's own
     vocabulary, and writing them out means a renamed dataclass field cannot
-    silently rename an artefact key along with it.
+    silently rename an artefact key along with it. It also keeps the 0.1
+    spelling fixed, which matters because the four 0.2 fields are ``None`` on a
+    0.1 event and emitting them would add dead keys to every old artefact.
     """
-    return {
+    document = {
         "action_index": event.action_index,
         "kind": event.kind,
         "target_id": event.target_id,
@@ -276,9 +510,20 @@ def _event_to_dict(event: Event) -> dict[str, Any]:
         "workspace_bytes": event.workspace_bytes,
         "bytes_released": event.bytes_released,
     }
+    if m1:
+        # M1_DESIGN.md §8: an event has to say *where* the work happened, so a
+        # reader can attribute it to a device, a direction or a domain without
+        # consulting the scenario.
+        document["device"] = event.device
+        document["src"] = event.src
+        document["dst"] = event.dst
+        document["location"] = event.location
+    return document
 
 
-def _state_to_dict(snapshot: StateSnapshot, action_index: int | None) -> dict[str, Any]:
+def _state_to_dict(
+    snapshot: StateSnapshot, action_index: int | None, *, m1: bool
+) -> dict[str, Any]:
     """One state summary, plus the action index that produced it.
 
     ``action_index`` is ``None`` for the initial state and ``i`` for the state
@@ -290,14 +535,23 @@ def _state_to_dict(snapshot: StateSnapshot, action_index: int | None) -> dict[st
 
     The status pairs are already sorted by id, so the dicts come out in the same
     order on every run.
+
+    There is no ``used_ssd_bytes`` beside the two domain usages: the SSD has no
+    capacity, so usage is not a number 0.2 has. What a reader needs from it --
+    which snapshots exist and whether a write has landed -- is ``ssd_status``.
     """
-    return {
+    document = {
         "action_index": action_index,
         "t_ns": snapshot.t,
         "used_vram_bytes": snapshot.used_vram_bytes,
         "op_status": dict(snapshot.op_status),
         "copy_status": dict(snapshot.copy_status),
     }
+    if m1:
+        document["used_dram_bytes"] = snapshot.used_dram_bytes
+        document["dram_status"] = dict(snapshot.dram_status)
+        document["ssd_status"] = dict(snapshot.ssd_status)
+    return document
 
 
 def _log_document(
@@ -308,7 +562,10 @@ def _log_document(
     entries: Sequence[Any],
     note: str | None,
 ) -> dict[str, Any]:
-    document: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "mode": mode}
+    document: dict[str, Any] = {
+        "schema_version": scenario.schema_version,
+        "mode": mode,
+    }
     document.update(_identity(scenario))
     if note is not None:
         document["note"] = note
@@ -333,7 +590,7 @@ def events_document(
         mode=mode,
         scenario=scenario,
         key="events",
-        entries=[_event_to_dict(event) for event in events],
+        entries=[_event_to_dict(event, m1=scenario.is_m1) for event in events],
         note=note,
     )
 
@@ -353,7 +610,7 @@ def states_document(
     """
     snapshots = () if evaluation is None else evaluation.states
     entries = [
-        _state_to_dict(snapshot, None if index == 0 else index - 1)
+        _state_to_dict(snapshot, None if index == 0 else index - 1, m1=scenario.is_m1)
         for index, snapshot in enumerate(snapshots)
     ]
     return _log_document(
@@ -397,6 +654,7 @@ def stats_document(
     action_count: int | None,
     declared_action_count: int,
     limits: Mapping[str, Any],
+    m1: Mapping[str, Any] | None = None,
     error: Mapping[str, Any] | None = None,
     search: Mapping[str, Any] | None = None,
     scenario_file: str | None = None,
@@ -413,9 +671,21 @@ def stats_document(
 
     ``action_count`` is ``None`` rather than ``0`` when nothing was applied at
     all, so that ``0`` never has to double as "absent".
+
+    ``m1`` carries the 0.2 numbers (:func:`m1_metrics`) and is required for a 0.2
+    scenario. It is a hard error rather than a silent ``null`` because the
+    failure it guards against -- a 0.2 run reporting no DRAM peak because a
+    caller forgot an argument -- produces a document that is *valid* and wrong,
+    which is the one kind of artefact worth crashing over. 0.1 passes nothing and
+    gets the document it always got.
     """
+    if scenario.is_m1 and m1 is None:
+        raise ValueError(
+            f"scenario {scenario.id!r} is 0.2, so its stats document needs the "
+            "M1 metrics; pass m1=m1_metrics(scenario, evaluation)"
+        )
     document: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": scenario.schema_version,
         "mode": mode,
         "status": status,
         "reason": reason,
@@ -428,8 +698,23 @@ def stats_document(
     document["graph_origin"] = _graph_origin(scenario)
     document["cost_source"] = scenario.costs.source
     document["makespan_ns"] = makespan_ns
+    if m1 is not None:
+        # The DRAM peak sits beside the VRAM one and the four directions sit
+        # beside ``h2d_bytes``, which keeps its exact 0.1 meaning (M1_DESIGN.md
+        # §8). Folding them into a nested block would have been tidier to emit
+        # and worse to read: a reader comparing a 0.1 and a 0.2 run of the same
+        # workload should find the peak in the same place.
+        document["peak_dram_bytes"] = m1["peak_dram_bytes"]
     document["peak_vram_bytes"] = peak_vram_bytes
     document["h2d_bytes"] = h2d_bytes
+    if m1 is not None:
+        document["d2h_bytes"] = m1["d2h_bytes"]
+        document["ssd_read_bytes"] = m1["ssd_read_bytes"]
+        document["ssd_write_bytes"] = m1["ssd_write_bytes"]
+        document["target_locations"] = dict(m1["target_locations"])
+        document["service_ns"] = (
+            None if m1["service_ns"] is None else dict(m1["service_ns"])
+        )
     document["action_count"] = action_count
     document["declared_action_count"] = declared_action_count
     document["limits"] = dict(limits)
@@ -491,10 +776,12 @@ def mapping_document(
     that is what makes two runs into different output directories comparable.
     """
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": scenario.schema_version,
         "scenario_id": scenario.id,
         "comment": comment,
         "workload_fingerprint": workload_fingerprint(scenario.workload),
         "scenario_fingerprint": scenario_fingerprint(scenario),
-        "actions": [action_to_dict(action) for action in result.actions],
+        "actions": [
+            action_to_dict(action, m1=scenario.is_m1) for action in result.actions
+        ],
     }

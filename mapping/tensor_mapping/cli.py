@@ -54,13 +54,14 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, NoReturn, Sequence
+from typing import Any, Mapping, NoReturn, Sequence
 
 from .artifacts import (
     MODE_MODEL,
     MODE_SEARCH,
     events_document,
     limits_block,
+    m1_metrics,
     mapping_document,
     mapping_note,
     search_block,
@@ -361,6 +362,29 @@ def _empty_note(*, what: str, status: str, reason: str) -> str:
     )
 
 
+def _m1_summary(m1: Mapping[str, Any] | None) -> str:
+    """The 0.2 metrics, appended to the one-line summary.
+
+    Empty for 0.1, so the line a 0.1 run prints is exactly what it always was --
+    the summary is what a shell and a script see, and a reader comparing the same
+    workload across the two schemas should get a common prefix rather than two
+    differently shaped lines.
+
+    The six service times are deliberately left out. They are in ``stats.json``
+    for whoever wants them, and the peak plus the four direction totals already
+    answer the question the summary exists to answer: did this plan move more
+    than it had to.
+    """
+    if m1 is None:
+        return ""
+    return (
+        f" peak_dram_bytes={m1['peak_dram_bytes']}"
+        f" d2h_bytes={m1['d2h_bytes']}"
+        f" ssd_read_bytes={m1['ssd_read_bytes']}"
+        f" ssd_write_bytes={m1['ssd_write_bytes']}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # The two commands
 # ---------------------------------------------------------------------------
@@ -407,6 +431,7 @@ def _run_model(args: argparse.Namespace) -> int:
         max_expanded_states=scenario.mapper.max_expanded_states,
         wall_time_limit_s=scenario.mapper.wall_time_limit_s,
     )
+    m1 = m1_metrics(scenario, evaluation) if scenario.is_m1 else None
     stats = stats_document(
         mode=MODE_MODEL,
         scenario=scenario,
@@ -422,6 +447,7 @@ def _run_model(args: argparse.Namespace) -> int:
         # user passed may have listed twenty.
         declared_action_count=len(document.actions),
         limits=limits,
+        m1=m1,
         error=error,
         scenario_file=args.scenario,
         mapping_file=args.mapping,
@@ -445,7 +471,8 @@ def _run_model(args: argparse.Namespace) -> int:
         f"model: {evaluation.status} ({evaluation.reason.split(':')[0]}) "
         f"makespan_ns={evaluation.makespan_ns} "
         f"peak_vram_bytes={evaluation.peak_vram_bytes} "
-        f"h2d_bytes={evaluation.h2d_bytes} "
+        f"h2d_bytes={evaluation.h2d_bytes}"
+        f"{_m1_summary(m1)} "
         f"action_count={evaluation.action_count} -> {out_dir}"
     )
     if ok:
@@ -481,6 +508,11 @@ def _run_search(args: argparse.Namespace) -> int:
     )
     evaluation = result.evaluation
     action_count = evaluation.action_count if evaluation is not None else None
+    # Built from the evaluator's result rather than from `result`'s own copies of
+    # the three 0.1 metrics: `SearchResult` carries those for convenience and has
+    # no equivalent for the 0.2 numbers, so reading them here keeps all six of
+    # the measured fields coming from one object.
+    m1 = m1_metrics(scenario, evaluation) if scenario.is_m1 else None
 
     note = (
         _empty_note(
@@ -508,6 +540,7 @@ def _run_search(args: argparse.Namespace) -> int:
         action_count=action_count,
         declared_action_count=len(result.actions),
         limits=limits,
+        m1=m1,
         search=search_block(result),
         scenario_file=args.scenario,
     )
@@ -542,7 +575,8 @@ def _run_search(args: argparse.Namespace) -> int:
         f"search: {result.status} ({result.termination_reason}) "
         f"makespan_ns={result.makespan_ns} "
         f"peak_vram_bytes={result.peak_vram_bytes} "
-        f"h2d_bytes={result.h2d_bytes} "
+        f"h2d_bytes={result.h2d_bytes}"
+        f"{_m1_summary(m1)} "
         f"optimality_proven={result.optimality_proven} "
         f"expanded_states={result.expanded_states} "
         f"wall_time_s={result.wall_time_s:.6f} -> {out_dir}"

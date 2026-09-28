@@ -40,12 +40,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 __all__ = [
     "SCHEMA_VERSION",
+    "SCHEMA_VERSION_M1",
+    "SUPPORTED_SCHEMA_VERSIONS",
     "SpecError",
     "InvalidInput",
     "Unsupported",
@@ -61,9 +64,15 @@ __all__ = [
     "Mapspace",
     "MapperConfig",
     "Scenario",
+    # --- 0.2 ---
+    "M1Costs",
+    "M1Goal",
+    "M1Mapspace",
+    "TransferCost",
     "aligned_size",
     "load_workload",
     "load_and_validate",
+    "reachable_locations",
     "workload_fingerprint",
     "scenario_fingerprint",
     "check_initial_capacity",
@@ -94,11 +103,41 @@ __all__ = [
     "SEMANTIC_ADD",
     "SEMANTIC_MUL_MAT",
     "SEMANTIC_RELU",
+    # 0.2 的取值域：位置多了一个 SSD，设备、路线、资源各是一组新名字。
+    # 与上面那些常量同理，调用方按名比较它们，所以属于公开面。
+    "DEVICE_CPU",
+    "DEVICE_GPU",
+    "DEVICE_OF_DOMAIN",
+    "DOMAIN_OF_DEVICE",
+    "DOMAINS",
+    "LOC_SSD",
+    "M1_RESOURCES",
+    "RESOURCE_CPU_COMPUTE",
+    "RESOURCE_GPU_COMPUTE",
+    "RESOURCE_OF_DEVICE",
+    "RESOURCE_OF_ROUTE",
+    "RESOURCE_PCIE_COPY",
+    "RESOURCE_SSD_IO",
+    "ROUTE_DRAM_TO_SSD",
+    "ROUTE_DRAM_TO_VRAM",
+    "ROUTE_ENDS",
+    "ROUTE_SSD_TO_DRAM",
+    "ROUTE_VRAM_TO_DRAM",
+    "ROUTES",
 ]
 
 # All M0 JSON documents -- workload, scenario and mapping alike -- carry this
 # same version string (DESIGN.md §4).
 SCHEMA_VERSION = "0.1"
+
+# M1 uses 0.2 (``M1_DESIGN.md`` §4). The two are not one schema with optional
+# fields: 0.1 fixes one device, one copy route and an unbounded DRAM source,
+# while 0.2 makes all three explicit. ``SUPPORTED_SCHEMA_VERSIONS`` is what the
+# parsers accept; everything downstream branches on the version string carried
+# on the ``Scenario``, so a 0.1 document can never accidentally acquire 0.2
+# semantics by having a field default to something new.
+SCHEMA_VERSION_M1 = "0.2"
+SUPPORTED_SCHEMA_VERSIONS = (SCHEMA_VERSION, SCHEMA_VERSION_M1)
 
 # ---------------------------------------------------------------------------
 # Enumerations. Kept as plain strings rather than enum.Enum so that the values
@@ -121,7 +160,51 @@ _SEMANTIC_OPS = frozenset({SEMANTIC_MUL_MAT, SEMANTIC_RELU, SEMANTIC_ADD})
 
 LOC_DRAM = "dram"
 LOC_VRAM = "vram"
+# M1.3 makes the SSD a real third location: tensors can start there and, unlike
+# M1.2, the engine can also write immutable snapshots back to it. It is still
+# not an allocation domain -- there is no SSD capacity, no alignment and no SSD
+# eviction action; what has to be tracked is only *which* SSD copies exist and
+# whether a write has finished (M1_DESIGN.md §3).
+LOC_SSD = "ssd"
 _LOCATIONS = frozenset({LOC_DRAM, LOC_VRAM})
+_LOCATIONS_M1 = frozenset({LOC_DRAM, LOC_VRAM, LOC_SSD})
+
+# Storage domains = locations a copy can live on and that are *ledgered*. SSD is
+# deliberately absent: it holds unbounded static scene content plus runtime
+# snapshots, and the design gives it no capacity constraint.
+DOMAINS = (LOC_DRAM, LOC_VRAM)
+# Where a 0.2 goal may ask for an output. An SSD target is delivered only when
+# its write has completed (M1_DESIGN.md §4).
+GOAL_LOCATIONS_M1 = (LOC_DRAM, LOC_VRAM, LOC_SSD)
+
+# Compute devices.
+DEVICE_CPU = "cpu"
+DEVICE_GPU = "gpu"
+_DEVICES = frozenset({DEVICE_CPU, DEVICE_GPU})
+# Which storage domain a device reads its operands from and writes its result
+# to. This is the whole of the "CPU computes in DRAM, GPU computes in VRAM"
+# rule (M1_DESIGN.md §5).
+DOMAIN_OF_DEVICE = {DEVICE_CPU: LOC_DRAM, DEVICE_GPU: LOC_VRAM}
+DEVICE_OF_DOMAIN = {LOC_DRAM: DEVICE_CPU, LOC_VRAM: DEVICE_GPU}
+
+# Transfer routes. Each is a fixed (source, destination) pair; the direction is
+# part of the route's identity, never a per-action choice.
+ROUTE_DRAM_TO_VRAM = "dram_to_vram"
+ROUTE_VRAM_TO_DRAM = "vram_to_dram"
+ROUTE_SSD_TO_DRAM = "ssd_to_dram"
+ROUTE_DRAM_TO_SSD = "dram_to_ssd"
+ROUTES = (
+    ROUTE_DRAM_TO_VRAM,
+    ROUTE_VRAM_TO_DRAM,
+    ROUTE_SSD_TO_DRAM,
+    ROUTE_DRAM_TO_SSD,
+)
+ROUTE_ENDS = {
+    ROUTE_DRAM_TO_VRAM: (LOC_DRAM, LOC_VRAM),
+    ROUTE_VRAM_TO_DRAM: (LOC_VRAM, LOC_DRAM),
+    ROUTE_SSD_TO_DRAM: (LOC_SSD, LOC_DRAM),
+    ROUTE_DRAM_TO_SSD: (LOC_DRAM, LOC_SSD),
+}
 
 # Operation status (DESIGN.md §5).
 OP_NOT_STARTED = "NOT_STARTED"
@@ -144,8 +227,49 @@ ORIGIN_SYNTHETIC = "synthetic_fixture"
 _ORIGIN_KINDS = frozenset({ORIGIN_GGML, ORIGIN_SYNTHETIC})
 
 # Resource names used in states, events and error reports.
+#
+# The two 0.1 names are kept exactly as they were: they appear in stored events
+# and states artefacts and in every M0 test, so renaming them would rewrite
+# history rather than describe it. In 0.2 the GPU compute resource *is* this
+# same name, and the new ones sit beside it.
 RESOURCE_COMPUTE = "gpu_compute"
 RESOURCE_COPY = "h2d_copy"
+
+RESOURCE_CPU_COMPUTE = "cpu_compute"
+RESOURCE_GPU_COMPUTE = RESOURCE_COMPUTE
+RESOURCE_PCIE_COPY = "pcie_copy"
+# One slot shared by SSD reads and SSD writes: the two directions are mutually
+# exclusive, while the SSD and the PCIe engine can run together
+# (M1_DESIGN.md §3).
+RESOURCE_SSD_IO = "ssd_io"
+
+# M1_DESIGN.md §3: exactly one slot of each. Declared here so the parser, the
+# engine and the report all read the same list.
+M1_RESOURCES = (
+    RESOURCE_CPU_COMPUTE,
+    RESOURCE_GPU_COMPUTE,
+    RESOURCE_PCIE_COPY,
+    RESOURCE_SSD_IO,
+)
+RESOURCE_OF_DEVICE = {
+    DEVICE_CPU: RESOURCE_CPU_COMPUTE,
+    DEVICE_GPU: RESOURCE_GPU_COMPUTE,
+}
+_RESOURCE_SLOT_FIELDS = {
+    RESOURCE_CPU_COMPUTE: "cpu_compute_slots",
+    RESOURCE_GPU_COMPUTE: "gpu_compute_slots",
+    RESOURCE_PCIE_COPY: "pcie_copy_slots",
+    RESOURCE_SSD_IO: "ssd_io_slots",
+}
+
+# Which resource a route's copy occupies. H2D and D2H share the one PCIe
+# engine; both SSD directions share the one SSD slot (M1_DESIGN.md §3, §6).
+RESOURCE_OF_ROUTE = {
+    ROUTE_DRAM_TO_VRAM: RESOURCE_PCIE_COPY,
+    ROUTE_VRAM_TO_DRAM: RESOURCE_PCIE_COPY,
+    ROUTE_SSD_TO_DRAM: RESOURCE_SSD_IO,
+    ROUTE_DRAM_TO_SSD: RESOURCE_SSD_IO,
+}
 
 ALGORITHM_UNIFORM_COST = "uniform_cost"
 
@@ -273,17 +397,69 @@ class Architecture:
     allocation_alignment_bytes: int = 1
     gpu_compute_slots: int = 1
     h2d_copy_slots: int = 1
-    # Must be null: M0 treats DRAM as unbounded. A finite DRAM budget would need
-    # a second eviction decision the search has no action for (DESIGN.md §4.2).
-    dram_capacity_bytes: None = None
+    # 0.1 spells DRAM as "null, i.e. unbounded" and the 0.1 parser still refuses
+    # any other value there (``_parse_architecture``). It is not refused *here*
+    # any more, because 0.2 makes it the real DRAM budget; moving the check to
+    # the parser is what keeps a 0.1 document from silently acquiring a 0.2
+    # field while leaving a 0.2 document able to set it.
+    dram_capacity_bytes: int | None = None
+
+    # --- 0.2 only. Defaults describe the 0.1 machine exactly: no DRAM reserve,
+    # both domains aligned and reserved as the 0.1 single pair says, one slot of
+    # the two new resources. ``None`` therefore means "0.1 wrote it this way and
+    # there is one number for both domains", never "unset".
+    dram_runtime_reserved_bytes: int = 0
+    vram_runtime_reserved_bytes: int | None = None
+    dram_alignment_bytes: int | None = None
+    vram_alignment_bytes: int | None = None
+    cpu_compute_slots: int = 1
+    pcie_copy_slots: int = 1
+    ssd_io_slots: int = 1
+
+    # -- per-domain accessors. Everything downstream goes through these rather
+    # than reading a field, so the 0.1/0.2 spelling difference lives in one
+    # place.
+
+    def capacity_of(self, domain: str) -> int | None:
+        """Bytes available in ``domain``; ``None`` means unbounded.
+
+        ``None`` covers two different situations on purpose: 0.1's DRAM, which
+        has no budget at all, and the SSD, which the design gives no capacity
+        either. Neither is ever charged, so neither needs a number
+        (``M1_DESIGN.md`` §3, §5).
+        """
+        if domain == LOC_DRAM:
+            return self.dram_capacity_bytes
+        if domain == LOC_VRAM:
+            return self.vram_capacity_bytes
+        return None
+
+    def reserved_of(self, domain: str) -> int:
+        """Static runtime reservation charged to ``domain`` from t=0."""
+        if domain == LOC_DRAM:
+            return self.dram_runtime_reserved_bytes
+        if domain == LOC_VRAM:
+            if self.vram_runtime_reserved_bytes is None:
+                return self.runtime_reserved_bytes
+            return self.vram_runtime_reserved_bytes
+        return 0
+
+    def alignment_of(self, domain: str) -> int:
+        """Allocation granularity in ``domain``."""
+        if domain == LOC_DRAM:
+            if self.dram_alignment_bytes is None:
+                return self.allocation_alignment_bytes
+            return self.dram_alignment_bytes
+        if domain == LOC_VRAM:
+            if self.vram_alignment_bytes is None:
+                return self.allocation_alignment_bytes
+            return self.vram_alignment_bytes
+        # The SSD is not an allocation domain: no capacity, no alignment, no
+        # eviction. A caller asking for one is asking a question M1 does not
+        # answer, and one is the answer that changes nothing.
+        return 1
 
     def __post_init__(self) -> None:
-        if self.dram_capacity_bytes is not None:
-            raise Unsupported(
-                "architecture.dram_capacity_bytes must be null: M0 treats DRAM as "
-                "unbounded, and a finite DRAM budget needs an eviction decision the "
-                "M0 action space does not have"
-            )
         if self.vram_capacity_bytes < 1:
             raise InvalidInput(
                 f"architecture.vram_capacity_bytes must be >= 1, got "
@@ -307,12 +483,43 @@ class Architecture:
         for name, slots in (
             ("gpu_compute_slots", self.gpu_compute_slots),
             ("h2d_copy_slots", self.h2d_copy_slots),
+            ("cpu_compute_slots", self.cpu_compute_slots),
+            ("pcie_copy_slots", self.pcie_copy_slots),
+            ("ssd_io_slots", self.ssd_io_slots),
         ):
             if slots != 1:
                 raise Unsupported(
                     f"architecture.{name} is {slots}; M0 models exactly one resource "
                     "of each kind"
                 )
+        for name, capacity, reserved in (
+            ("dram", self.dram_capacity_bytes, self.dram_runtime_reserved_bytes),
+            ("vram", self.vram_capacity_bytes, self.reserved_of(LOC_VRAM)),
+        ):
+            if capacity is None:
+                continue
+            if capacity < 1:
+                raise InvalidInput(
+                    f"architecture.{name}_capacity_bytes must be >= 1, got {capacity}"
+                )
+            if reserved < 0:
+                raise InvalidInput(
+                    f"architecture.{name}_runtime_reserved_bytes must be >= 0, got "
+                    f"{reserved}"
+                )
+            # The static reservation is charged from t=0, so a reservation that
+            # does not fit is not a search failure but an impossible starting
+            # point -- reported as `initial_capacity_exceeded`, never as a
+            # capacity the search could free up (M1_ACCEPTANCE.md §8).
+            if reserved > capacity:
+                raise InvalidInput(
+                    f"architecture.{name}_runtime_reserved_bytes ({reserved}) exceeds "
+                    f"{name}_capacity_bytes ({capacity})"
+                )
+        for name in ("dram_alignment_bytes", "vram_alignment_bytes"):
+            value = getattr(self, name)
+            if value is not None and value < 1:
+                raise InvalidInput(f"architecture.{name} must be >= 1, got {value}")
 
 
 @dataclass(frozen=True)
@@ -340,6 +547,40 @@ class Costs:
 
 
 @dataclass(frozen=True)
+class TransferCost:
+    """Duration of one transfer along one route.
+
+    Same shape as :class:`H2DCost` and deliberately a different name: in 0.2 the
+    direction is part of what is being costed, and a reader who sees
+    ``H2DCost`` in an M1 context would reasonably assume host-to-device.
+    """
+
+    duration_ns: int
+
+
+@dataclass(frozen=True)
+class M1Costs:
+    """The 0.2 cost model: per-device compute, per-route transfer.
+
+    Kept apart from :class:`Costs` rather than folded into it. A 0.1 ``Costs``
+    is a single duration per operation and a single duration per tensor; 0.2 is
+    indexed twice over. One dataclass with both shapes would have to let one set
+    of fields be empty, and every reader would then have to know which. Two
+    types make the version test unavoidable.
+    """
+
+    source: str
+    compute: dict[str, dict[str, ComputeCost]]
+    transfer: dict[str, dict[str, TransferCost]]
+
+    def compute_cost(self, operation_id: str, device: str) -> ComputeCost | None:
+        return self.compute.get(operation_id, {}).get(device)
+
+    def transfer_cost(self, route: str, tensor_id: str) -> TransferCost | None:
+        return self.transfer.get(route, {}).get(tensor_id)
+
+
+@dataclass(frozen=True)
 class Mapspace:
     """What the mapper is allowed to do.
 
@@ -355,6 +596,51 @@ class Mapspace:
 
 
 @dataclass(frozen=True)
+class M1Mapspace:
+    """0.2's mapspace: which device may run which op, which tensor may take
+    which route.
+
+    The 0.1 single ``compute_device`` and flat ``copy_tensor_ids`` are gone
+    because they *are* the answer to a question 0.2 asks: "gpu for every
+    operation" and "dram_to_vram for these tensors". Expressing 0.1 as this
+    shape would have been possible; refusing to parse 0.2 into the old shape is
+    what keeps a 0.1 document from silently gaining a CPU option.
+    """
+
+    allowed_devices: dict[str, tuple[str, ...]]
+    allowed_transfers: dict[str, tuple[str, ...]]
+    allow_eviction: bool
+    allow_copy_compute_overlap: bool
+    allow_cpu_gpu_overlap: bool
+    allow_recomputation: bool = False
+
+    def devices_for(self, operation_id: str) -> tuple[str, ...]:
+        return self.allowed_devices.get(operation_id, ())
+
+    def tensors_for(self, route: str) -> tuple[str, ...]:
+        return self.allowed_transfers.get(route, ())
+
+    def allows(self, route: str, tensor_id: str) -> bool:
+        return tensor_id in self.allowed_transfers.get(route, ())
+
+
+@dataclass(frozen=True)
+class M1Goal:
+    """Where each requested output has to end up.
+
+    One location per output, mandatory and exhaustive: "the result may be in
+    DRAM or VRAM" is not a goal, it is the absence of one. A missing or extra
+    key is an input error rather than a default, because the default would
+    silently change what the search is optimising.
+    """
+
+    output_locations: dict[str, str]
+
+    def location_of(self, tensor_id: str) -> str | None:
+        return self.output_locations.get(tensor_id)
+
+
+@dataclass(frozen=True)
 class MapperConfig:
     """Search budget. Zero means unlimited for both fields."""
 
@@ -365,29 +651,58 @@ class MapperConfig:
 
 @dataclass(frozen=True)
 class Scenario:
-    """A workload bound to an architecture, a cost model, and a mapspace."""
+    """A workload bound to an architecture, a cost model, and a mapspace.
+
+    ``costs`` and ``mapspace`` are typed loosely because 0.1 and 0.2 genuinely
+    have different shapes; ``schema_version`` is what tells them apart, and
+    every accessor below branches on it exactly once.
+    """
 
     schema_version: str
     id: str
     workload: Workload
     architecture: Architecture
-    costs: Costs
-    mapspace: Mapspace
+    costs: Costs | M1Costs
+    mapspace: Mapspace | M1Mapspace
     mapper: MapperConfig
+    # 0.2 only. ``None`` for a 0.1 scenario, whose goal is "every requested
+    # output resident in VRAM" (DESIGN.md §5).
+    goal: M1Goal | None = None
 
-    def size_alloc(self, tensor_id: str) -> int:
-        """VRAM actually occupied by ``tensor_id``, after alignment."""
+    @property
+    def is_m1(self) -> bool:
+        return self.schema_version == SCHEMA_VERSION_M1
+
+    def size_alloc(self, tensor_id: str, domain: str = LOC_VRAM) -> int:
+        """Bytes ``tensor_id`` occupies in ``domain``, after that domain's alignment."""
         tensor = self.workload.tensor_by_id[tensor_id]
         return aligned_size(
-            tensor.storage_bytes, self.architecture.allocation_alignment_bytes
+            tensor.storage_bytes, self.architecture.alignment_of(domain)
         )
 
-    def workspace_alloc(self, operation_id: str) -> int:
-        """VRAM reserved for the running compute's transient workspace."""
-        cost = self.costs.compute[operation_id]
-        return aligned_size(
-            cost.workspace_bytes, self.architecture.allocation_alignment_bytes
+    def workspace_alloc(self, operation_id: str, device: str = DEVICE_GPU) -> int:
+        """Workspace reserved for a running compute, in that device's domain."""
+        assert isinstance(self.costs, M1Costs) or device == DEVICE_GPU
+        cost = (
+            self.costs.compute_cost(operation_id, device)
+            if isinstance(self.costs, M1Costs)
+            else self.costs.compute[operation_id]
         )
+        assert cost is not None
+        domain = DOMAIN_OF_DEVICE[device] if self.is_m1 else LOC_VRAM
+        return aligned_size(cost.workspace_bytes, self.architecture.alignment_of(domain))
+
+    def goal_location(self, tensor_id: str) -> str:
+        """Where ``tensor_id`` has to end up for the goal to hold.
+
+        0.1 has one answer for every output -- VRAM -- and it is spelled here
+        rather than at each call site so that "0.1 means VRAM" appears once.
+        """
+        if self.goal is None:
+            return LOC_VRAM
+        location = self.goal.location_of(tensor_id)
+        assert location is not None  # checked exhaustively by the parser
+        return location
 
 
 # ---------------------------------------------------------------------------
@@ -460,16 +775,20 @@ def _reject_unknown_keys(block: dict[str, Any], allowed: set[str], what: str) ->
 
 
 def _check_schema_version(raw: Any, where: str) -> str:
-    """Every M0 document declares ``schema_version`` and ``"0.1"`` is the only one.
+    """Every document declares ``schema_version``; the parser accepts 0.1 and 0.2.
 
     A missing version is an error rather than a default: an unversioned file is
     of unknown vintage, and guessing would defeat the point of versioning it.
+
+    Accepting a second version is not the same as reinterpreting the first: the
+    returned string is carried on the ``Scenario`` and every later decision
+    branches on it, so a 0.1 document keeps 0.1 semantics exactly.
     """
     version = _require_str(raw, f"{where}.schema_version")
-    if version != SCHEMA_VERSION:
+    if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise Unsupported(
             f"{where}.schema_version is {version!r}; this build implements "
-            f"{SCHEMA_VERSION!r}"
+            f"{', '.join(repr(v) for v in SUPPORTED_SCHEMA_VERSIONS)}"
         )
     return version
 
@@ -519,7 +838,7 @@ def _parse_origin(raw: Any, where: str) -> Origin:
     return Origin(kind=kind, ggml_version=ggml_version, sample=sample)
 
 
-def _parse_tensor(raw: Any, where: str) -> Tensor:
+def _parse_tensor(raw: Any, where: str, locations_allowed: frozenset[str]) -> Tensor:
     block = _require_mapping(raw, where)
     _reject_unknown_keys(
         block,
@@ -587,10 +906,22 @@ def _parse_tensor(raw: Any, where: str) -> Tensor:
     for i, loc in enumerate(locs_raw):
         loc = _require_str(loc, f"{where}.initial_locations[{i}]")
         _expect(
-            loc in _LOCATIONS,
-            f"{where}.initial_locations[{i}] must be one of {sorted(_LOCATIONS)}, got {loc!r}",
+            loc in locations_allowed,
+            f"{where}.initial_locations[{i}] must be one of "
+            f"{sorted(locations_allowed)}, got {loc!r}",
         )
         _expect(loc not in locations, f"{where}.initial_locations lists {loc!r} twice")
+        if loc == LOC_SSD:
+            # M1_DESIGN.md §4: an SSD source is legal for a *leaf* -- a weight or
+            # an input. A computed value cannot start there: it would mean
+            # skipping the compute that produces it, which is the same rule that
+            # already forbids any initial copy on a produced tensor
+            # (``_validate_workload``).
+            _expect(
+                role in (ROLE_WEIGHT, ROLE_INPUT),
+                f"{where}: only a leaf weight or input may have an SSD source; "
+                f"{tensor_id!r} has role {role!r}",
+            )
         locations.append(loc)
 
     return Tensor(
@@ -685,14 +1016,19 @@ def _parse_workload(raw: Any, where: str) -> Workload:
         block, {"schema_version", "id", "origin", "tensors", "operations", "outputs", "comment"}, where
     )
 
-    _check_schema_version(block.get("schema_version"), where)
+    version = _check_schema_version(block.get("schema_version"), where)
 
     workload_id = _require_str(block.get("id"), f"{where}.id")
     origin = _parse_origin(block.get("origin"), where)
 
+    # The initial locations a tensor may declare depend on the document's own
+    # version, not on the scenario that references it: a 0.1 workload has no
+    # `ssd` even when a 0.2 scenario points at it.
+    allowed_locations = _LOCATIONS_M1 if version == SCHEMA_VERSION_M1 else _LOCATIONS
     tensors_raw = _require_list(block.get("tensors"), f"{where}.tensors")
     tensors = tuple(
-        _parse_tensor(entry, f"{where}.tensors[{i}]") for i, entry in enumerate(tensors_raw)
+        _parse_tensor(entry, f"{where}.tensors[{i}]", allowed_locations)
+        for i, entry in enumerate(tensors_raw)
     )
 
     operations_raw = _require_list(block.get("operations"), f"{where}.operations")
@@ -989,6 +1325,7 @@ def load_and_validate(scenario_path: str | Path) -> Scenario:
         "costs",
         "mapspace",
         "mapper",
+        "goal",
         "comment",
     }
     _reject_unknown_keys(raw, allowed, path.name)
@@ -1001,9 +1338,25 @@ def load_and_validate(scenario_path: str | Path) -> Scenario:
     workload_path = path.parent / workload_file
     workload = load_workload(workload_path)
 
-    architecture = _parse_architecture(raw.get("architecture"), path.name)
-    costs = _parse_costs(raw.get("costs"), path.name, workload)
-    mapspace = _parse_mapspace(raw.get("mapspace"), path.name, workload)
+    architecture = _parse_architecture(raw.get("architecture"), path.name, schema_version)
+    if schema_version == SCHEMA_VERSION_M1:
+        # The mapspace is parsed first: the cost tables are checked against the
+        # allowed sets, so the sets have to exist before the costs are read.
+        mapspace_m1 = _parse_mapspace_m1(raw.get("mapspace"), path.name, workload)
+        mapspace: Mapspace | M1Mapspace = mapspace_m1
+        costs: Costs | M1Costs = _parse_costs_m1(
+            raw.get("costs"), path.name, workload, mapspace_m1
+        )
+        goal = _parse_goal(raw.get("goal"), path.name, workload)
+    else:
+        if raw.get("goal") is not None:
+            raise Unsupported(
+                f"{path.name}.goal is a 0.2 field; a 0.1 scenario's outputs are "
+                "always requested in VRAM and there is nothing to choose"
+            )
+        costs = _parse_costs(raw.get("costs"), path.name, workload)
+        mapspace = _parse_mapspace(raw.get("mapspace"), path.name, workload)
+        goal = None
     mapper_config = _parse_mapper(raw.get("mapper"), path.name)
 
     return Scenario(
@@ -1014,10 +1367,14 @@ def load_and_validate(scenario_path: str | Path) -> Scenario:
         costs=costs,
         mapspace=mapspace,
         mapper=mapper_config,
+        goal=goal,
     )
 
 
-def _parse_architecture(raw: Any, where: str) -> Architecture:
+def _parse_architecture(raw: Any, where: str, version: str) -> Architecture:
+    if version == SCHEMA_VERSION_M1:
+        return _parse_architecture_m1(raw, where)
+
     block = _require_mapping(raw, f"{where}.architecture")
     _reject_unknown_keys(
         block,
@@ -1032,10 +1389,20 @@ def _parse_architecture(raw: Any, where: str) -> Architecture:
         f"{where}.architecture",
     )
 
-    # The invariants themselves live on Architecture.__post_init__, so that a
+    # The 0.1 rule that DRAM must be null lives here rather than on
+    # ``Architecture.__post_init__`` because 0.2 makes the same field the real
+    # DRAM budget. Keeping it on the parser is what makes it a statement about
+    # *this document version* instead of about the type.
+    if block.get("dram_capacity_bytes", None) is not None:
+        raise Unsupported(
+            "architecture.dram_capacity_bytes must be null: M0 treats DRAM as "
+            "unbounded, and a finite DRAM budget needs an eviction decision the "
+            "M0 action space does not have"
+        )
+
+    # The remaining invariants live on Architecture.__post_init__, so that a
     # directly constructed value cannot slip past them; here we only coerce and
-    # hand over. dram_capacity_bytes is passed through as-is so the dataclass can
-    # be the one to reject a non-null value.
+    # hand over.
     return Architecture(
         vram_capacity_bytes=_require_int(
             block.get("vram_capacity_bytes"),
@@ -1061,7 +1428,68 @@ def _parse_architecture(raw: Any, where: str) -> Architecture:
             f"{where}.architecture.h2d_copy_slots",
             minimum=1,
         ),
-        dram_capacity_bytes=block.get("dram_capacity_bytes", None),
+        dram_capacity_bytes=None,
+    )
+
+
+def _parse_architecture_m1(raw: Any, where: str) -> Architecture:
+    """0.2's architecture block (``M1_DESIGN.md`` §4).
+
+    Every capacity, reservation and alignment is stated per domain and every
+    slot count is present. There is no "default to the other domain's value":
+    a missing field here is a document that has not said what machine it means.
+    """
+    block = _require_mapping(raw, f"{where}.architecture")
+    _reject_unknown_keys(
+        block,
+        {
+            "dram_capacity_bytes",
+            "vram_capacity_bytes",
+            "dram_runtime_reserved_bytes",
+            "vram_runtime_reserved_bytes",
+            "dram_alignment_bytes",
+            "vram_alignment_bytes",
+            "cpu_compute_slots",
+            "gpu_compute_slots",
+            "pcie_copy_slots",
+            "ssd_io_slots",
+        },
+        f"{where}.architecture",
+    )
+    label = f"{where}.architecture"
+    return Architecture(
+        dram_capacity_bytes=_require_int(
+            block.get("dram_capacity_bytes"), f"{label}.dram_capacity_bytes", minimum=1
+        ),
+        vram_capacity_bytes=_require_int(
+            block.get("vram_capacity_bytes"), f"{label}.vram_capacity_bytes", minimum=1
+        ),
+        dram_runtime_reserved_bytes=_require_int(
+            block.get("dram_runtime_reserved_bytes", 0),
+            f"{label}.dram_runtime_reserved_bytes",
+        ),
+        vram_runtime_reserved_bytes=_require_int(
+            block.get("vram_runtime_reserved_bytes", 0),
+            f"{label}.vram_runtime_reserved_bytes",
+        ),
+        dram_alignment_bytes=_require_int(
+            block.get("dram_alignment_bytes", 1), f"{label}.dram_alignment_bytes", minimum=1
+        ),
+        vram_alignment_bytes=_require_int(
+            block.get("vram_alignment_bytes", 1), f"{label}.vram_alignment_bytes", minimum=1
+        ),
+        cpu_compute_slots=_require_int(
+            block.get("cpu_compute_slots", 1), f"{label}.cpu_compute_slots", minimum=1
+        ),
+        gpu_compute_slots=_require_int(
+            block.get("gpu_compute_slots", 1), f"{label}.gpu_compute_slots", minimum=1
+        ),
+        pcie_copy_slots=_require_int(
+            block.get("pcie_copy_slots", 1), f"{label}.pcie_copy_slots", minimum=1
+        ),
+        ssd_io_slots=_require_int(
+            block.get("ssd_io_slots", 1), f"{label}.ssd_io_slots", minimum=1
+        ),
     )
 
 
@@ -1107,6 +1535,346 @@ def _parse_costs(raw: Any, where: str, workload: Workload) -> Costs:
         )
 
     return Costs(source=source, compute=compute, h2d=h2d)
+
+
+def _parse_goal(raw: Any, where: str, workload: Workload) -> M1Goal:
+    """``goal``: one final location per requested output, exactly (0.2).
+
+    The keys must match ``outputs`` exactly in both directions. A missing key
+    would have to default to something, and the default would decide the answer
+    to the question the field exists to ask; an extra key names a tensor nobody
+    requested.
+    """
+    block = _require_mapping(raw, f"{where}.goal")
+    _reject_unknown_keys(block, {"output_locations"}, f"{where}.goal")
+    locations_raw = _require_mapping(
+        block.get("output_locations"), f"{where}.goal.output_locations"
+    )
+    label = f"{where}.goal.output_locations"
+    locations: dict[str, str] = {}
+    for tensor_id, location in locations_raw.items():
+        if tensor_id not in workload.outputs:
+            raise InvalidInput(
+                f"{label}[{tensor_id!r}]: {tensor_id!r} is not one of the workload's "
+                f"outputs ({', '.join(workload.outputs)})"
+            )
+        location = _require_str(location, f"{label}[{tensor_id!r}]")
+        if location not in GOAL_LOCATIONS_M1:
+            raise InvalidInput(
+                f"{label}[{tensor_id!r}] must be one of {list(GOAL_LOCATIONS_M1)}, "
+                f"got {location!r}"
+            )
+        locations[tensor_id] = location
+    missing = sorted(set(workload.outputs) - set(locations))
+    if missing:
+        raise InvalidInput(
+            f"{label} is missing {', '.join(missing)}; every requested output needs a "
+            "final location, and a default would silently change what is optimised"
+        )
+    return M1Goal(output_locations=locations)
+
+
+def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspace) -> M1Costs:
+    """0.2 costs: per (operation, device) and per (route, tensor).
+
+    M1_DESIGN.md §4: the allowed sets and the cost tables must agree. Requiring
+    agreement in both directions is what makes "the cost of a route this scenario
+    allows" impossible to be missing, and a cost for something the scenario does
+    not allow impossible to look meaningful.
+    """
+    block = _require_mapping(raw, f"{where}.costs")
+    _reject_unknown_keys(block, {"source", "compute", "transfer"}, f"{where}.costs")
+    source = _require_str(block.get("source"), f"{where}.costs.source")
+
+    compute_raw = _require_mapping(block.get("compute"), f"{where}.costs.compute")
+    compute: dict[str, dict[str, ComputeCost]] = {}
+    for op_id, entry in compute_raw.items():
+        label = f"{where}.costs.compute[{op_id!r}]"
+        if op_id not in workload.operation_by_id:
+            raise InvalidInput(f"{label}: no such operation in the workload")
+        allowed = mapspace.devices_for(op_id)
+        if not allowed:
+            raise InvalidInput(
+                f"{label}: operation {op_id!r} has no allowed device, so costing it "
+                "is meaningless"
+            )
+        body = _require_mapping(entry, label)
+        unknown = sorted(set(body) - set(allowed))
+        if unknown:
+            raise InvalidInput(
+                f"{label}: {', '.join(unknown)} is not an allowed device for "
+                f"{op_id!r} (allowed: {', '.join(allowed)})"
+            )
+        missing = sorted(set(allowed) - set(body))
+        if missing:
+            raise InvalidInput(
+                f"{label} is missing a duration for {', '.join(missing)}; M1 never "
+                "guesses a compute cost"
+            )
+        _reject_unknown_keys(body, set(_DEVICES), label)
+        compute[op_id] = {
+            device: _parse_device_cost(body, device, label) for device in allowed
+        }
+
+    missing_ops = sorted(
+        operation.id
+        for operation in workload.operations
+        if mapspace.devices_for(operation.id) and operation.id not in compute
+    )
+    if missing_ops:
+        raise InvalidInput(
+            f"{where}.costs.compute is missing a duration for "
+            f"{', '.join(missing_ops)}; M1 never guesses a compute cost"
+        )
+
+    transfer_raw = _require_mapping(block.get("transfer"), f"{where}.costs.transfer")
+    transfer: dict[str, dict[str, TransferCost]] = {}
+    for route, entry in transfer_raw.items():
+        label = f"{where}.costs.transfer[{route!r}]"
+        if route not in ROUTES:
+            raise Unsupported(
+                f"{label}: {route!r} is not a route M1 models; the only ones are "
+                f"{list(ROUTES)} (SSD traffic goes through DRAM: there is no direct "
+                "SSD-to-VRAM path and no SSD-to-SSD copy)"
+            )
+        allowed_tensors = mapspace.tensors_for(route)
+        body = _require_mapping(entry, label)
+        if not allowed_tensors:
+            # An empty table is the shape the design gives an unused route, and
+            # it costs nothing because nothing may travel it. Anything in it
+            # would be a cost for a move the mapspace forbids.
+            if body:
+                raise InvalidInput(
+                    f"{label}: the mapspace allows no tensor on route {route!r}, so "
+                    f"costing {', '.join(sorted(body))} is meaningless"
+                )
+            transfer[route] = {}
+            continue
+        missing = sorted(set(allowed_tensors) - set(body))
+        if missing:
+            raise InvalidInput(
+                f"{label} is missing a duration for {', '.join(missing)}; M1 never "
+                "guesses a transfer cost"
+            )
+        unknown = sorted(set(body) - set(allowed_tensors))
+        if unknown:
+            raise InvalidInput(
+                f"{label}: {', '.join(unknown)} is not allowed on route {route!r} "
+                f"(allowed: {', '.join(allowed_tensors)})"
+            )
+        transfer[route] = {
+            tensor_id: _parse_transfer_cost(body[tensor_id], f"{label}[{tensor_id!r}]")
+            for tensor_id in allowed_tensors
+        }
+
+    missing_routes = sorted(
+        route for route in ROUTES if mapspace.tensors_for(route) and route not in transfer
+    )
+    if missing_routes:
+        raise InvalidInput(
+            f"{where}.costs.transfer is missing a table for "
+            f"{', '.join(missing_routes)}; M1 never guesses a transfer cost"
+        )
+
+    return M1Costs(source=source, compute=compute, transfer=transfer)
+
+
+def _parse_transfer_cost(raw: Any, label: str) -> TransferCost:
+    """One route+tensor duration.
+
+    The object form, exactly as a compute entry and exactly as the 0.1 ``h2d``
+    table this replaces: ``{"duration_ns": N}``. A bare integer is refused rather
+    than accepted as a shorthand, so the field has one spelling on disk and a
+    reader never has to work out which of the two they are looking at.
+    """
+    _expect(not isinstance(raw, list), f"{label} must be a JSON object")
+    item = _require_mapping(raw, label)
+    _reject_unknown_keys(item, {"duration_ns"}, label)
+    return TransferCost(
+        duration_ns=_parse_duration_ns(item.get("duration_ns"), f"{label}.duration_ns")
+    )
+
+
+def _parse_device_cost(body: dict[str, Any], device: str, label: str) -> ComputeCost:
+    entry_label = f"{label}[{device!r}]"
+    _expect(not isinstance(body[device], list), f"{entry_label} must be a JSON object")
+    item = _require_mapping(body[device], entry_label)
+    _reject_unknown_keys(item, {"duration_ns", "workspace_bytes"}, entry_label)
+    return ComputeCost(
+        duration_ns=_parse_duration_ns(item.get("duration_ns"), f"{entry_label}.duration_ns"),
+        workspace_bytes=_require_int(
+            item.get("workspace_bytes", 0), f"{entry_label}.workspace_bytes"
+        ),
+    )
+
+
+def _parse_duration_ns(raw: Any, what: str) -> int:
+    """A duration must be a positive, finite integer number of nanoseconds.
+
+    ``_require_int`` already refuses bools, floats, strings and anything below
+    the minimum; this wrapper exists so the message names the field the way the
+    contract does and so a float like ``2.5`` is refused rather than truncated
+    into a plan that is 500 ns short.
+    """
+    if isinstance(raw, float):
+        raise InvalidInput(f"{what} must be an integer number of ns, got {raw!r}")
+    return _require_int(raw, what, minimum=1)
+
+
+def _parse_mapspace_m1(raw: Any, where: str, workload: Workload) -> M1Mapspace:
+    block = _require_mapping(raw, f"{where}.mapspace")
+    _reject_unknown_keys(
+        block,
+        {
+            "allowed_devices",
+            "allowed_transfers",
+            "allow_copy_compute_overlap",
+            "allow_cpu_gpu_overlap",
+            "allow_eviction",
+            "allow_recomputation",
+        },
+        f"{where}.mapspace",
+    )
+
+    devices_raw = _require_mapping(
+        block.get("allowed_devices"), f"{where}.mapspace.allowed_devices"
+    )
+    label = f"{where}.mapspace.allowed_devices"
+    allowed_devices: dict[str, tuple[str, ...]] = {}
+    for op_id, entry in devices_raw.items():
+        item_label = f"{label}[{op_id!r}]"
+        if op_id not in workload.operation_by_id:
+            raise InvalidInput(f"{item_label}: no such operation in the workload")
+        entries = _require_list(entry, item_label)
+        if not entries:
+            raise InvalidInput(
+                f"{item_label} is empty; every operation must be runnable somewhere"
+            )
+        seen: list[str] = []
+        for i, device in enumerate(entries):
+            device = _require_str(device, f"{item_label}[{i}]")
+            if device not in _DEVICES:
+                raise Unsupported(
+                    f"{item_label}[{i}] is {device!r}; M1 models the devices "
+                    f"{list(_DEVICES)}"
+                )
+            if device in seen:
+                raise InvalidInput(f"{item_label} lists {device!r} twice")
+            seen.append(device)
+        # A fixed order, not the document's: the search's candidate order is part
+        # of the deterministic contract, and it must not depend on how the JSON
+        # happened to be written.
+        allowed_devices[op_id] = tuple(sorted(seen))
+
+    missing = sorted(set(workload.operation_by_id) - set(allowed_devices))
+    if missing:
+        raise InvalidInput(
+            f"{label} is missing {', '.join(missing)}; every operation needs a "
+            "non-empty device set"
+        )
+
+    transfers_raw = _require_mapping(
+        block.get("allowed_transfers"), f"{where}.mapspace.allowed_transfers"
+    )
+    tlabel = f"{where}.mapspace.allowed_transfers"
+    allowed_transfers: dict[str, tuple[str, ...]] = {}
+    for route, entry in transfers_raw.items():
+        item_label = f"{tlabel}[{route!r}]"
+        if route not in ROUTES:
+            raise Unsupported(
+                f"{item_label}: {route!r} is not a route M1 models; the only ones are "
+                f"{list(ROUTES)} (SSD traffic goes through DRAM: there is no direct "
+                "SSD-to-VRAM path, and no SSD-to-SSD copy)"
+            )
+        entries = _require_list(entry, item_label)
+        seen_tensors: list[str] = []
+        for i, tensor_id in enumerate(entries):
+            tensor_id = _require_str(tensor_id, f"{item_label}[{i}]")
+            if tensor_id not in workload.tensor_by_id:
+                raise InvalidInput(f"{item_label}[{i}]: unknown tensor {tensor_id!r}")
+            if tensor_id in seen_tensors:
+                raise InvalidInput(f"{item_label} lists {tensor_id!r} twice")
+            seen_tensors.append(tensor_id)
+        allowed_transfers[route] = tuple(sorted(seen_tensors))
+
+    # A route the scenario lists must be reachable for the tensors on it. This
+    # is a check on the *document*, not on the search: without it a scenario can
+    # claim a tensor may take a route whose source end the tensor can never be
+    # at, and the only symptom is a search that quietly never uses the option.
+    #
+    # A produced tensor is exempt from the source-end requirement on purpose:
+    # it is materialised wherever its compute ran, and M1_DESIGN.md §4 says a
+    # computed intermediate may be listed.
+    for tensor in workload.tensors:
+        if tensor.id in workload.producer_of:
+            continue
+        reachable = reachable_locations(
+            tensor.initial_locations, allowed_transfers, tensor.id
+        )
+        for route, tensors in allowed_transfers.items():
+            if tensor.id not in tensors:
+                continue
+            source, _ = ROUTE_ENDS[route]
+            if source not in reachable:
+                raise InvalidInput(
+                    f"{tlabel}[{route!r}] includes {tensor.id!r}, but no allowed route "
+                    f"can get it to {source} (initial_locations: "
+                    f"{list(tensor.initial_locations)})"
+                )
+
+    recomputation = _require_bool(
+        block.get("allow_recomputation", False),
+        f"{where}.mapspace.allow_recomputation",
+    )
+    if recomputation:
+        raise Unsupported(
+            f"{where}.mapspace.allow_recomputation is true; M1 has no recomputation "
+            "and must not silently ignore the request"
+        )
+
+    return M1Mapspace(
+        allowed_devices=allowed_devices,
+        allowed_transfers=allowed_transfers,
+        allow_eviction=_require_bool(
+            block.get("allow_eviction"), f"{where}.mapspace.allow_eviction"
+        ),
+        allow_copy_compute_overlap=_require_bool(
+            block.get("allow_copy_compute_overlap"),
+            f"{where}.mapspace.allow_copy_compute_overlap",
+        ),
+        allow_cpu_gpu_overlap=_require_bool(
+            block.get("allow_cpu_gpu_overlap", True),
+            f"{where}.mapspace.allow_cpu_gpu_overlap",
+        ),
+        allow_recomputation=False,
+    )
+
+
+def reachable_locations(
+    starts: tuple[str, ...],
+    allowed_transfers: Mapping[str, tuple[str, ...]],
+    tensor_id: str,
+) -> frozenset[str]:
+    """Every location ``tensor_id`` can be *brought to* using allowed routes.
+
+    A plain closure over the route graph restricted to this one tensor: start at
+    the places it already is and repeatedly apply any allowed route whose source
+    end has been reached. It says nothing about capacity, timing or device
+    choice -- this is a property of the document, and the search is what decides
+    whether a route is actually usable.
+    """
+    reached = set(starts)
+    changed = True
+    while changed:
+        changed = False
+        for route, tensors in allowed_transfers.items():
+            if tensor_id not in tensors:
+                continue
+            source, destination = ROUTE_ENDS[route]
+            if source in reached and destination not in reached:
+                reached.add(destination)
+                changed = True
+    return frozenset(reached)
 
 
 def _parse_mapspace(raw: Any, where: str, workload: Workload) -> Mapspace:
@@ -1229,21 +1997,32 @@ def check_initial_capacity(scenario: Scenario) -> None:
 
     Called before the search starts and again before a mapping replay, so both
     entry points agree on the verdict (``DESIGN.md`` §8).
+
+    Both domains are checked in 0.2. A tensor that starts in DRAM *and* VRAM is
+    charged to both, because that is two allocations and the model says so
+    (``M1_ACCEPTANCE.md`` §8). SSD is not a domain: it has no capacity.
     """
     architecture = scenario.architecture
-    used = architecture.runtime_reserved_bytes
-    resident: list[str] = []
-    for tensor in scenario.workload.tensors:
-        if LOC_VRAM in tensor.initial_locations:
-            used += scenario.size_alloc(tensor.id)
-            resident.append(tensor.id)
-    if used > architecture.vram_capacity_bytes:
-        raise InitialCapacityExceeded(
-            f"initial layout needs {used} bytes (runtime reserve "
-            f"{architecture.runtime_reserved_bytes} + tensors "
-            f"{', '.join(sorted(resident))}) but vram_capacity_bytes is "
-            f"{architecture.vram_capacity_bytes}"
-        )
+    for domain in DOMAINS:
+        capacity = architecture.capacity_of(domain)
+        if capacity is None:
+            continue  # 0.1's DRAM: unbounded, and nothing is charged to it
+        used = architecture.reserved_of(domain)
+        resident: list[str] = []
+        for tensor in scenario.workload.tensors:
+            if domain in tensor.initial_locations:
+                used += scenario.size_alloc(tensor.id, domain)
+                resident.append(tensor.id)
+        if used > capacity:
+            # The domain is named by the trailing field: for 0.1 that reproduces
+            # the original sentence word for word, and for 0.2 it says which of
+            # the two budgets was exceeded (``M1_ACCEPTANCE.md`` §8).
+            raise InitialCapacityExceeded(
+                f"initial layout needs {used} bytes (runtime reserve "
+                f"{architecture.reserved_of(domain)} + tensors "
+                f"{', '.join(sorted(resident))}) but {domain}_capacity_bytes is "
+                f"{capacity}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -1299,11 +2078,19 @@ def _canonical_workload(workload: Workload) -> dict[str, Any]:
 def _canonical_scenario(scenario: Scenario) -> dict[str, Any]:
     """Semantic content of a scenario.
 
-    ``workload_file`` is excluded -- it is an external path, exactly what the
-    spec says to drop -- and the workload is represented by its fingerprint
+    Two algorithms, chosen by ``schema_version``, and the choice is deliberate
+    rather than incidental: these digests identify *stored mappings*, and a 0.1
+    mapping written before M1 must keep hashing to the same value afterwards
+    (``M1_DESIGN.md`` §8). Extending the 0.1 payload with new keys would have
+    silently invalidated every historical mapping, so 0.2 gets its own shape.
+
+    ``workload_file`` is excluded in both -- it is an external path, exactly what
+    the spec says to drop -- and the workload is represented by its fingerprint
     instead, so a scenario fingerprint still pins the exact graph without
     depending on where the file happens to live.
     """
+    if scenario.is_m1:
+        return _canonical_scenario_m1(scenario)
     architecture = scenario.architecture
     mapspace = scenario.mapspace
     mapper = scenario.mapper
@@ -1338,6 +2125,88 @@ def _canonical_scenario(scenario: Scenario) -> dict[str, Any]:
             "compute_device": mapspace.compute_device,
             "copy_tensor_ids": sorted(mapspace.copy_tensor_ids),
             "allow_copy_compute_overlap": mapspace.allow_copy_compute_overlap,
+            "allow_eviction": mapspace.allow_eviction,
+            "allow_recomputation": mapspace.allow_recomputation,
+        },
+        "mapper": {
+            "algorithm": mapper.algorithm,
+            "max_expanded_states": mapper.max_expanded_states,
+            "wall_time_limit_s": mapper.wall_time_limit_s,
+        },
+    }
+
+
+def _canonical_scenario_m1(scenario: Scenario) -> dict[str, Any]:
+    """Semantic content of a 0.2 scenario.
+
+    Everything that changes what the search may do is in here: the device sets,
+    the routes, both domains' capacities, reservations and alignments, the cost
+    tables, the goal locations and the two switches. ``M1_DESIGN.md`` §8 asks
+    for exactly this list, because a mapping made for one machine must not be
+    replayable against another.
+    """
+    architecture = scenario.architecture
+    mapspace = scenario.mapspace
+    costs = scenario.costs
+    mapper = scenario.mapper
+    assert isinstance(mapspace, M1Mapspace)
+    assert isinstance(costs, M1Costs)
+    assert scenario.goal is not None
+    return {
+        "schema_version": scenario.schema_version,
+        "id": scenario.id,
+        "workload_fingerprint": workload_fingerprint(scenario.workload),
+        "architecture": {
+            "dram_capacity_bytes": architecture.dram_capacity_bytes,
+            "vram_capacity_bytes": architecture.vram_capacity_bytes,
+            "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,
+            "vram_runtime_reserved_bytes": architecture.reserved_of(LOC_VRAM),
+            "dram_alignment_bytes": architecture.alignment_of(LOC_DRAM),
+            "vram_alignment_bytes": architecture.alignment_of(LOC_VRAM),
+            "cpu_compute_slots": architecture.cpu_compute_slots,
+            "gpu_compute_slots": architecture.gpu_compute_slots,
+            "pcie_copy_slots": architecture.pcie_copy_slots,
+            "ssd_io_slots": architecture.ssd_io_slots,
+        },
+        "goal": {
+            "output_locations": [
+                {"tensor_id": t, "location": scenario.goal.output_locations[t]}
+                for t in sorted(scenario.goal.output_locations)
+            ]
+        },
+        "costs": {
+            "source": costs.source,
+            "compute": [
+                {
+                    "operation_id": op_id,
+                    "device": device,
+                    "duration_ns": cost.duration_ns,
+                    "workspace_bytes": cost.workspace_bytes,
+                }
+                for op_id in sorted(costs.compute)
+                for device, cost in sorted(costs.compute[op_id].items())
+            ],
+            "transfer": [
+                {
+                    "route": route,
+                    "tensor_id": tensor_id,
+                    "duration_ns": cost.duration_ns,
+                }
+                for route in sorted(costs.transfer)
+                for tensor_id, cost in sorted(costs.transfer[route].items())
+            ],
+        },
+        "mapspace": {
+            "allowed_devices": [
+                {"operation_id": op_id, "devices": sorted(devices)}
+                for op_id, devices in sorted(mapspace.allowed_devices.items())
+            ],
+            "allowed_transfers": [
+                {"route": route, "tensor_ids": sorted(tensor_ids)}
+                for route, tensor_ids in sorted(mapspace.allowed_transfers.items())
+            ],
+            "allow_copy_compute_overlap": mapspace.allow_copy_compute_overlap,
+            "allow_cpu_gpu_overlap": mapspace.allow_cpu_gpu_overlap,
             "allow_eviction": mapspace.allow_eviction,
             "allow_recomputation": mapspace.allow_recomputation,
         },

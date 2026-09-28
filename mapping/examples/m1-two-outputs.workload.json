@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-two-outputs",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance C (second half): a = relu(u) on GPU, b = relu(v) on CPU, two requested outputs in two different domains"
+  },
+  "comment": "M1_ACCEPTANCE.md 4. The only case in the set with two requested outputs, and they are asked for in different domains, so 'the output is delivered' cannot be a single flag. The two PCIe moves are forced to queue behind each other: one shared slot, and both are on the critical path.",
+  "tensors": [
+    {
+      "id": "u",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "v",
+      "name": "inp_pos",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["vram"]
+    },
+    {
+      "id": "a",
+      "name": "blk.0.attn_act",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "b",
+      "name": "blk.0.ffn_act",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "ca",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["u"],
+      "output": "a"
+    },
+    {
+      "id": "cb",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["v"],
+      "output": "b"
+    }
+  ],
+  "outputs": ["a", "b"]
+}

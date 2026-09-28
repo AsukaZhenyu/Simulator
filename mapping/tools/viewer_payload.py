@@ -1,37 +1,45 @@
 """查看器的纯数据装配层：把 scenario 变成一页能画出来的载荷。
 
 这个模块**不做任何决策**。它只做三件事：把内核已有的数字搬进一个 JSON 友好的
-形状、把搜索的**过程**重走一遍并记下来、把两处会「拒绝」的边界原样报出来。合法性、
-时间推进、最优性一律还是问内核——和 ``artifacts.py`` 同一条纪律。
+形状、把搜索的**过程**记下来、把两处会「拒绝」的边界原样报出来。合法性、时间推进、
+最优性一律还是问内核——和 ``artifacts.py`` 同一条纪律。
 
-为什么要把搜索重走一遍（``explore()``）
-----------------------------------------
-``mapper.search()`` 只回一个 :class:`SearchResult`：终局、数字、动作序列。它**不回
-搜索树**，也没有回调钩子（``best_cost``/``parents`` 都是函数局部变量），所以想看
-「搜索长什么样」只能在包外按同样的规则再走一遍。这份重走是按 ``mapper.py`` 逐条对着
-写的，六条容易写错的地方都写在 ``explore()`` 的注释里。
+搜索树是怎么来的（``explore()``）
+----------------------------------
+以前它**在包外重走了一遍 Dijkstra**：``mapper.search()`` 只回一个 :class:`SearchResult`
+（终局、数字、动作序列），不回搜索树，于是这里按 ``mapper.py`` 逐条对着抄了一份主循环，
+再把两趟的结果对账。``M1_ACCEPTANCE.md`` §11 把这条路否掉了——「GUI 不再重走第二份
+Dijkstra」。画出来的树只跟那份副本一样可信，而副本是会腐烂的。
 
-重走有三条硬规则，都是实测踩出来的：
+现在树是**这一趟搜索的副产品**：:class:`tensor_mapping.mapper.SearchRecorder` 把搜索
+自己做出的每个决定报出来，这里只负责记。内核那边没有任何分支读记录器，所以「挂不挂
+记录器，搜索结果一样」是结构性的，不是靠两趟各自算对。
 
-1. **两条终局路径的数字都必须来自 :func:`evaluate_mapping`**，不能从堆里的 cost 合成。
-   ``mapper._budget_cut`` 就是这么做的：它把待定目标的动作重放一遍再取 makespan。
-   自己从堆里取 cost 会在 ``feasible`` 那条路上得到 ``None``（而 ``search`` 报 8000000），
-   因为「搜到过目标」和「这条路能走通」是两件事。``optimal`` 那条路还要镜像
-   ``mapper._replay`` 的断言：重放的 makespan 与弹出的 cost 不等就是内核有 bug，宁可炸。
-2. **堆元素带递增序号平局裁决**。``State`` 是 frozen 但**不可排序**（没有 ``order=True``），
-   两个同 ``g`` 的条目一进堆就 ``TypeError``。这是输入相关的：只在这类图上炸。
-3. **预算检查在目标检查之后、``expanded += 1`` 之前**。两行颠倒会静默地把一个可证的
-   ``optimal`` 变成 ``unknown``，而且只在 ``k == expanded_states`` 那一点显形。
+对账没有跟着走（``reconcile``）
+-------------------------------
+树不再是独立算出来的，所以旧的那种「两份实现互相比对」没有意义了。留下的是**树与它
+自己那趟搜索的自洽**，四条都能被证伪：
 
-走完还要与 ``mapper.search()`` **逐字段对账**（``reconcile``）：status、
-termination_reason、expanded_states、动作序列（tuple 相等，不是长度相等）、makespan。
+1. 树上被展开的节点数 == ``result.expanded_states``；
+2. 树上的节点总数 == ``result.visited_states``（图被截断时这条不成立，见下）；
+3. **沿父链从终局节点走回起点，路上每个节点的动作拼起来 == ``result.actions``**
+   （tuple 相等，不是长度相等）。这条是真正的网：它证明画出来的那棵树自己就能拼出
+   报告出去的那份映射；
+4. 终局节点存在 ⟺ 搜索报的是 ``optimal`` / ``feasible``；没有终局节点时
+   ``result.actions`` 必须为空。
+
 对不上就在屏上打红条并禁用搜索树屏——宁可说「我不知道」，不画一棵可能是错的树。
-这条对账是这份重走唯一的回归网。
+
+图被截断时（节点数超过 ``max_nodes``）节点不全，第 2、3 条**验不了**，于是
+``reconcile.checked`` 是 ``False``：不是「一致」，是「没有结论」。截断本身另有
+``truncated`` 徽章，屏上写「展示不完整」，两者不混。
 
 节点与边的形状
 --------------
-``nodes`` 覆盖**每一个创建过的状态**：起点、被展开过的、进过堆但没被展开的（前沿）、
-以及**只由被剪边到达**的。后两类都带 ``expand_order == -1``。每个被展开的节点带一份
+``nodes`` 覆盖**每一个被接受过的状态**：起点、被展开过的、进过堆但没被展开的（前沿）。
+后一类带 ``expand_order == -1``。只由被剪边到达的节点**不存在**——``search()`` 只在
+接受一条边时才有状态可报，被支配的后继从来没被接受过，所以它连 ``State`` 都不是这棵树
+的一部分。每个被展开的节点带一份
 ``children``——它在 ``legal_actions`` 里的**全部**合法动作，每个或者有出边、或者是一条
 ``cut``（被支配）。因此「从某个已展开的节点出发，所有合法动作都能点」在离线也成立，
 不需要 Python 侧再算一次。**没被展开的节点没有 ``children``**（前沿就是前沿），屏上
@@ -48,9 +56,7 @@ termination_reason、expanded_states、动作序列（tuple 相等，不是长�
 
 from __future__ import annotations
 
-import heapq
-import time
-from typing import Any, Sequence
+from typing import Any
 
 from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE,
@@ -67,10 +73,31 @@ from llm_infer_model.tensor.engine import (
     is_goal,
     legal_actions,
     transition,
+    used_bytes,
     used_vram_bytes,
 )
+# ``ordered_candidates`` 要的是 ``legal_actions`` 那套次序的**全集**。私有名字跨包 import
+# 是刻意的：契约说这个次序是确定性的来源，那它就只能有一份定义。改名会在 import 处炸。
+from llm_infer_model.tensor.engine import (  # noqa: E402
+    _m0_candidates,
+    _m1_candidates,
+)
 from llm_infer_model.tensor.spec import (
+    DEVICE_CPU,
+    DEVICE_GPU,
+    GOAL_LOCATIONS_M1,
+    LOC_DRAM,
+    LOC_SSD,
+    LOC_VRAM,
+    RESOURCE_CPU_COMPUTE,
+    RESOURCE_GPU_COMPUTE,
+    RESOURCE_OF_DEVICE,
+    RESOURCE_OF_ROUTE,
+    RESOURCE_PCIE_COPY,
+    RESOURCE_SSD_IO,
     ROLE_WEIGHT,
+    ROUTES,
+    ROUTE_ENDS,
     InitialCapacityExceeded,
     Scenario,
 )
@@ -85,14 +112,7 @@ from tensor_mapping.artifacts import (
 )
 from tensor_mapping.mapper import (
     STATUS_FEASIBLE,
-    STATUS_INFEASIBLE,
     STATUS_OPTIMAL,
-    STATUS_UNKNOWN,
-    TERMINATION_EXHAUSTED,
-    TERMINATION_GOAL_POPPED,
-    TERMINATION_INITIAL_CAPACITY,
-    TERMINATION_STATE_BUDGET,
-    TERMINATION_TIME_BUDGET,
     SearchResult,
     search,
 )
@@ -161,6 +181,100 @@ def _ranks(scenario: Scenario) -> dict[str, int]:
     return ranks
 
 
+def movable_tensors(scenario: Scenario) -> set[str]:
+    """哪些张量**有办法被搬**。
+
+    0.1 是 ``mapspace.copy_tensor_ids`` 一个字面清单。0.2 没有这张清单：可搬性是
+    「某条路线上允许搬它」的并集（``M1Mapspace.tensors_for``）。按域问，不猜字段名。
+    """
+    if not scenario.is_m1:
+        return set(scenario.mapspace.copy_tensor_ids)
+    movable: set[str] = set()
+    for route in ROUTES:
+        movable.update(scenario.mapspace.tensors_for(route))
+    return movable
+
+
+def m1_block(scenario: Scenario) -> dict[str, Any] | None:
+    """0.2 才有的一块：域、资源、路线、设备、交付目标。0.1 返回 ``None``。
+
+    返回 ``None`` 而不是空字典：0.1 的载荷因此**一个键都不多**，前端也能用一个
+    ``payload.m1 == null`` 判断「这一屏要不要画 M1 那些面板」。
+
+    这块里没有一个是这里算出来的：容量/预留/对齐走 ``architecture`` 的**按域访问器**
+    （0.1 与 0.2 拼字段的差异就锁在那一处），可跑的设备与可搬的张量走 ``mapspace``，
+    资源名字走 ``spec`` 的常量。前端因此不需要认识任何字段名就能画泳道。
+    """
+    if not scenario.is_m1:
+        return None
+    architecture = scenario.architecture
+    mapspace = scenario.mapspace
+
+    labels = {LOC_DRAM: "DRAM", LOC_VRAM: "VRAM", LOC_SSD: "SSD"}
+    devices = {LOC_DRAM: DEVICE_CPU, LOC_VRAM: DEVICE_GPU, LOC_SSD: None}
+    locations: list[dict[str, Any]] = []
+    for domain in GOAL_LOCATIONS_M1:
+        locations.append(
+            {
+                "id": domain,
+                "label": labels[domain],
+                # ``None`` 有两种来源，但屏上的意思是同一个：没有上限。
+                # ``capacity_of`` 的文档里写着这两个来源（0.1 的 DRAM、以及 SSD）。
+                "capacity_bytes": architecture.capacity_of(domain),
+                "reserved_bytes": architecture.reserved_of(domain),
+                "alignment_bytes": architecture.alignment_of(domain),
+                "device": devices[domain],
+                # 淘汰只在**有容量**的域上有意义：SSD 没有容量，所以没有可淘汰的。
+                "can_evict": architecture.capacity_of(domain) is not None,
+            }
+        )
+
+    # 四个资源，槽位从 ``limits`` 同一批字段取——与 ``limits_block`` 共用一份名字，
+    # 屏上的「几条泳道」和产物里的「几个槽」因此不可能对不上。
+    slot_fields = {
+        RESOURCE_CPU_COMPUTE: "cpu_compute_slots",
+        RESOURCE_GPU_COMPUTE: "gpu_compute_slots",
+        RESOURCE_PCIE_COPY: "pcie_copy_slots",
+        RESOURCE_SSD_IO: "ssd_io_slots",
+    }
+    resources = [
+        {
+            "id": resource,
+            "slots": getattr(architecture, field),
+            # 计算资源与搬运资源在屏上是两种东西（一个是算子，一个是副本）。
+            "kind": "compute" if resource in RESOURCE_OF_DEVICE.values() else "transfer",
+        }
+        for resource, field in slot_fields.items()
+    ]
+
+    routes = [
+        {
+            "id": route,
+            "src": ROUTE_ENDS[route][0],
+            "dst": ROUTE_ENDS[route][1],
+            "resource": RESOURCE_OF_ROUTE[route],
+            "tensors": list(mapspace.tensors_for(route)),
+        }
+        for route in ROUTES
+    ]
+
+    return {
+        "locations": locations,
+        "resources": resources,
+        "routes": routes,
+        "devices": {
+            operation_id: list(allowed)
+            for operation_id, allowed in sorted(mapspace.allowed_devices.items())
+        },
+        # 交付目标：每个输出**必须**落在哪个域。屏上「输出是否已交付」的判据就是它。
+        "targets": dict(scenario.goal.output_locations),
+        "outputs": list(scenario.workload.outputs),
+        "allow_cpu_gpu_overlap": mapspace.allow_cpu_gpu_overlap,
+        "allow_copy_compute_overlap": mapspace.allow_copy_compute_overlap,
+        "allow_eviction": mapspace.allow_eviction,
+    }
+
+
 def graph_block(scenario: Scenario) -> dict[str, Any]:
     """计算图本身：张量、算子、连线、布局秩。
 
@@ -172,7 +286,7 @@ def graph_block(scenario: Scenario) -> dict[str, Any]:
     workload = scenario.workload
     ranks = _ranks(scenario)
     outputs = set(workload.outputs)
-    copyable = set(scenario.mapspace.copy_tensor_ids)
+    copyable = movable_tensors(scenario)
 
     tensors = [
         {
@@ -203,8 +317,39 @@ def graph_block(scenario: Scenario) -> dict[str, Any]:
             "unary_op": operation.unary_op,
             "inputs": list(operation.inputs),
             "output": operation.output,
-            "compute_ns": scenario.costs.compute[operation.id].duration_ns,
-            "workspace_bytes": scenario.costs.compute[operation.id].workspace_bytes,
+            # 0.1 的时长与工作区是**一个数**；0.2 的是「每台设备一个」。两个键都给，
+            # 各自在另一个版本里是 ``None``。不共用一个「有时是数、有时是字典」的键：
+            # 那种键要求每个读它的人都先知道版本，而读的人会忘。
+            "compute_ns": (
+                None
+                if scenario.is_m1
+                else scenario.costs.compute[operation.id].duration_ns
+            ),
+            "compute_ns_devices": (
+                {
+                    device: cost.duration_ns
+                    for device, cost in sorted(
+                        scenario.costs.compute.get(operation.id, {}).items()
+                    )
+                }
+                if scenario.is_m1
+                else None
+            ),
+            "workspace_bytes": (
+                None
+                if scenario.is_m1
+                else scenario.costs.compute[operation.id].workspace_bytes
+            ),
+            "workspace_bytes_devices": (
+                {
+                    device: cost.workspace_bytes
+                    for device, cost in sorted(
+                        scenario.costs.compute.get(operation.id, {}).items()
+                    )
+                }
+                if scenario.is_m1
+                else None
+            ),
             "output_alloc_bytes": scenario.size_alloc(operation.output),
             "rank": ranks[operation.id],
         }
@@ -248,128 +393,60 @@ def graph_block(scenario: Scenario) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# 搜索走查
+# 搜索树：挂在搜索上的记录器
 # ---------------------------------------------------------------------------
 
 
-def _reconstruct(
-    parents: dict[tuple[Any, ...], tuple[tuple[Any, ...], Action]],
-    goal_key: tuple[Any, ...],
-    start_key: tuple[Any, ...],
-) -> tuple[Action, ...]:
-    """沿父链走回起点再反转。与 ``mapper._reconstruct`` 同一份逻辑。"""
-    actions: list[Action] = []
-    key = goal_key
-    while key != start_key:
-        parent_key, action = parents[key]
-        actions.append(action)
-        key = parent_key
-    actions.reverse()
-    return tuple(actions)
+class _TreeRecorder:
+    """``SearchRecorder`` 的实现：把搜索**自己报出来**的每一步记成一棵树。
 
+    它只写、不读、不做判断：每个钩子返回 ``None``，记下来的东西没有任何一处回流到
+    ``search()``。所以「挂不挂它，结果一样」不靠纪律，靠结构。
 
-def _replay(scenario: Scenario, actions: Sequence[Action], claimed_ns: int) -> EvaluationResult:
-    """重放并镜像 ``mapper._replay`` 的断言。
+    两条记录规则与 ``mapper.py`` 逐字相同，不是这里发明的：
 
-    走查与内核共用同一个 ``transition``，所以两者对不上只可能是这段重走写错了。宁可
-    当场炸掉，也不要在屏上画一个内核不认的 makespan。
+    * **只在严格更省时换父**。等值保持第一条路径——这正是零成本动作不会被按各种排列
+      各走一遍的原因。钩子只在「这条边被接受了」时被叫到，所以这条规则天然成立。
+    * **节点数超过 ``max_nodes`` 就停止建节点，但搜索照常跑完**。终局因此永远正确，
+      另挂一个「图已截断」徽章。
     """
-    evaluation = evaluate_mapping(scenario, actions)
-    if evaluation.status != "valid" or evaluation.makespan_ns != claimed_ns:
-        raise RuntimeError(
-            f"走查在 {claimed_ns} ns 到达目标，但重放这份映射得到 "
-            f"status={evaluation.status!r}, makespan={evaluation.makespan_ns!r} "
-            f"({evaluation.reason})；走查与 mapper.py 已经分叉"
-        )
-    return evaluation
 
+    def __init__(self, scenario: Scenario, max_nodes: int) -> None:
+        self.scenario = scenario
+        self.max_nodes = max_nodes
+        # 动作的 JSON 拼法分 0.1/0.2 两套。树上的每条边都要写成**这个 scenario 的**
+        # 那套：0.2 的动作缺了 ``device`` / ``src`` / ``dst`` 就不是这个动作了，
+        # 而屏上「这一步在哪台机器上跑的」正是从这几个字段读的。
+        self.m1 = scenario.is_m1
+        self.nodes: list[dict[str, Any]] = []
+        # 与 ``nodes`` 同序的 State，只为搜索结束后补算「每个已展开节点有哪些动作不合法」。
+        # 放这里而不是塞进节点字典，是因为 State 不是 JSON，而且节点要精简。
+        self.states: list[State] = []
+        # 与 ``nodes`` 同序的 Action，只为沿父链重建动作序列（那份映射由搜索给出，
+        # 这里是拿树自己拼一份来对账）。节点字典里存的是 JSON 形状，对不了 tuple。
+        self.actions: list[Action | None] = []
+        self.index_by_key: dict[tuple[Any, ...], int] = {}
+        self.cut_counts: dict[str, int] = {}
+        self.truncated = False
+        self.start_id: int | None = None
+        self.goal_id: int | None = None
+        self.pending_id: int | None = None
 
-def _reconcile(
-    block: dict[str, Any], result: SearchResult | None, expected_actions: tuple[Action, ...]
-) -> dict[str, Any]:
-    """把走查的终局与 ``mapper.search()`` 逐字段比一遍。
+    # -- 记录 ---------------------------------------------------------------
 
-    比的是**动作序列本身**（tuple 相等）而不是长度——两条不同的最优映射完全可能一样长，
-    而「一样长」什么都不证明。``makespan_ns`` 在两条路上都来自 ``evaluate_mapping``，
-    所以相等是应当的，不是巧合。
-    """
-    if result is None:
-        return {"checked": False, "agrees": None, "differences": []}
+    def _action_document(self, action: Action | None) -> dict[str, Any] | None:
+        """一个动作写成 JSON，按**这个 scenario 的**版本。
 
-    differences: list[str] = []
-    verdict = block["verdict"]
-    if verdict["status"] != result.status:
-        differences.append(f"status: 走查 {verdict['status']!r} vs search {result.status!r}")
-    if verdict["termination_reason"] != result.termination_reason:
-        differences.append(
-            f"termination_reason: 走查 {verdict['termination_reason']!r} vs "
-            f"search {result.termination_reason!r}"
-        )
-    if verdict["optimality_proven"] != result.optimality_proven:
-        differences.append(
-            f"optimality_proven: 走查 {verdict['optimality_proven']} vs "
-            f"search {result.optimality_proven}"
-        )
-    if verdict["expanded_states"] != result.expanded_states:
-        differences.append(
-            f"expanded_states: 走查 {verdict['expanded_states']} vs search {result.expanded_states}"
-        )
-    if expected_actions != result.actions:
-        differences.append(
-            f"动作序列不同：走查 {len(expected_actions)} 条 vs search {len(result.actions)} 条"
-        )
-    if block["solution"]["makespan_ns"] != result.makespan_ns:
-        differences.append(
-            f"makespan_ns: 走查 {block['solution']['makespan_ns']} vs search {result.makespan_ns}"
-        )
-    return {"checked": True, "agrees": not differences, "differences": differences}
+        0.2 的动作多带 ``device`` / ``src`` / ``dst`` / ``location``，那不是装饰：
+        屏上「这一步在哪台机器上跑的、从哪搬到哪」只能从这里读。少调一次
+        ``m1=True`` 的后果不是报错，是这几列安静地空掉。
+        """
+        if action is None:
+            return None
+        return action_to_dict(action, m1=self.m1)
 
-
-def explore(
-    scenario: Scenario,
-    *,
-    max_expanded_states: int | None = None,
-    wall_time_limit_s: float | None = None,
-    max_nodes: int = DEFAULT_MAX_NODES,
-    result: SearchResult | None = None,
-    clock: Any = None,
-) -> dict[str, Any]:
-    """重走一次 Dijkstra，把整棵状态图记下来，并与 ``search()`` 对账。
-
-    ``result`` 是调用方已经算好的 :class:`SearchResult`（传 None 就自己调一次
-    ``search``）。传进来而不是在里面调，是为了让调用方决定要不要多花那一次搜索。
-
-    ``clock`` 只在自检里用：Windows 上 ``time.monotonic()`` 实测是 ``GetTickCount64()``
-    （分辨率 15.625 ms），所以 ``wall_time_limit_s=1e-9`` 这种极小预算**永远不触发**
-    ——第一次 ``elapsed_s()`` 就返回 0.0。想确定性地走一遍 ``time_budget_exhausted``
-    就得注入一个假时钟，和 ``mapper.search`` 的测试同一个做法。
-    """
-    state_limit = (
-        scenario.mapper.max_expanded_states
-        if max_expanded_states is None
-        else max_expanded_states
-    )
-    time_limit = (
-        scenario.mapper.wall_time_limit_s
-        if wall_time_limit_s is None
-        else wall_time_limit_s
-    )
-    if clock is None:
-        clock = WallClock(time_limit)
-
-    expanded = 0
-    best_cost: dict[tuple[Any, ...], int] = {}
-    parents: dict[tuple[Any, ...], tuple[tuple[Any, ...], Action]] = {}
-    nodes: list[dict[str, Any]] = []
-    # 与 ``nodes`` 同序的 State，只为走完之后补算「每个已展开节点有哪些动作不合法」。
-    # 放这里而不是塞进节点字典，是因为 State 不是 JSON，而且节点要精简。
-    states: list[State] = []
-    index_by_key: dict[tuple[Any, ...], int] = {}
-    cut_counts: dict[str, int] = {}
-    truncated = False
-
-    def register(
-        key: tuple[Any, ...],
+    def _register(
+        self,
         state: State,
         cost: int,
         parent_id: int | None,
@@ -380,251 +457,275 @@ def explore(
         返回节点 id，超出 ``max_nodes`` 时返回 ``None``（此时**不**建节点，但搜索
         照常往下跑）。
         """
-        nonlocal truncated
-        existing = index_by_key.get(key)
+        key = state.key()
+        existing = self.index_by_key.get(key)
         if existing is not None:
-            node = nodes[existing]
-            if cost < node["g_ns"]:
-                # 只有严格更省才换父。等值保持第一条路径——这正是零成本动作不会
-                # 被按各种排列各走一遍的原因（``mapper.py`` 的更新条件）。
+            if cost < self.nodes[existing]["g_ns"]:
+                node = self.nodes[existing]
                 node["g_ns"] = cost
                 node["t_ns"] = state.t
                 node["parent"] = parent_id
-                node["action"] = action_to_dict(action) if action is not None else None
+                node["action"] = self._action_document(action)
+                self.actions[existing] = action
             return existing
-        if len(nodes) >= max_nodes:
-            truncated = True
+        if len(self.nodes) >= self.max_nodes:
+            self.truncated = True
             return None
-        node_id = len(nodes)
-        index_by_key[key] = node_id
-        nodes.append(
-            {
-                "id": node_id,
-                "t_ns": state.t,
-                "g_ns": cost,
-                "used_vram_bytes": used_vram_bytes(scenario, state),
-                "op_status": dict(state.op_status),
-                "copy_status": dict(state.copy_status),
-                "running": [
-                    {
-                        "resource": task.resource,
-                        "target_id": task.target_id,
-                        "remaining_ns": task.remaining_ns,
-                    }
-                    for task in state.running
-                ],
-                "is_goal": is_goal(scenario, state),
-                "parent": parent_id,
-                "action": action_to_dict(action) if action is not None else None,
-                "expand_order": -1,
-                "role": "cut",
-                "depth": 0,
-                "on_solution_path": False,
-                "children": [],
-            }
-        )
-        states.append(state)
+        node_id = len(self.nodes)
+        self.index_by_key[key] = node_id
+        node: dict[str, Any] = {
+            "id": node_id,
+            "t_ns": state.t,
+            "g_ns": cost,
+            "used_vram_bytes": used_vram_bytes(self.scenario, state),
+            "op_status": dict(state.op_status),
+            "copy_status": dict(state.copy_status),
+            "running": [
+                {
+                    "resource": task.resource,
+                    "target_id": task.target_id,
+                    "remaining_ns": task.remaining_ns,
+                }
+                for task in state.running
+            ],
+            "is_goal": is_goal(self.scenario, state),
+            "parent": parent_id,
+            "action": self._action_document(action),
+            "expand_order": -1,
+            "role": "frontier",
+            "depth": 0,
+            "on_solution_path": False,
+            "children": [],
+        }
+        if self.m1:
+            # 三个账本分开报，不并成一个。``copy_status`` 在 0.1 与 0.2 里**都是
+            # 显存那一本**（``engine.State`` 的文档写着），0.2 另加 DRAM 与 SSD 两本。
+            # 屏上按域画格子时，缺哪本就会把「在 DRAM 里」读成「不在任何地方」。
+            # 只问 DRAM：SSD 没有容量也没有用量（``used_bytes`` 的文档写着
+            # 「向它要 SSD 的用量就是在要一个设计里没定义的数」），所以这一格
+            # 不是漏了，是本来就没有。
+            node["used_dram_bytes"] = used_bytes(self.scenario, state, LOC_DRAM)
+            node["dram_status"] = dict(state.dram_status)
+            node["ssd_status"] = dict(state.ssd_status)
+        self.nodes.append(node)
+        self.states.append(state)
+        self.actions.append(action)
         return node_id
 
-    verdict: dict[str, Any] = {
-        "status": None,
-        "termination_reason": None,
-        "optimality_proven": False,
-        "expanded_states": 0,
-        "visited_states": 0,
-        "wall_time_s": 0.0,
-    }
-    solution: dict[str, Any] = {"actions": [], "makespan_ns": None, "peak_vram_bytes": None,
-                               "h2d_bytes": None, "evaluation": None}
-
-    started = time.monotonic()
-    try:
-        start = initial_state(scenario)
-    except InitialCapacityExceeded:
-        # 起点就装不下：这是关于 scenario 的结论，不是输入错误，而且**是可证的**
-        # （没有任何映射能绕过起点）。别把「展开 0 个」读成「没跑」。
-        verdict.update(
-            status=STATUS_INFEASIBLE,
-            termination_reason=TERMINATION_INITIAL_CAPACITY,
-            optimality_proven=True,
-            wall_time_s=time.monotonic() - started,
+    def _child(
+        self,
+        parent_id: int | None,
+        action: Action,
+        to_id: int | None,
+        cut: dict[str, Any] | None,
+    ) -> None:
+        """给父节点记一条出边（或一条被剪边）。父或子没建节点时什么都不记。"""
+        if parent_id is None or to_id is None:
+            return
+        self.nodes[parent_id]["children"].append(
+            {"action": self._action_document(action), "to": to_id, "cut": cut}
         )
-        block = {
-            "verdict": verdict,
-            "start_id": None,
-            "goal_id": None,
-            "nodes": [],
-            "frontier": [],
-            "cut_counts": {},
-            "budget": {"max_expanded_states": state_limit, "wall_time_limit_s": time_limit},
-            "truncated": False,
-            "solution": solution,
-            # 起点都没活下来，没有节点，也就没有候选可言。
-            "candidates": {"messages": [], "nodes": []},
-            "reconcile": None,
-        }
-        if result is None:
-            result = search(
-                scenario,
-                max_expanded_states=max_expanded_states,
-                wall_time_limit_s=wall_time_limit_s,
-                clock=clock,
+
+    # -- SearchRecorder -----------------------------------------------------
+    #
+    # 钩子按 ``mapper.py`` 的调用顺序被叫到，所以 ``children`` 的先后与
+    # ``legal_actions`` 的先后一致——每个父节点只被展开一次，追加即等价。
+
+    def on_start(self, state: State, cost: int) -> None:
+        self.start_id = self._register(state, cost, None, None)
+
+    def on_expand(self, state: State, cost: int, order: int) -> None:
+        node_id = self.index_by_key.get(state.key())
+        if node_id is not None:
+            self.nodes[node_id]["expand_order"] = order
+
+    def on_edge(
+        self, parent: State, action: Action, successor: State, cost: int
+    ) -> None:
+        parent_id = self.index_by_key.get(parent.key())
+        successor_id = self._register(successor, cost, parent_id, action)
+        self._child(parent_id, action, successor_id, None)
+
+    def on_cut(
+        self, parent: State, action: Action, successor: State, cost: int, incumbent: int
+    ) -> None:
+        # 被支配：已经有一条不更差的路径。**只记录，不展开**——这就是「被剪边」在屏上
+        # 的全部含义。后继本身不会被登记（它从没被接受过），所以 to_id 可能是 None：
+        # 那条边只连到一个不在树上的状态，屏上就不画。
+        self.cut_counts[CUT_DOMINATED] = self.cut_counts.get(CUT_DOMINATED, 0) + 1
+        self._child(
+            self.index_by_key.get(parent.key()),
+            action,
+            self.index_by_key.get(successor.key()),
+            {"reason": CUT_DOMINATED, "g_new_ns": cost, "g_existing_ns": incumbent},
+        )
+
+    def on_pending_goal(self, state: State, cost: int) -> None:
+        # 只在「record 被刷新」时被叫到，所以最后一次就是这个搜索在预算切断时会
+        # 报 ``feasible`` 的那个目标。这里不需要重推 ``_budget_cut`` 的取舍规则。
+        self.pending_id = self.index_by_key.get(state.key())
+
+    def on_goal_popped(self, state: State, cost: int) -> None:
+        self.goal_id = self.index_by_key.get(state.key())
+
+
+def _trace_check(
+    block: dict[str, Any],
+    result: SearchResult,
+    *,
+    path_actions: tuple[Action, ...] | None,
+    complete: bool,
+) -> dict[str, Any]:
+    """把记下来的这棵树与**产生它的那趟搜索**比一遍。
+
+    树不再是独立实现算出来的，所以这里比的不再是「两份 Dijkstra 一致」，而是「这棵树
+    自己能不能拼出搜索报出去的东西」。四条，每条都能被证伪：
+
+    * 树上**标了展开序号**的节点数 == ``expanded_states``；
+    * 树上的节点总数 == ``visited_states``；
+    * 沿父链拼出来的动作序列 == ``actions``（tuple 相等）；
+    * 终局节点存在 ⟺ 报的是 ``optimal`` / ``feasible``。
+
+    计数一律从**节点数据**上数，不从记录器自己的计数器上取——计数器是搜索调用了几次
+    钩子的回声，与屏上真画出来什么无关，比它等于自证。
+
+    ``complete`` 为 ``False``（图被截断）时后三条验不了（节点不全），于是 ``checked``
+    也是 ``False``——「没有结论」，不是「一致」。
+    """
+    differences: list[str] = []
+
+    verdict = block["verdict"]
+    for field in ("status", "termination_reason", "optimality_proven"):
+        if verdict[field] != getattr(result, field):
+            differences.append(f"{field}: 树 {verdict[field]!r} vs search {getattr(result, field)!r}")
+
+    if block["goal_id"] is not None:
+        if result.status != STATUS_OPTIMAL:
+            differences.append(
+                f"树上有弹出的目标节点，但 search 报的是 {result.status!r}"
             )
-        block["reconcile"] = _reconcile(block, result, ())
-        return block
+    elif block["pending_id"] is not None:
+        if result.status != STATUS_FEASIBLE:
+            differences.append(
+                f"树上有待定目标节点，但 search 报的是 {result.status!r}"
+            )
+    elif result.actions:
+        differences.append("树上没有终局节点，但 search 给了一份非空映射")
 
-    start_key = start.key()
-    best_cost[start_key] = 0
-    start_id = register(start_key, start, 0, None, None)
-    assert start_id == 0
+    if not complete:
+        # 截断：节点不全，下面几条不但验不了，比出来还会误导。
+        return {"checked": False, "agrees": None, "differences": differences}
 
-    # (累计时间, 递增序号, 状态)。序号让同 g 的条目有确定的先后，也让堆**永远不需要
-    # 比较两个 State**——它本来也做不到，State 没有 order=True。
-    queue: list[tuple[int, int, State]] = [(0, 0, start)]
-    sequence = 1
-    # 见过但还没弹出的最省目标。只有预算切断时才会被用到：正是它让搜索能答
-    # `feasible` 而不是 `unknown`。
-    pending_goal: tuple[int, tuple[Any, ...]] | None = None
-
-    goal_key: tuple[Any, ...] | None = None
-    claimed_ns: int | None = None
-    cut_reason: str | None = None
-
-    while queue:
-        cost, _, state = heapq.heappop(queue)
-        key = state.key()
-        if cost > best_cost[key]:
-            continue  # 被更省的路径取代的陈旧条目
-
-        if is_goal(scenario, state):
-            goal_key, claimed_ns = key, cost
-            break
-
-        # 在展开**之前**检查，而不是之后：已经弹出的目标因此总是被确认，而不是被
-        # 丢掉。顺序颠倒会静默地把可证的 optimal 变成 unknown。
-        if state_limit and expanded >= state_limit:
-            cut_reason = TERMINATION_STATE_BUDGET
-            break
-        if clock.expired():
-            cut_reason = TERMINATION_TIME_BUDGET
-            break
-
-        expanded += 1
-        node_id = index_by_key.get(key)
-        if node_id is not None:
-            nodes[node_id]["expand_order"] = expanded
-
-        children: list[dict[str, Any]] = []
-        for action in legal_actions(scenario, state):
-            successor = transition(scenario, state, action)
-            successor_key = successor.key()
-            # 只有 ADVANCE 有代价，另外三个不动时钟。
-            successor_cost = cost + (successor.t - state.t)
-            previous = best_cost.get(successor_key)
-            if previous is not None and successor_cost >= previous:
-                # 被支配：已经有一条不更差的路径。**只记录，不展开**——这就是
-                # 「被剪边」在屏上的全部含义。
-                to_id = index_by_key.get(successor_key)
-                cut_counts[CUT_DOMINATED] = cut_counts.get(CUT_DOMINATED, 0) + 1
-                if to_id is not None:
-                    children.append(
-                        {
-                            "action": action_to_dict(action),
-                            "to": to_id,
-                            "cut": {
-                                "reason": CUT_DOMINATED,
-                                "g_new_ns": successor_cost,
-                                "g_existing_ns": previous,
-                            },
-                        }
-                    )
-                continue
-            best_cost[successor_key] = successor_cost
-            parents[successor_key] = (key, action)
-            successor_id = register(successor_key, successor, successor_cost, node_id, action)
-            heapq.heappush(queue, (successor_cost, sequence, successor))
-            sequence += 1
-            if successor_id is not None:
-                children.append(
-                    {"action": action_to_dict(action), "to": successor_id, "cut": None}
-                )
-            if is_goal(scenario, successor):
-                if pending_goal is None or successor_cost < pending_goal[0]:
-                    pending_goal = (successor_cost, successor_key)
-
-        if node_id is not None:
-            nodes[node_id]["children"] = children
-
-    # --- 终局：五种，照抄 ``mapper.search``，不自创 ---
-    actions: tuple[Action, ...] = ()
-    evaluation: EvaluationResult | None = None
-    if goal_key is not None:
-        verdict.update(
-            status=STATUS_OPTIMAL,
-            termination_reason=TERMINATION_GOAL_POPPED,
-            optimality_proven=True,
-        )
-        actions = _reconstruct(parents, goal_key, start_key)
-        assert claimed_ns is not None
-        evaluation = _replay(scenario, actions, claimed_ns)
-    elif cut_reason is not None:
-        verdict.update(termination_reason=cut_reason, optimality_proven=False)
-        if pending_goal is None:
-            verdict.update(status=STATUS_UNKNOWN)
-        else:
-            # 目标见过但没弹出：这是一份真能重放的映射，所以报 feasible——**绝不能**
-            # 报 optimal，搜索没有证明不存在更省的。
-            verdict.update(status=STATUS_FEASIBLE)
-            actions = _reconstruct(parents, pending_goal[1], start_key)
-            evaluation = evaluate_mapping(scenario, actions)
-    else:
-        verdict.update(
-            status=STATUS_INFEASIBLE,
-            termination_reason=TERMINATION_EXHAUSTED,
-            optimality_proven=True,
+    expanded_marked = sum(1 for node in block["nodes"] if node["expand_order"] > 0)
+    if expanded_marked != result.expanded_states:
+        differences.append(
+            f"展开数：树上标了展开的节点 {expanded_marked} 个 vs search expanded_states="
+            f"{result.expanded_states}"
         )
 
-    verdict["expanded_states"] = expanded
-    verdict["visited_states"] = len(best_cost)
-    verdict["wall_time_s"] = time.monotonic() - started
+    if len(block["nodes"]) != result.visited_states:
+        differences.append(
+            f"节点数：树上 {len(block['nodes'])} vs search visited_states="
+            f"{result.visited_states}"
+        )
+    if path_actions is None:
+        # 没有终局节点时 ``search`` 也不该有映射（上面那条已经这样要求了），两处都说
+        # 「没有」就不算分叉——例如起点就装不下：可证的不可行，零个动作。
+        if result.actions:
+            differences.append("父链没能走回起点，拼不出映射")
+    elif path_actions != result.actions:
+        differences.append(
+            f"动作序列不同：树上拼出 {len(path_actions)} 条 vs search {len(result.actions)} 条"
+        )
+    if block["solution"]["makespan_ns"] != result.makespan_ns:
+        differences.append(
+            f"makespan_ns: 树 {block['solution']['makespan_ns']} vs search {result.makespan_ns}"
+        )
+    return {"checked": True, "agrees": not differences, "differences": differences}
 
-    # 解路径：沿父链把节点标出来，前端的树据此高亮。
-    terminal_key = goal_key if goal_key is not None else (
-        pending_goal[1] if (cut_reason is not None and pending_goal is not None) else None
+
+def explore(
+    scenario: Scenario,
+    *,
+    max_expanded_states: int | None = None,
+    wall_time_limit_s: float | None = None,
+    max_nodes: int = DEFAULT_MAX_NODES,
+    clock: Any = None,
+) -> tuple[dict[str, Any], SearchResult]:
+    """跑一次 ``mapper.search()``（挂上记录器），把这一趟记成一棵树。
+
+    返回 ``(树, 那次搜索的结果)``。**两个一起返回**，因为它们是同一件事的两面：树不是
+    另算的，它就是这趟搜索的过程记录。分开拿会在调用方手里重新长出「再搜一次」的余地，
+    而那正是 ``M1_ACCEPTANCE.md`` §11 要拆掉的东西。
+
+    ``clock`` 只在自检里用：Windows 上 ``time.monotonic()`` 实测是 ``GetTickCount64()``
+    （分辨率 15.625 ms），所以 ``wall_time_limit_s=1e-9`` 这种极小预算**永远不触发**
+    ——第一次 ``elapsed_s()`` 就返回 0.0。想确定性地走一遍 ``time_budget_exhausted``
+    就得注入一个假时钟，和 ``mapper.search`` 的测试同一个做法。
+    """
+    recorder = _TreeRecorder(scenario, max_nodes)
+    result = search(
+        scenario,
+        max_expanded_states=max_expanded_states,
+        wall_time_limit_s=wall_time_limit_s,
+        clock=clock,
+        recorder=recorder,
     )
-    if terminal_key is not None:
-        key = terminal_key
-        while True:
-            node_id = index_by_key.get(key)
-            if node_id is None:
-                break
-            nodes[node_id]["on_solution_path"] = True
-            if key == start_key:
-                break
-            key = parents[key][0]
 
-    # 深度与前沿：深度从父链算（父在更新时会换），前沿是「进过堆但从未展开」的那些。
-    # 只由被剪边到达的节点既没进过堆也不会被展开，是第三类，屏上要分开说。
-    pushed = {index_by_key[key] for key in best_cost if key in index_by_key}
+    nodes = recorder.nodes
+    verdict = {
+        "status": result.status,
+        "termination_reason": result.termination_reason,
+        "optimality_proven": result.optimality_proven,
+        "expanded_states": result.expanded_states,
+        "visited_states": result.visited_states,
+        "wall_time_s": result.wall_time_s,
+    }
+
+    # 终局节点：弹出的目标优先，其次是待定目标。与 ``mapper._budget_cut`` 同一套判断，
+    # 但不重推它——刚才那条 ``_trace_check`` 会验这两者是不是一回事。
+    terminal_id = recorder.goal_id if recorder.goal_id is not None else recorder.pending_id
+
+    # 解路径：沿父链把节点标出来（前端的树据此高亮），顺带**用树自己的边拼一份映射**。
+    # 这份拼出来的动作序列只用来与 ``result.actions`` 对账，不发给前端——发给前端的是
+    # 搜索给的那份，屏上不能出现两个真相。
+    path_actions: tuple[Action, ...] | None = None
+    if terminal_id is not None:
+        walked: list[int] = []
+        node_id: int | None = terminal_id
+        while node_id is not None:
+            walked.append(node_id)
+            if node_id == recorder.start_id:
+                break
+            node_id = nodes[node_id]["parent"]
+        if node_id == recorder.start_id:
+            walked.reverse()
+            actions: list[Action] = []
+            for step_id in walked:
+                nodes[step_id]["on_solution_path"] = True
+                step_action = recorder.actions[step_id]
+                if step_action is not None:
+                    actions.append(step_action)
+            path_actions = tuple(actions)
+
+    # 角色与深度：进过堆的（也就是登记过的）没被展开就是前沿。深度从父链算，父在
+    # 更新时会换，所以放在最后。
     frontier: list[int] = []
     for node in nodes:
         if node["expand_order"] > 0:
-            node["role"] = "start" if node["id"] == start_id else "expanded"
-        elif node["id"] in pushed:
+            node["role"] = "start" if node["id"] == recorder.start_id else "expanded"
+        else:
             node["role"] = "frontier"
             frontier.append(node["id"])
-        else:
-            # 只由被剪边到达：从来没有进过堆，所以也不会被展开。它**不是**前沿，
-            # 屏上不能混为一谈。
-            node["role"] = "cut"
         parent_id = node["parent"]
         if parent_id is not None:
             node["depth"] = nodes[parent_id]["depth"] + 1
     frontier.sort()
 
+    evaluation = result.evaluation
     solution = {
-        "actions": [action_to_dict(action) for action in actions],
-        "action_count": len(actions),
+        "actions": [action_to_dict(action, m1=scenario.is_m1) for action in result.actions],
+        "action_count": len(result.actions),
         "makespan_ns": evaluation.makespan_ns if evaluation else None,
         "peak_vram_bytes": evaluation.peak_vram_bytes if evaluation else None,
         "h2d_bytes": evaluation.h2d_bytes if evaluation else None,
@@ -632,32 +733,45 @@ def explore(
         "evaluation_reason": evaluation.reason if evaluation else None,
         "evaluation": evaluation,
     }
+    if scenario.is_m1:
+        # 0.2 才有：另一个域的峰值与另外三个方向的字节。``h2d_bytes`` 留在上面不动，它在
+        # 0.2 里仍是「dram_to_vram 搬了多少」那一个意思（``EvaluationResult`` 的文档写着），
+        # 所以屏头「显存峰值 / H2D」两格在 0.1 与 0.2 上是同一句话。
+        #
+        # 缺评估结果时这四个键仍然**在**（值为 None）：它们与上面的键是同一屏的同一排
+        # 格子，格子在不在不该随评估成败忽有忽无——那会让前端每次都要判「这个格子存在吗」，
+        # 而它判错的后果是整排数字错位。
+        solution["peak_dram_bytes"] = evaluation.peak_dram_bytes if evaluation else None
+        solution["d2h_bytes"] = evaluation.d2h_bytes if evaluation else None
+        solution["ssd_read_bytes"] = evaluation.ssd_read_bytes if evaluation else None
+        solution["ssd_write_bytes"] = evaluation.ssd_write_bytes if evaluation else None
 
-    block = {
+    block: dict[str, Any] = {
         "verdict": verdict,
-        "start_id": start_id,
-        "goal_id": index_by_key.get(goal_key) if goal_key is not None else None,
+        "start_id": recorder.start_id,
+        "goal_id": recorder.goal_id,
+        "pending_id": recorder.pending_id,
         "nodes": nodes,
         "frontier": frontier,
-        "cut_counts": cut_counts,
-        "budget": {"max_expanded_states": state_limit, "wall_time_limit_s": time_limit},
-        "truncated": truncated,
+        "cut_counts": recorder.cut_counts,
+        "budget": {
+            "max_expanded_states": result.max_expanded_states,
+            "wall_time_limit_s": result.wall_time_limit_s,
+        },
+        "truncated": recorder.truncated,
         "solution": solution,
         # 每个已展开节点的**非法**候选（合法的在 children 里，不存两遍）。去重后的理由
         # 表放在 candidates.messages。
-        "candidates": _intern_candidates(scenario, nodes, states),
+        "candidates": _intern_candidates(scenario, nodes, recorder.states),
         "reconcile": None,
     }
-
-    if result is None:
-        result = search(
-            scenario,
-            max_expanded_states=max_expanded_states,
-            wall_time_limit_s=wall_time_limit_s,
-            clock=clock,
-        )
-    block["reconcile"] = _reconcile(block, result, actions)
-    return block
+    block["reconcile"] = _trace_check(
+        block,
+        result,
+        path_actions=path_actions,
+        complete=not recorder.truncated,
+    )
+    return block, result
 
 
 # ---------------------------------------------------------------------------
@@ -668,20 +782,17 @@ def explore(
 def ordered_candidates(scenario: Scenario) -> list[Action]:
     """**全部**候选动作，固定顺序。
 
-    契约顺序（``engine.legal_actions``）：COPY_H2D 按 ``mapspace.copy_tensor_ids`` 排序
-    → COMPUTE 按算子 id 排序 → EVICT 按张量 id 排序 → ADVANCE 最后。照抄而不是自己排，
-    是为了让候选表不随实现漂移——``legal_actions`` 只给合法集，这份是全集的顺序来源，
-    两者必须用同一套次序，否则屏上「为什么这个不行」会指着一个邻居说。
+    顺序就是内核 ``legal_actions`` 用的那一份（``engine`` 里按版本分的
+    ``_m0_candidates`` / ``_m1_candidates``）。``legal_actions`` 只给合法集，这一份是
+    全集的顺序来源，两者必须用同一套次序，否则屏上「为什么这个不行」会指着一个邻居说。
+
+    **不在这里重排，也不再抄一份。** 以前抄了一份 0.1 的，加 0.2 时没跟上，于是查看器
+    一打开 0.2 场景就在 ``mapspace.copy_tensor_ids`` 上抛 ``AttributeError``（0.2 的
+    mapspace 没有这个字段）。抄一份就是两个真相，而漂移是静默的——直接拿内核那一份，
+    它改名时会在 import 处炸，那是个响亮的失败，比屏上悄悄换一个次序好。
     """
-    ordered: list[Action] = []
-    for tensor_id in sorted(scenario.mapspace.copy_tensor_ids):
-        ordered.append(Action(ACTION_COPY_H2D, tensor_id))
-    for operation_id in sorted(scenario.workload.operation_by_id):
-        ordered.append(Action(ACTION_COMPUTE, operation_id))
-    for tensor_id in sorted(scenario.workload.tensor_by_id):
-        ordered.append(Action(ACTION_EVICT, tensor_id))
-    ordered.append(Action(ACTION_ADVANCE))
-    return ordered
+    candidates = _m1_candidates(scenario) if scenario.is_m1 else _m0_candidates(scenario)
+    return list(candidates)
 
 
 def illegal_candidates(scenario: Scenario, state: State) -> list[dict[str, Any]]:
@@ -760,7 +871,6 @@ def payload(
     *,
     scenario_path: str | None = None,
     mode: str = "live",
-    search_result: SearchResult | None = None,
     max_expanded_states: int | None = None,
     wall_time_limit_s: float | None = None,
     max_nodes: int = DEFAULT_MAX_NODES,
@@ -770,21 +880,16 @@ def payload(
     ``mode`` 是 ``"live"``（本地服务）或 ``"snapshot"``（导出的自包含 HTML）。快照是
     活页面的**死拷贝**：没有 Python 侧可以对话，所以参数编辑与重跑在那一侧必须禁用，
     屏上也要说清楚原因，而不是给一个点了没反应的按钮。
-    """
-    result = search_result
-    if result is None:
-        result = search(
-            scenario,
-            max_expanded_states=max_expanded_states,
-            wall_time_limit_s=wall_time_limit_s,
-        )
 
-    block = explore(
+    整页只搜**一次**：树与终局都来自 ``explore()`` 里那趟挂了记录器的 ``search()``。
+    这里没有「传一个已经算好的结果进来」的口子——那个口子只会长成第二趟搜索
+    （``M1_ACCEPTANCE.md`` §11）。
+    """
+    block, result = explore(
         scenario,
         max_expanded_states=max_expanded_states,
         wall_time_limit_s=wall_time_limit_s,
         max_nodes=max_nodes,
-        result=result,
     )
     evaluation = block["solution"]["evaluation"]
     block["solution"].pop("evaluation", None)
@@ -811,6 +916,8 @@ def payload(
         },
         "explore": block,
         "graph": graph_block(scenario),
+        # 0.2 才有的一块（0.1 是 ``None``，于是 0.1 的载荷一个键都不多）。
+        "m1": m1_block(scenario),
         "log": _log_block(scenario, evaluation, None),
         "source": {"limits": limits, "assumptions": assumptions(scenario)},
         "params_echo": params_echo(scenario, result),
@@ -883,6 +990,11 @@ REFUSAL_REMEDY = {
     # ——配置根本没读进来。所以措辞上不说「门 4」，也不给「换成参考硬件」（那也要先有个配置）。
     "config": "补救：**检查 ``--config`` 指的文件**。这是三道门之前的一步——配置没读进来，"
               "所以开关清单是空的，那不是坏了。",
+    # 第五类同样不是门，也同样刻意不编号。三道门说的都是「有一份能对齐的成本表，但这一份
+    # 过不去」；这一类是**没有可对齐的表**——0.2 的成本表与桥产的那份不同构。补救方向因此
+    # 不是改参数、也不是关服务，而是「这一屏在 0.2 上没有要展示的东西」。
+    "m1": "补救：**不用补救**。0.2 的时长本来就在 scenario 自带的成本表里，时间线、计算图、"
+          "状态图照常画；这一屏只是没有「从硬件参数推一遍」这条对照。",
 }
 
 REFUSAL_CLASS_LABEL = {
@@ -890,6 +1002,7 @@ REFUSAL_CLASS_LABEL = {
     "invalid": "InvalidInput · 单位分辨率 / 图形状",
     "value": "ValueError · 参数不变式",
     "config": "配置未载入 · 路径或内容",
+    "m1": "0.2 的两级成本表 · 成本桥只产 0.1 的一级形状",
 }
 
 
@@ -996,6 +1109,7 @@ def _refusal(
     stage: str,
     layers: dict[str, Any] | None = None,
     problems: list[dict[str, Any]] | None = None,
+    source_label: str | None = None,
 ) -> dict[str, Any]:
     return {
         "kind": kind,
@@ -1006,6 +1120,10 @@ def _refusal(
         "message": message,
         "stage": stage,
         "remedy": REFUSAL_REMEDY[kind],
+        # 「来源」那一栏的措辞。**只有 0.2 那一类给**：它要说的是「没有可对齐的表」，而
+        # 三四道门那句「modeling 推不出来」套上去是反的（0.2 的时长推得出来，就在场景里）。
+        # 缺省 ``None`` 时由 :func:`sourced_scenario` 按老办法拼。
+        "source_label": source_label,
         "toggles": _toggle_rows(config, message) if config is not None else [],
         "structural_problems": problems or [],
         "layers": [
@@ -1059,6 +1177,31 @@ def bridge_table(
     """
     from llm_infer_model.tensor.layer_costs import costs_from_model_config
     from llm_infer_model.tensor.spec import InvalidInput, Unsupported
+
+    if scenario.is_m1:
+        # 0.2 的成本表**不同构**，不是「算不出来」：0.1 是 ``compute[op]`` / ``h2d[tensor]``
+        # 两个一维表，0.2 是 ``compute[op][device]`` / ``transfer[route][tensor]`` 两个二维表
+        # （``M1Costs`` 的文档写着为什么另起一个类型而不是把字段摊平）。而这道桥的下游
+        # ``costs_for_chain`` 产的是 0.1 那一份，也没有 0.2 的对应物——把它硬塞进来就得在
+        # 这里替 CPU/GPU 挑一个 flops、替四条路线挑一组带宽，那是**建模决策**，不是查看器
+        # 该做的。所以这一屏在 0.2 上如实说「没有可推导的东西」，而时间线、计算图、状态图
+        # 用的仍是 scenario 自带的 0.2 成本表（内核从它算出 ``log.events``），一屏都不缺。
+        #
+        # 这一支排在 ``--config`` 前面：形状不对是**还没走到门口**就看出来的事，跟配置读没读
+        # 进来无关。与第四类一样刻意不编号——三道门都是 ``costs_from_model_config`` 在拒绝。
+        return _refusal(
+            scenario, config, "m1",
+            code=None,
+            message=(
+                "这份 0.2 场景自带**逐（算子,设备）与逐（路线,张量）**的成本表，而成本桥"
+                "（``costs_from_model_config`` / ``costs_for_chain``）产的是 0.1 那份一维形状："
+                "算子和搬运各一个时长。两者不同构，桥没有可对齐的字段。"
+                "要把 0.2 的时长也从硬件参数推出来，得先定 CPU/GPU 各自的有效算力与四条路线"
+                "各自的带宽——那是建模决策，不在查看器里做。"
+            ),
+            stage="scenario.costs 的形状（M1Costs vs Costs）",
+            source_label="scenario 声明值（0.2 的两级成本表，成本桥不产这一形状）",
+        )
 
     if config is None and config_error is not None:
         # ``--config`` 指的文件没读进来（``main()`` 的选择是「打印失败、继续跑」，因为
@@ -1297,10 +1440,14 @@ def sourced_scenario(
         return scenario, block
 
     if derived is None:
+        # 「推不出来」这个说法只对三道门与「配置没载入」成立。0.2 那一类**不是**推不出来：
+        # 0.2 的时长就在 scenario 自带的表里，只是那张表与桥产的不同构，没有可对齐的字段。
+        # 措辞由 ``bridge`` 自己给（``source_label``），别在这里替它猜。
         block.update(
             kind="declared", swapped=False,
             reason_class=bridge.get("kind"),
-            label=f"scenario 声明值（modeling 推不出来：{bridge.get('refusal_label') or bridge.get('kind')}）",
+            label=bridge.get("source_label")
+            or f"scenario 声明值（modeling 推不出来：{bridge.get('refusal_label') or bridge.get('kind')}）",
             message=bridge.get("message"),
             remedy=bridge.get("remedy"),
         )
@@ -1320,16 +1467,50 @@ def params_echo(scenario: Scenario, result: SearchResult) -> dict[str, Any]:
 
     屏上的表单是**从这里**生成的，不是前端写死的一份。否则改了一个旋钮、表单却还显示
     旧值，用户会以为没生效。
+
+    两个版本的键各写各的，不共用一个「差不多」的形状：0.1 的 ``copy_tensor_ids`` 在
+    0.2 里根本不存在（0.2 没有那张清单，可搬性按路线问），而 0.2 的三样东西（DRAM
+    预算、两个域各自的预留、四个资源的槽位）在 0.1 里也没有。共用一个形状就得有一半
+    的键在另一半里是假的。
     """
-    return {
+    common = {
         "vram_capacity_bytes": scenario.architecture.vram_capacity_bytes,
-        "runtime_reserved_bytes": scenario.architecture.runtime_reserved_bytes,
-        "allocation_alignment_bytes": scenario.architecture.allocation_alignment_bytes,
-        "allow_copy_compute_overlap": scenario.mapspace.allow_copy_compute_overlap,
-        "allow_eviction": scenario.mapspace.allow_eviction,
-        "copy_tensor_ids": list(scenario.mapspace.copy_tensor_ids),
         "max_expanded_states": result.max_expanded_states,
         "wall_time_limit_s": result.wall_time_limit_s,
+        "allow_copy_compute_overlap": scenario.mapspace.allow_copy_compute_overlap,
+        "allow_eviction": scenario.mapspace.allow_eviction,
+    }
+    if scenario.is_m1:
+        architecture = scenario.architecture
+        return {
+            **common,
+            "dram_capacity_bytes": architecture.dram_capacity_bytes,
+            "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,
+            "vram_runtime_reserved_bytes": architecture.reserved_of(LOC_VRAM),
+            "cpu_compute_slots": architecture.cpu_compute_slots,
+            "gpu_compute_slots": architecture.gpu_compute_slots,
+            "pcie_copy_slots": architecture.pcie_copy_slots,
+            "ssd_io_slots": architecture.ssd_io_slots,
+            # 0.2 的计算时长按（算子，设备）两级索引，所以这里也是两级——摊平成一个
+            # ``op`` 键就得分不清哪台机器上的那个数。
+            "compute_ns": {
+                operation_id: {
+                    device: cost.duration_ns for device, cost in sorted(by_device.items())
+                }
+                for operation_id, by_device in sorted(scenario.costs.compute.items())
+            },
+            "transfer_ns": {
+                route: {
+                    tensor_id: cost.duration_ns for tensor_id, cost in sorted(by_tensor.items())
+                }
+                for route, by_tensor in sorted(scenario.costs.transfer.items())
+            },
+        }
+    return {
+        **common,
+        "runtime_reserved_bytes": scenario.architecture.runtime_reserved_bytes,
+        "allocation_alignment_bytes": scenario.architecture.allocation_alignment_bytes,
+        "copy_tensor_ids": list(scenario.mapspace.copy_tensor_ids),
         "compute_ns": {
             operation_id: cost.duration_ns
             for operation_id, cost in sorted(scenario.costs.compute.items())

@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-b-hybrid",
+  "workload_file": "m1-chain.workload.json",
+  "comment": "M1_ACCEPTANCE.md 3. c1 is cheap on CPU, c2 is cheap on GPU, so the best plan hands h across the bus once and finishes in 5 ms -- faster than either device running the whole chain (9 and 10). Search must find it without being told which device goes first.",
+  "architecture": {
+    "dram_capacity_bytes": 256,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"y": "dram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "cpu": {"duration_ns": 1000000, "workspace_bytes": 0},
+        "gpu": {"duration_ns": 6000000, "workspace_bytes": 0}
+      },
+      "c2": {
+        "cpu": {"duration_ns": 8000000, "workspace_bytes": 0},
+        "gpu": {"duration_ns": 1000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {
+        "x": {"duration_ns": 2000000},
+        "h": {"duration_ns": 2000000}
+      },
+      "vram_to_dram": {
+        "h": {"duration_ns": 1000000},
+        "y": {"duration_ns": 1000000}
+      },
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"c1": ["cpu", "gpu"], "c2": ["cpu", "gpu"]},
+    "allowed_transfers": {
+      "dram_to_vram": ["x", "h"],
+      "vram_to_dram": ["h", "y"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

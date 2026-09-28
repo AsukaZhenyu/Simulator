@@ -1,0 +1,79 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-fork",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance C: a = relu(x); b = relu(x); y = a + b, x resident in DRAM and VRAM"
+  },
+  "comment": "M1_ACCEPTANCE.md 4. x is deliberately in both domains, charged once in each: the two branches then need no transfer at all, so the case isolates device parallelism from copy scheduling. The D2H of b is the only move allowed, and it is the one the CPU add depends on.",
+  "tensors": [
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram", "vram"]
+    },
+    {
+      "id": "a",
+      "name": "blk.0.attn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "b",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "ca",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["x"],
+      "output": "a"
+    },
+    {
+      "id": "cb",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": ["x"],
+      "output": "b"
+    },
+    {
+      "id": "add",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["a", "b"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

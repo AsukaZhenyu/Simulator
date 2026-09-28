@@ -59,6 +59,7 @@ __all__ = [
     "STATUS_INFEASIBLE",
     "STATUS_OPTIMAL",
     "STATUS_UNKNOWN",
+    "SearchRecorder",
     "SearchResult",
     "search",
 ]
@@ -83,6 +84,67 @@ class Clock(Protocol):
     def elapsed_s(self) -> float: ...
 
     def expired(self) -> bool: ...
+
+
+class SearchRecorder(Protocol):
+    """Observes a search, and takes no part in it.
+
+    ``M1_ACCEPTANCE.md`` §11: there must be no second Dijkstra. A viewer that
+    wants to draw the search tree used to re-implement this module's loop outside
+    the package and reconcile the two afterwards; the tree it drew was therefore
+    only as trustworthy as that copy. These hooks are the alternative -- the one
+    search announces what it does, and a display layer listens.
+
+    **Passive** is a promise with teeth, and it is kept by construction rather
+    than by discipline: every hook returns ``None``, nothing the recorder holds is
+    read back, and no branch in :func:`search` consults one. So the same budget
+    with and without a recorder must yield the same status, the same termination
+    reason, the same expansion count and the same action tuple -- which is
+    exactly the equality ``M1_ACCEPTANCE.md`` §11 asks for, and it is tested.
+
+    A recorder that raises aborts the search. That is a caller's bug, not a
+    supported way to prune: a hook is called *after* the decision it reports, so
+    there is nothing left to influence.
+
+    ``on_cut`` and ``on_edge`` are separate rather than one call with an
+    ``incumbent`` field, so that the dominance test stays in this module. A
+    recorder that had to recompute ``successor_cost >= previous`` would be
+    re-implementing a rule with a silent failure mode: get it backwards and the
+    tree shows an edge where the search pruned one, which looks like a bug in
+    the search.
+    """
+
+    def on_start(self, state: State, cost: int) -> None:
+        """The initial state, before anything is expanded."""
+
+    def on_expand(self, state: State, cost: int, order: int) -> None:
+        """A state was popped and is being expanded. ``order`` counts from 1."""
+
+    def on_edge(
+        self, parent: State, action: Action, successor: State, cost: int
+    ) -> None:
+        """A successor was accepted and pushed, possibly re-parenting an old one."""
+
+    def on_cut(
+        self, parent: State, action: Action, successor: State, cost: int, incumbent: int
+    ) -> None:
+        """A successor was dominated: a path no worse than ``cost`` already exists.
+
+        ``incumbent`` is that path's cost. The successor is not pushed and not
+        expanded, so it may never be reached any other way -- which is why a
+        display layer has to be told about it at all.
+        """
+
+    def on_pending_goal(self, state: State, cost: int) -> None:
+        """A goal is now the cheapest one seen but not yet popped.
+
+        Called only when that record improves, so the last call is the goal a
+        budget cut-off will report as ``feasible``. A recorder does not have to
+        re-derive ``_budget_cut``'s tie-breaking, which is the point.
+        """
+
+    def on_goal_popped(self, state: State, cost: int) -> None:
+        """A goal came out of the queue: the search is about to return ``optimal``."""
 
 
 @dataclass(frozen=True)
@@ -115,6 +177,7 @@ def search(
     max_expanded_states: int | None = None,
     wall_time_limit_s: float | None = None,
     clock: Clock | None = None,
+    recorder: SearchRecorder | None = None,
 ) -> SearchResult:
     """Find a minimum-makespan mapping, or report why it could not.
 
@@ -123,6 +186,10 @@ def search(
     expanding a state, so a goal already popped is always confirmed; running out
     of budget is never reported as infeasible, because an unfinished search has
     proven nothing.
+
+    ``recorder`` is optional and passive -- see :class:`SearchRecorder`. With one
+    attached the search does exactly what it would have done without it; the
+    hooks are called after each decision and their return values are unused.
     """
     state_limit = (
         scenario.mapper.max_expanded_states
@@ -181,6 +248,8 @@ def search(
     start_key = start.key()
     best_cost[start_key] = 0
     parents: dict[StateKey, tuple[StateKey, Action]] = {}
+    if recorder is not None:
+        recorder.on_start(start, 0)
 
     # Entries are (cumulative time, sequence, state). The sequence number is
     # unique, so the heap never has to compare two State objects -- which it
@@ -201,6 +270,8 @@ def search(
             # The first goal out of a uniform-cost queue has minimum cost, so
             # this is the only way `optimal` is ever concluded.
             actions = _reconstruct(parents, key, start_key)
+            if recorder is not None:
+                recorder.on_goal_popped(state, cost)
             return assemble(
                 status=STATUS_OPTIMAL,
                 termination_reason=TERMINATION_GOAL_POPPED,
@@ -219,6 +290,8 @@ def search(
                                parents, assemble)
 
         expanded += 1
+        if recorder is not None:
+            recorder.on_expand(state, cost, expanded)
         for action in legal_actions(scenario, state):
             successor = transition(scenario, state, action)
             successor_key = successor.key()
@@ -229,14 +302,20 @@ def search(
                 # Strictly-less-only updates. Equal cost keeps the first path
                 # found, which is what stops zero-cost actions from being
                 # explored in every possible order (DESIGN.md §7).
+                if recorder is not None:
+                    recorder.on_cut(state, action, successor, successor_cost, previous)
                 continue
             best_cost[successor_key] = successor_cost
             parents[successor_key] = (key, action)
             heapq.heappush(queue, (successor_cost, sequence, successor))
             sequence += 1
+            if recorder is not None:
+                recorder.on_edge(state, action, successor, successor_cost)
             if is_goal(scenario, successor):
                 if pending_goal is None or successor_cost < pending_goal[0]:
                     pending_goal = (successor_cost, successor_key)
+                    if recorder is not None:
+                        recorder.on_pending_goal(successor, successor_cost)
 
     # Every reachable state was expanded and none was a goal. This exhaustiveness
     # is the only thing that ever justifies concluding infeasible.

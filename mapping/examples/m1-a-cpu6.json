@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-a-cpu6",
+  "workload_file": "m1-matvec.workload.json",
+  "comment": "M1_ACCEPTANCE.md 2, CPU 6 ms row. Both operands are already in DRAM, so the CPU finishes in one 6 ms compute while the GPU plan cannot beat 4 ms of H2D + 2 ms + 1 ms of D2H. The GPU is the faster device and still loses; that is the point of the case.",
+  "architecture": {
+    "dram_capacity_bytes": 256,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"y": "dram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "cpu": {"duration_ns": 6000000, "workspace_bytes": 0},
+        "gpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {
+        "W": {"duration_ns": 3000000},
+        "x": {"duration_ns": 1000000}
+      },
+      "vram_to_dram": {"y": {"duration_ns": 1000000}},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"c1": ["cpu", "gpu"]},
+    "allowed_transfers": {
+      "dram_to_vram": ["W", "x"],
+      "vram_to_dram": ["y"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

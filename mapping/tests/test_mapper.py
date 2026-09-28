@@ -239,6 +239,147 @@ class BudgetTests(unittest.TestCase):
         self.assertEqual(result.status, STATUS_OPTIMAL)
 
 
+class SearchRecorderTests(unittest.TestCase):
+    """``M1_ACCEPTANCE.md`` §11: recording a search must not change it.
+
+    The hooks exist so a display layer can draw the tree without re-implementing
+    the loop (``mapper.SearchRecorder``). That is only safe if attaching one is
+    free, so the net is an equality: the verdict, the budget accounting, the
+    expansion count and the action tuple, with and without a recorder, across
+    every terminal outcome the search has -- ``optimal``, ``feasible``,
+    ``unknown`` and ``infeasible``.
+
+    A recorder is deliberately given *no* way to influence the search, so these
+    assertions cannot be satisfied by a recorder that merely behaves; they are
+    checking that the hooks were bolted on after the fact, which is the only
+    version of this feature that is worth having.
+    """
+
+    class Recorder:
+        """A recorder that keeps every call, so the shape of a search is visible."""
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+            self.starts: list[int] = []
+            self.expansions: list[int] = []
+            self.edges: list[int] = []
+            self.cuts: list[int] = []
+            self.cut_pairs: list[tuple[int, int]] = []
+            self.pending_goals: list[int] = []
+            self.goal_popped: int | None = None
+
+        def on_start(self, state: State, cost: int) -> None:
+            self.calls.append("start")
+            self.starts.append(cost)
+
+        def on_expand(self, state: State, cost: int, order: int) -> None:
+            self.calls.append("expand")
+            self.expansions.append(order)
+
+        def on_edge(self, parent, action, successor, cost: int) -> None:
+            self.calls.append("edge")
+            self.edges.append(cost)
+
+        def on_cut(self, parent, action, successor, cost: int, incumbent: int) -> None:
+            self.calls.append("cut")
+            self.cuts.append(cost)
+            self.cut_pairs.append((cost, incumbent))
+
+        def on_pending_goal(self, state: State, cost: int) -> None:
+            self.calls.append("pending_goal")
+            self.pending_goals.append(cost)
+
+        def on_goal_popped(self, state: State, cost: int) -> None:
+            self.calls.append("goal_popped")
+            self.goal_popped = cost
+
+    def outcomes(self):
+        """One run per terminal outcome, each with and without a recorder."""
+        chain = load_example("chain-cap160")
+        yield "optimal", chain, {}
+        yield "unknown", chain, {"max_expanded_states": 1}
+        # An infeasible scenario: the 0.1 chain cannot fit in 95 bytes however it
+        # is scheduled, so the search exhausts a small space rather than cutting.
+        yield "infeasible", with_capacity(chain, 95), {}
+        # `feasible` needs a budget between "no goal seen" and "goal popped"; the
+        # next test finds one rather than hardcoding an implementation detail.
+        for limit in range(1, 60):
+            result = search(chain, max_expanded_states=limit)
+            if result.status == STATUS_FEASIBLE:
+                yield "feasible", chain, {"max_expanded_states": limit}
+                return
+
+    def test_recording_does_not_change_the_search(self) -> None:
+        outcomes = list(self.outcomes())
+        self.assertEqual(
+            {name for name, _, _ in outcomes},
+            {"optimal", "unknown", "infeasible", "feasible"},
+            "every terminal outcome must be exercised",
+        )
+        for name, scenario, budget in outcomes:
+            with self.subTest(outcome=name):
+                plain = search(scenario, **budget)
+                recorded = search(scenario, recorder=self.Recorder(), **budget)
+                self.assertEqual(recorded.status, plain.status)
+                self.assertEqual(recorded.termination_reason, plain.termination_reason)
+                self.assertEqual(recorded.optimality_proven, plain.optimality_proven)
+                self.assertEqual(recorded.expanded_states, plain.expanded_states)
+                self.assertEqual(recorded.visited_states, plain.visited_states)
+                self.assertEqual(recorded.makespan_ns, plain.makespan_ns)
+                self.assertEqual(recorded.actions, plain.actions)
+
+    def test_the_hooks_report_a_consistent_search(self) -> None:
+        """The trace has to agree with the numbers it is a trace *of*.
+
+        A recorder that never fired would satisfy the equality above, so this
+        checks the recording is real: one start, expansions numbered 1..n with no
+        gaps, and -- for a proven optimum -- the popped goal's cost is the
+        makespan the result reports.
+        """
+        scenario = load_example("chain-cap160")
+        recorder = self.Recorder()
+        result = search(scenario, recorder=recorder)
+
+        self.assertEqual(result.status, STATUS_OPTIMAL)
+        self.assertEqual(recorder.starts, [0])
+        self.assertEqual(recorder.expansions, list(range(1, result.expanded_states + 1)))
+        self.assertEqual(recorder.goal_popped, result.makespan_ns)
+        # Every successor either became an edge or was dominated by a cheaper
+        # path, so the two counts together are the branching the search saw.
+        self.assertTrue(recorder.edges)
+        self.assertEqual(recorder.calls[0], "start")
+        self.assertEqual(recorder.calls[-1], "goal_popped")
+
+    def test_every_cut_carries_the_path_that_dominated_it(self) -> None:
+        """The dominance test stays in ``mapper``; the hooks only report its result.
+
+        ``incumbent`` is the cost of the path that made the search prune, so it
+        is by definition no worse than the one that was pruned. If the two hooks
+        were ever swapped, or the incumbent were read off the wrong state, this
+        is the assertion that notices -- and on screen the mistake would look
+        like an edge where the search had actually cut one.
+        """
+        recorder = self.Recorder()
+        search(load_example("chain-cap160"), max_expanded_states=8, recorder=recorder)
+        self.assertTrue(recorder.cut_pairs, "this budget should meet a dominated edge")
+        for cost, incumbent in recorder.cut_pairs:
+            self.assertLessEqual(incumbent, cost)
+        self.assertTrue(recorder.edges)
+
+    def test_a_tighter_budget_fires_no_fewer_hooks(self) -> None:
+        """Recording is passive, so it also stops exactly where the search does."""
+        for limit in (1, 2, 5, 12):
+            with self.subTest(max_expanded_states=limit):
+                recorder = self.Recorder()
+                result = search(
+                    load_example("chain-cap160"),
+                    max_expanded_states=limit,
+                    recorder=recorder,
+                )
+                self.assertEqual(recorder.expansions, list(range(1, limit + 1)))
+                self.assertEqual(result.expanded_states, limit)
+
+
 class DeterminismTests(unittest.TestCase):
     """DESIGN.md §7: the same input must give the same mapping."""
 
@@ -368,7 +509,11 @@ class StateKeyTests(unittest.TestCase):
                 RunningTask("h2d_copy", "W2", 1_000_000),
             )
         )
-        self.assertEqual(len(both.key()[-1]), 2)
+        self.assertEqual(len(both.running), 2)
+        # Looked up by value, not by position: 0.2 appended the DRAM ledger to the
+        # key, so "the last element is the running tuple" stopped being true. The
+        # assertion that matters is that the in-flight tasks are *in* the key.
+        self.assertIn(both.running, both.key())
 
     def test_a_reservation_is_not_the_same_state_as_a_ready_copy(self) -> None:
         reserved = self._state(copy_status=(("W1", "RESERVED_COPY"),))

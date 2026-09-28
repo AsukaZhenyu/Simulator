@@ -85,7 +85,17 @@
         <p class="hint" id="timeline-hint"></p>
       </div>
       <div class="canvas-wrap"><svg id="gantt-svg" role="img" aria-label="执行时间线"></svg></div>
-      <div class="canvas-wrap"><svg id="vram-svg" role="img" aria-label="显存占用曲线"></svg></div>
+      <!-- 两条容量曲线各带一行**说明**，说明写在 HTML 里而不画进 SVG：SVG 里的字不换行，
+           窄图上会被画布静默裁掉（这个坑吃过一次，见 app.js 里那段注释）。内存那条由
+           app.js 在 0.1 上整格收起来——0.1 没有 DRAM 这本账，屏上就不该有这个格子。 -->
+      <div class="canvas-wrap">
+        <p class="curve-name" id="vram-name"></p>
+        <svg id="vram-svg" role="img" aria-label="显存占用曲线"></svg>
+      </div>
+      <div class="canvas-wrap" id="dram-wrap" hidden>
+        <p class="curve-name" id="dram-name"></p>
+        <svg id="dram-svg" role="img" aria-label="内存占用曲线"></svg>
+      </div>
       <div class="canvas-wrap"><svg id="states-svg" role="img" aria-label="状态时间线"></svg></div>
       <div id="refused-body"></div>
     </section>

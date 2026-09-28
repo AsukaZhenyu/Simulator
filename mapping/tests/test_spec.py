@@ -455,9 +455,15 @@ class UnsupportedTests(unittest.TestCase):
         self.assertIn("M0 models only", self._reject(workload))
 
     def test_unknown_schema_version(self) -> None:
+        # Was "0.2" until M1 made that a real version. The probe moves to a
+        # version that is genuinely unknown; what is being tested -- that an
+        # unrecognised version is refused rather than guessed at -- is unchanged.
         workload = self._chain()
-        workload["schema_version"] = "0.2"
-        self.assertIn("0.2", self._reject(workload))
+        workload["schema_version"] = "0.3"
+        message = self._reject(workload)
+        self.assertIn("0.3", message)
+        self.assertIn("'0.1'", message)
+        self.assertIn("'0.2'", message)
 
     def test_multi_gpu_compute_device(self) -> None:
         scenario = self._scenario()

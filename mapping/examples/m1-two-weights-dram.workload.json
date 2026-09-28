@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-two-weights-dram",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance D: h = W1*x; y = W2*h, CPU-only, x and W1 in DRAM and W2 on SSD"
+  },
+  "comment": "M1_ACCEPTANCE.md 5. W2 has no DRAM copy and no DRAM->VRAM route is allowed, so the whole case is about whether the 64 B read target fits alongside the tensors already resident. The D/E graph is the same; only this placement differs, and a workload file is where placement lives.",
+  "tensors": [
+    {
+      "id": "W1",
+      "name": "blk.0.ffn_gate.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "W2",
+      "name": "blk.0.ffn_down.weight",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 4, 1, 1],
+      "nb": [4, 16, 64, 64],
+      "storage_bytes": 64,
+      "initial_locations": ["ssd"]
+    },
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16,
+      "initial_locations": ["dram"]
+    },
+    {
+      "id": "h",
+      "name": "blk.0.ffn_act",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [4, 1, 1, 1],
+      "nb": [4, 16, 16, 16],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W1", "x"],
+      "output": "h"
+    },
+    {
+      "id": "c2",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": ["W2", "h"],
+      "output": "y"
+    }
+  ],
+  "outputs": ["y"]
+}

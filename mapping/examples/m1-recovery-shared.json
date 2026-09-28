@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-recovery-shared",
+  "workload_file": "m1-shared-weight.workload.json",
+  "comment": "M1_ACCEPTANCE.md 8, the shared-weight recovery case. W has an SSD source and two consumers, so its DRAM copy can be released after c1 and re-read for c2 -- and the legality of that release rests entirely on the SSD source still being reachable. Drop the ssd_to_dram route and the same release becomes LIVE_VALUE_LOSS. DRAM is deliberately generous: the case is about recoverability, not about fitting.",
+  "architecture": {
+    "dram_capacity_bytes": 256,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {"output_locations": {"y": "dram"}},
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "cpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      },
+      "c2": {
+        "cpu": {"duration_ns": 2000000, "workspace_bytes": 0}
+      },
+      "add": {
+        "cpu": {"duration_ns": 1000000, "workspace_bytes": 0}
+      }
+    },
+    "transfer": {
+      "ssd_to_dram": {"W": {"duration_ns": 4000000}},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {"c1": ["cpu"], "c2": ["cpu"], "add": ["cpu"]},
+    "allowed_transfers": {
+      "ssd_to_dram": ["W"],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

@@ -21,7 +21,7 @@ import json
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from tensor_mapping import (
     Action,
@@ -33,10 +33,17 @@ from tensor_mapping import (
 )
 from tensor_mapping.engine import (
     ACTION_ADVANCE,
+    ACTION_COMPUTE,
+    ACTION_COPY,
+    ACTION_EVICT,
+    ACTION_READ_SSD,
+    ACTION_WRITE_SSD,
     MappingError,
     initial_state,
+    used_bytes,
 )
 from tensor_mapping.spec import (
+    LOC_DRAM,
     LOC_VRAM,
     ROLE_WEIGHT,
     ComputeCost,
@@ -189,13 +196,60 @@ def parse_actions(*specs: str | Action) -> tuple[Action, ...]:
     return tuple(parse_action(spec) for spec in specs)
 
 
+def parse_action_m1(spec: str | Action) -> Action:
+    """``"COMPUTE c1 cpu"``, ``"COPY x dram vram"``, ``"EVICT W dram"``,
+    ``"READ_SSD W"``, ``"WRITE_SSD h"``.
+
+    Fields in the order the 0.2 document spells them. Nothing is defaulted: an
+    action spelled without its device or location is a typo here, not a GPU
+    action.
+    """
+    if isinstance(spec, Action):
+        return spec
+    parts = spec.split()
+    if not parts:
+        raise ValueError("empty action spec")
+    kind, rest = parts[0], parts[1:]
+    if kind == ACTION_ADVANCE:
+        if rest:
+            raise ValueError(f"{ACTION_ADVANCE} takes no target: {spec!r}")
+        return Action(kind, None)
+    if kind == ACTION_COMPUTE:
+        if len(rest) != 2:
+            raise ValueError(f"expected 'COMPUTE <op> <device>' in {spec!r}")
+        return Action(kind, rest[0], device=rest[1])
+    if kind == ACTION_EVICT:
+        if len(rest) != 2:
+            raise ValueError(f"expected 'EVICT <tensor> <location>' in {spec!r}")
+        return Action(kind, rest[0], location=rest[1])
+    if kind == ACTION_COPY:
+        if len(rest) != 3:
+            raise ValueError(f"expected 'COPY <tensor> <src> <dst>' in {spec!r}")
+        return Action(kind, rest[0], src=rest[1], dst=rest[2])
+    if kind in (ACTION_READ_SSD, ACTION_WRITE_SSD):
+        if len(rest) != 1:
+            raise ValueError(f"expected '{kind} <tensor>' in {spec!r}")
+        return Action(kind, rest[0])
+    raise ValueError(f"unknown 0.2 action kind {kind!r} in {spec!r}")
+
+
+def parse_actions_m1(*specs: str | Action) -> tuple[Action, ...]:
+    return tuple(parse_action_m1(spec) for spec in specs)
+
+
 class Replay:
     """Step a mapping by hand, one action at a time.
 
     ``do`` applies an action and lets a :class:`MappingError` propagate;
     ``refuse`` asserts that the action is rejected and returns the error, which
     is what the semantic table needs.
+
+    Subclasses swap ``parser``: the 0.2 action grammar carries three more fields,
+    and writing a plan in the 0.1 grammar against a 0.2 scenario is exactly the
+    mistake the extra fields exist to prevent.
     """
+
+    parser = staticmethod(parse_action)
 
     def __init__(self, scenario: Scenario, state: State | None = None) -> None:
         self.scenario = scenario
@@ -203,14 +257,14 @@ class Replay:
         self.applied: list[Action] = []
 
     def do(self, *specs: str | Action) -> State:
-        for action in parse_actions(*specs):
+        for action in self._parse_all(specs):
             self.state = transition(self.scenario, self.state, action)
             self.applied.append(action)
         return self.state
 
     def refuse(self, spec: str | Action) -> MappingError:
         """Apply nothing; assert the action is rejected and return the error."""
-        action = parse_action(spec)
+        action = self._parse_all((spec,))[0]
         try:
             transition(self.scenario, self.state, action)
         except MappingError as error:
@@ -221,13 +275,26 @@ class Replay:
             ) from exc
         raise AssertionError(f"{spec} was accepted but should have been rejected")
 
+    def _parse_all(self, specs: tuple[str | Action, ...]) -> tuple[Action, ...]:
+        return tuple(self.parser(spec) for spec in specs)
+
     # Convenience accessors so tests read like the acceptance table.
     @property
     def t(self) -> int:
         return self.state.t
 
-    def used_bytes(self) -> int:
-        return used_vram_bytes(self.scenario, self.state)
+    def used_bytes(self, domain: str = LOC_VRAM) -> int:
+        return used_bytes(self.scenario, self.state, domain)
+
+
+class M1Replay(Replay):
+    """The same stepper with the 0.2 action grammar.
+
+    The spelling of an action is a field list, in the order the JSON document
+    writes it, so a test reads the same way the mapping file does.
+    """
+
+    parser = staticmethod(parse_action_m1)
 
 
 # ---------------------------------------------------------------------------
@@ -296,3 +363,79 @@ def _write(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+
+
+# ---------------------------------------------------------------------------
+# M1 (0.2) scenario variants
+# ---------------------------------------------------------------------------
+
+
+@contextmanager
+def m1_scenario(
+    workload: str,
+    scenario: str,
+    mutate: Callable[[dict[str, Any], dict[str, Any]], None] | None = None,
+) -> Iterator[Scenario]:
+    """An M1 example pair, optionally mutated, as a validated :class:`Scenario`.
+
+    ``mutate`` receives *both* documents. M1 variants differ in initial placement
+    as often as in scenario fields, and placement lives in the workload -- so a
+    helper that could only touch the scenario would push those cases into extra
+    near-identical JSON files, which ``M1_ACCEPTANCE.md`` §10 asks not to do.
+
+    The pair is written to a temp directory, so nothing here touches the repo and
+    the loader still sees real files: ``workload_file`` resolution and the
+    fingerprints go through the same path a user's document would.
+    """
+    workload_raw = example_document("workload", workload)
+    scenario_raw = example_document("scenario", scenario)
+    if mutate is not None:
+        mutate(workload_raw, scenario_raw)
+    with documents(workload_raw, scenario_raw) as path:
+        yield load_and_validate(path)
+
+
+def set_capacity(document: dict[str, Any], **capacities: int) -> None:
+    """``set_capacity(scenario, dram=64)`` -- works on either document."""
+    for domain, value in capacities.items():
+        document["architecture"][f"{domain}_capacity_bytes"] = value
+
+
+def set_compute(
+    document: dict[str, Any], operation_id: str, device: str, duration_ms: float,
+    workspace_bytes: int | None = None,
+) -> None:
+    entry = document["costs"]["compute"][operation_id][device]
+    entry["duration_ns"] = ms(duration_ms)
+    if workspace_bytes is not None:
+        entry["workspace_bytes"] = workspace_bytes
+
+
+def set_transfer(
+    document: dict[str, Any], route: str, tensor_id: str, duration_ms: float
+) -> None:
+    document["costs"]["transfer"][route][tensor_id]["duration_ns"] = ms(duration_ms)
+
+
+def allow_only(document: dict[str, Any], operation_id: str, *devices: str) -> None:
+    """Restrict an operation's devices, keeping the cost table in agreement.
+
+    The parser requires the allowed set and the cost table to match in both
+    directions, so a restriction that leaves a stale cost behind is a document
+    error rather than a variant.
+    """
+    table = document["costs"]["compute"][operation_id]
+    document["mapspace"]["allowed_devices"][operation_id] = list(devices)
+    document["costs"]["compute"][operation_id] = {d: table[d] for d in devices}
+
+
+def transfer_only(document: dict[str, Any], route: str, *tensor_ids: str) -> None:
+    """Narrow one route to those tensors, dropping the rest of its costs."""
+    table = document["costs"]["transfer"][route]
+    document["mapspace"]["allowed_transfers"][route] = list(tensor_ids)
+    document["costs"]["transfer"][route] = {t: table[t] for t in tensor_ids}
+
+
+def drop_route(document: dict[str, Any], route: str) -> None:
+    del document["mapspace"]["allowed_transfers"][route]
+    del document["costs"]["transfer"][route]

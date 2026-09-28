@@ -1,0 +1,96 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-g-spill-dram96",
+  "workload_file": "m1-spill.workload.json",
+  "comment": "M1_ACCEPTANCE.md 8, the 96-byte row: c2 needs 96 bytes all by itself, so h cannot stay resident while it runs. h is written to the SSD, dropped, and read back for c3 -- which is the only reason the case is solvable at all. There is no PCIe route: the SSD is not standing in for a second memory tier here.",
+  "architecture": {
+    "dram_capacity_bytes": 96,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {
+    "output_locations": {
+      "y": "dram"
+    }
+  },
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 0
+        }
+      },
+      "c2": {
+        "cpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 0
+        }
+      },
+      "c3": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 0
+        }
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {},
+      "vram_to_dram": {},
+      "ssd_to_dram": {
+        "W": {
+          "duration_ns": 3000000
+        },
+        "h": {
+          "duration_ns": 1000000
+        }
+      },
+      "dram_to_ssd": {
+        "h": {
+          "duration_ns": 2000000
+        }
+      }
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "c1": [
+        "cpu"
+      ],
+      "c2": [
+        "cpu"
+      ],
+      "c3": [
+        "cpu"
+      ]
+    },
+    "allowed_transfers": {
+      "dram_to_vram": [],
+      "vram_to_dram": [],
+      "ssd_to_dram": [
+        "W",
+        "h"
+      ],
+      "dram_to_ssd": [
+        "h"
+      ]
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

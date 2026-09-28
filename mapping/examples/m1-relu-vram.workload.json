@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-relu-vram",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "M1 acceptance H (GPU variant): y = relu(x) with x starting in VRAM, so a CPU run would have to copy it"
+  },
+  "comment": "M1_ACCEPTANCE.md 9. The same graph with the input already on the GPU: the CPU cannot use it without a copy, and delivering to the SSD means going back through DRAM first. The D2H target is a real allocation -- it cannot hide behind the output that is about to be written.",
+  "tensors": [
+    {
+      "id": "x",
+      "name": "inp_embd",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "vram"
+      ]
+    },
+    {
+      "id": "y",
+      "name": "result_norm",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "c1",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": [
+        "x"
+      ],
+      "output": "y"
+    }
+  ],
+  "outputs": [
+    "y"
+  ]
+}

@@ -137,6 +137,15 @@ DEFAULT_SCENARIO = EXAMPLES / "chain-cap160.json"
 # 一份「除硬件外一切服务都关着」的配置，时长来源才默认是 modeling 推导，而不是一上来就
 # 展示门 1 的拒绝）。这份配置只剩一个用途：自检里当**触发门 1 的样本**。
 DEFAULT_CONFIG = CONFIGS / "toy_dense_decode.json"
+# **查看器的搜索预算必须有上限。** 随包的 scenario 里两个预算都写着 0（不限），那是给
+# 小图穷尽验收用的（``M1_DESIGN.md`` §6：「上例的 0 仅供小图穷尽验收」）。查看器是交互的：
+# 一次 POST 没回来，整页就停在那儿，用户看不到「它还在跑」——不限预算的那一版在稍大的
+# 图上就是转圈转到天荒地老。所以查看器把 0 换成这两个数，并把**实际生效的值**回显在
+# 参数表与 ``limits`` 里（屏上写的就是真跑的那个数，不是 scenario 里那个 0）。
+# 5000 与 ``viewer_payload.DEFAULT_MAX_NODES`` 同量级：真到这个数，用户要看的是「搜索给了
+# 什么结论」，而不是把一万个状态画出来。
+GUI_DEFAULT_MAX_EXPANDED_STATES = 5000
+GUI_DEFAULT_WALL_TIME_LIMIT_S = 10.0
 # 双击即用的启动器，就在 mapping/ 下、和本工具平级。它坏起来**没有任何症状**：自检照样
 # 全绿，只是双击之后窗口闪一下就没了——所以下面 check_launcher() 专门钉它三条硬约束。
 LAUNCHER = REPO_ROOT / "viewer.cmd"
@@ -166,41 +175,119 @@ def edit_scenario(scenario: Any, params: dict[str, Any]) -> Any:
     所以 ``dataclasses.replace`` 够用。``replace`` 会重跑 ``__post_init__``：手填的非法
     参数（比如容量 0）会当场抛 ``InvalidInput``——这不是要吞掉的麻烦，它本身就是要显示
     的一类拒绝（门 3）。
+
+    0.1 与 0.2 的旋钮**按名字分流**，不共用一个「差不多」的键：``runtime_reserved_bytes``
+    在 0.1 是 VRAM 那一笔预留，0.2 有两个域各自的预留（``vram_``/``dram_`` 前缀），把前者
+    当成后者的默认值就等于在 0.2 里悄悄改了一个设计里别的东西。四个槽位与
+    ``allow_cpu_gpu_overlap`` 只在 0.2 存在，0.1 上给了就忽略——**忽略而不是报错**：
+    表单是服务端按版本生成的，出现 0.1 不认识的键说明是手发的请求，此时按 0.1 的语义
+    执行才是「这份 scenario 是什么就按什么改」。
     """
     architecture = scenario.architecture
+    m1 = bool(scenario.is_m1)
     if "vram_capacity_bytes" in params:
         architecture = replace(
             architecture, vram_capacity_bytes=int(params["vram_capacity_bytes"])
         )
-    if "runtime_reserved_bytes" in params:
+    if "runtime_reserved_bytes" in params and not m1:
+        # 只在 0.1 上认这个键。0.2 的 VRAM 预留有**自己的**名字
+        # （``vram_runtime_reserved_bytes``），而 ``reserved_of(LOC_VRAM)`` 只在后者是
+        # ``None`` 时才回落到前者——0.2 的 document 写了后者，于是这里把前者当成 VRAM 预留
+        # 就是一次**静默无效**的写入：参数收下了、数字没动、屏上还回显得理直气壮。
         architecture = replace(
             architecture, runtime_reserved_bytes=int(params["runtime_reserved_bytes"])
         )
+    if m1:
+        for key in (
+            "dram_capacity_bytes",
+            "dram_runtime_reserved_bytes",
+            "vram_runtime_reserved_bytes",
+        ):
+            if key in params:
+                architecture = replace(architecture, **{key: int(params[key])})
+    # **槽位数不是旋钮。** ``Architecture.__post_init__`` 对四个资源都要求恰好 1 个槽
+    # （「M0 models exactly one resource of each kind」——首版假设，见 ``M1_DESIGN.md`` §4），
+    # 所以这里没有一条能把它改成 2 的路：给一个只能撞拒绝的输入框，比不给更糟。
+    # 想要两个搬运引擎，那是内核的改动，不是查看器的旋钮。
 
     mapspace = scenario.mapspace
-    for key in ("allow_copy_compute_overlap", "allow_eviction"):
+    flags = ["allow_copy_compute_overlap", "allow_eviction"]
+    if m1:
+        flags.append("allow_cpu_gpu_overlap")
+    for key in flags:
         if key in params:
             mapspace = replace(mapspace, **{key: bool(params[key])})
 
     costs = scenario.costs
     overrides = params.get("compute_ns") or {}
     if overrides:
-        compute = dict(costs.compute)
-        for operation_id, nanoseconds in overrides.items():
-            if operation_id not in compute:
+        if m1:
+            # 0.2 的键是两级：``{算子: {设备: 纳秒}}``。某一级缺失就整条跳过，不退化成
+            # 「所有设备都改成这个数」——那会把用户在 CPU 上敲的数安到 GPU 上。
+            compute = dict(costs.compute)
+            for operation_id, by_device in overrides.items():
+                if operation_id not in compute or not isinstance(by_device, dict):
+                    continue
+                current = dict(compute[operation_id])
+                for device, nanoseconds in by_device.items():
+                    if device not in current:
+                        continue
+                    current[device] = replace(
+                        current[device], duration_ns=int(nanoseconds)
+                    )
+                compute[operation_id] = current
+            costs = replace(costs, compute=compute)
+        else:
+            compute = dict(costs.compute)
+            for operation_id, nanoseconds in overrides.items():
+                if operation_id not in compute:
+                    continue
+                compute[operation_id] = replace(
+                    compute[operation_id], duration_ns=int(nanoseconds)
+                )
+            costs = replace(costs, compute=compute)
+
+    transfer = params.get("transfer_ns") or {}
+    if m1 and transfer:
+        routes = dict(costs.transfer)
+        for route, by_tensor in transfer.items():
+            if route not in routes or not isinstance(by_tensor, dict):
                 continue
-            compute[operation_id] = replace(compute[operation_id], duration_ns=int(nanoseconds))
-        costs = replace(costs, compute=compute)
+            current = dict(routes[route])
+            for tensor_id, nanoseconds in by_tensor.items():
+                if tensor_id not in current:
+                    continue
+                current[tensor_id] = replace(
+                    current[tensor_id], duration_ns=int(nanoseconds)
+                )
+            routes[route] = current
+        costs = replace(costs, transfer=routes)
 
     return replace(scenario, architecture=architecture, mapspace=mapspace, costs=costs)
 
 
 def budget_from(params: dict[str, Any], fallback_states: int, fallback_time: float) -> tuple[int, float]:
+    """表单给了就用表单的，没给就用 ``fallback_*``。
+
+    调用方传进来的 ``fallback_*`` 是**查看器的**默认（见 ``GUI_DEFAULT_*``），不是 scenario
+    自己写的那个 0：0 在这里的意思是「不限」，而查看器不接受不限。想真要不限，在参数表里
+    把 0 敲进去——那时它是用户明确说的话，照办。
+    """
     states = params.get("max_expanded_states")
     seconds = params.get("wall_time_limit_s")
     return (
         fallback_states if states is None else int(states),
         fallback_time if seconds is None else float(seconds),
+    )
+
+
+def gui_budget_defaults(scenario: Any) -> tuple[int, float]:
+    """scenario 写着 0（不限）的预算换成查看器的有限默认值，其余原样。"""
+    declared_states = scenario.mapper.max_expanded_states
+    declared_time = scenario.mapper.wall_time_limit_s
+    return (
+        GUI_DEFAULT_MAX_EXPANDED_STATES if not declared_states else declared_states,
+        GUI_DEFAULT_WALL_TIME_LIMIT_S if not declared_time else declared_time,
     )
 
 
@@ -238,6 +325,23 @@ def scenario_catalog(scenario_path: str | None) -> list[dict[str, str]]:
             "path": f"{directory}/{path.name}" if directory else path.name,
         })
     return items
+
+
+def loadable_scenarios() -> list[str]:
+    """``examples/`` 下每一份**能当 scenario 载进来**的 json 的名字。
+
+    名单过滤用的是名字后缀（``SCENARIO_ARTIFACT_SUFFIXES``），这里用的是加载器——
+    两个**独立的定义**。所以拿它对名单不是把同一句话抄两遍：后缀表要是漏了一类派生产物、
+    或者哪天 examples/ 里躺了一份载得进来却没被列出的图，两边就会不一致。
+    """
+    names = []
+    for path in sorted(EXAMPLES.glob("*.json")):
+        try:
+            load_and_validate(path)
+        except (SpecError, OSError, ValueError):
+            continue
+        names.append(path.stem)
+    return names
 
 
 # ---------------------------------------------------------------------------
@@ -287,12 +391,14 @@ def _load(name: str) -> Any:
 
 
 def check_walk(checks: Checks) -> None:
-    """A 组：走查与 ``mapper.search()`` 逐字段对账。
+    """A 组：搜一次、记一棵树，树与那趟搜索自洽。
 
-    这是搜索树那一屏唯一的回归网。走查与内核共用 ``transition``，所以分叉只可能是这段
-    重走写错了；对不上就要**禁用那一屏**，不能画一棵可能是错的树。
+    这里**不再有第二份 Dijkstra**（``M1_ACCEPTANCE.md`` §11）。树是 ``explore()`` 里
+    那趟 ``search()`` 挂上记录器之后自己报出来的，所以这一组验的是「画出来的树能不能
+    拼出搜索报出去的那份映射」——沿父链走回起点的动作序列必须与 ``result.actions``
+    逐条相等。对不上就要**禁用那一屏**，不能画一棵可能是错的树。
     """
-    print("A · 搜索走查 == mapper.search()")
+    print("A · 搜索树 == 产生它的那趟 search()")
     cases: list[tuple[str, str, dict[str, Any]]] = [
         ("matvec-cap160", "matvec-cap160", {}),
         ("chain-cap160", "chain-cap160", {}),
@@ -303,16 +409,30 @@ def check_walk(checks: Checks) -> None:
         ("chain-cap160 k=30（恰好够）", "chain-cap160", {"max_expanded_states": 30}),
         ("chain-cap160 k=8", "chain-cap160", {"max_expanded_states": 8}),
         ("three_layer_chain k=100", "three_layer_chain-cap1024", {"max_expanded_states": 100}),
+        # 0.2 的图。**加进来是为了让「A 组自洽」这条网盖住 M1**——`explore()` 对 0.2 走的是
+        # 同一份代码，但动作词表、资源表、SSD 那两页账都不一样，0.1 的九例一条也照不到。
+        # 挑的是验收文档点过名的几张：γ1（纯 CPU）、ε（显存装不下逼出 DRAM）、
+        # δ（DRAM 也装不下的溢出）、以及两条 SSD 交付（CPU 出 / GPU 出）与一次两输出的交付。
+        ("m1-a-cpu6", "m1-a-cpu6", {}),
+        ("m1-b-hybrid", "m1-b-hybrid", {}),
+        ("m1-e-dram128", "m1-e-dram128", {}),
+        ("m1-f-dram96", "m1-f-dram96", {}),
+        ("m1-g-spill-dram96", "m1-g-spill-dram96", {}),
+        ("m1-h-ssd-cpu", "m1-h-ssd-cpu", {}),
+        ("m1-h-ssd-gpu", "m1-h-ssd-gpu", {}),
+        ("m1-c-two-outputs", "m1-c-two-outputs", {}),
+        ("m1-c-fork", "m1-c-fork", {}),
     ]
     for label, fixture, kwargs in cases:
-        block = vp.explore(_load(fixture), **kwargs)
+        block, result = vp.explore(_load(fixture), **kwargs)
         verdict = block["verdict"]
         reconcile = block["reconcile"]
         checks.check(
             f"{label}：{verdict['status']} / {verdict['termination_reason']}"
             f" / exp={verdict['expanded_states']} / {block['solution']['makespan_ns']} ns",
-            reconcile["agrees"] is True,
-            "；".join(reconcile["differences"]) or f"与 search 一致（{len(block['nodes'])} 节点）",
+            reconcile["agrees"] is True and not block["truncated"],
+            "；".join(reconcile["differences"])
+            or f"树与 search 自洽（{len(block['nodes'])} 节点）",
         )
 
     # 起点就装不下：展开 0 个**不是**「没跑」，而是一条可证的结论。
@@ -320,7 +440,7 @@ def check_walk(checks: Checks) -> None:
         _load("chain-cap160"),
         architecture=replace(_load("chain-cap160").architecture, vram_capacity_bytes=1),
     )
-    block = vp.explore(small)
+    block, result = vp.explore(small)
     verdict = block["verdict"]
     checks.check(
         "chain cap=1 → infeasible / initial_capacity_exceeded / 可证 / 零节点",
@@ -337,7 +457,7 @@ def check_walk(checks: Checks) -> None:
         _load("chain-cap160"),
         architecture=replace(_load("chain-cap160").architecture, vram_capacity_bytes=80),
     )
-    block = vp.explore(tight)
+    block, _ = vp.explore(tight)
     verdict = block["verdict"]
     checks.check(
         "chain cap=80 → infeasible / search_space_exhausted / exp=5",
@@ -349,29 +469,47 @@ def check_walk(checks: Checks) -> None:
     )
 
     # 时间预算：走的是假时钟，因为真时钟在这台机器上不触发（见 FakeClock）。
-    scenario = _load("chain-cap160")
-    clock = FakeClock()
-    result = search(scenario, clock=clock)
-    block = vp.explore(scenario, clock=FakeClock(), result=result)
+    block, result = vp.explore(_load("chain-cap160"), clock=FakeClock())
     verdict = block["verdict"]
     checks.check(
         "时间预算耗尽 → unknown / time_budget_exhausted",
         verdict["status"] == "unknown"
         and verdict["termination_reason"] == "time_budget_exhausted"
+        and result.status == "unknown"
         and block["reconcile"]["agrees"] is True,
         f"{verdict['status']} / {verdict['termination_reason']}",
     )
 
     # feasible 绝不能被读成最优。
-    block = vp.explore(_load("chain-cap160"), max_expanded_states=28)
+    block, result = vp.explore(_load("chain-cap160"), max_expanded_states=28)
     checks.check(
         "feasible 不带最优性（k=28 有解、但没证明）",
         block["verdict"]["status"] == "feasible"
         and block["verdict"]["optimality_proven"] is False
+        and result.optimality_proven is False
         and block["solution"]["makespan_ns"] == 8_000_000
         and block["solution"]["action_count"] == 9,
         f"{block['solution']['action_count']} 个动作 / {block['solution']['makespan_ns']} ns",
     )
+
+    # 「记录器不参与搜索」在这里再验一次，这次是在查看器真正用的那条路上：同一组
+    # 参数挂不挂记录器，终局必须逐个字段相同。``M1_ACCEPTANCE.md`` §11 第一句。
+    scenario = _load("three_layer_chain-cap1024")
+    for kwargs in ({}, {"max_expanded_states": 100}, {"max_expanded_states": 8}):
+        block, recorded = vp.explore(scenario, **kwargs)
+        plain = search(scenario, **kwargs)
+        checks.check(
+            "带记录器与不带记录器同预算同结果"
+            f"（{kwargs or '默认预算'}）",
+            (recorded.status, recorded.termination_reason, recorded.optimality_proven,
+             recorded.expanded_states, recorded.visited_states, recorded.actions,
+             recorded.makespan_ns)
+            == (plain.status, plain.termination_reason, plain.optimality_proven,
+                plain.expanded_states, plain.visited_states, plain.actions,
+                plain.makespan_ns),
+            f"{recorded.status} / exp={recorded.expanded_states} / "
+            f"{len(recorded.actions)} 动作",
+        )
 
 
 def check_bridge(checks: Checks) -> None:
@@ -655,9 +793,8 @@ def check_payload(checks: Checks) -> None:
     items = scenario_catalog(str(EXAMPLES / "chain-cap160.json"))
     names = [item["name"] for item in items]
     checks.check(
-        "名单 = examples/ 下的那 5 个 scenario，且不含派生产物",
-        names == ["chain-cap160", "fork-cap160", "matvec-cap160", "residual-cap160",
-                  "three_layer_chain-cap1024"],
+        "名单 = examples/ 下每一份能当 scenario 载进来的 json（推导自加载器，不是重抄一遍后缀）",
+        names == loadable_scenarios(),
         "、".join(names),
     )
     # 逐份试载。**不要写成 ``all(load_and_validate(...))``**：目录里躺着一份不是 scenario 的
@@ -1141,11 +1278,12 @@ def check_http(checks: Checks) -> None:
         # 而不是白屏，而且**失败之后那一侧不能停在半路**（屏上是旧图、顶栏写着新名字）。
         code, payload = get("/api/payload")
         catalog = json.loads(payload)["scenarios"]
+        expected = loadable_scenarios()
         checks.check(
             "载荷里有选择器要的名单，且当前那份在里面",
             code == 200 and catalog["current"] == "chain-cap160"
-            and len(catalog["items"]) == 5
-            and any(item["name"] == catalog["current"] for item in catalog["items"]),
+            and [item["name"] for item in catalog["items"]] == expected
+            and catalog["current"] in expected,
             f"current={catalog.get('current')} n={len(catalog.get('items', []))}",
         )
         # 换图前先拧一个旋钮：下一步要看它有没有跟着走到新图上（这是「同一套旋钮换一张图」
@@ -1258,6 +1396,22 @@ def check_js(checks: Checks) -> str | None:
         # ``examples/x.json`` 就跟着启动时的 cwd 走了（从仓库根跑 self-check 时那个
         # ``examples/`` 不存在，名单空掉，顶栏选择器那几条断言会**静默地空转**成「0 个
         # 选项也匹配 0 个选项」）。绝对路径下这一批恒为那 5 个，与在哪儿敲命令无关。
+        viewer = Viewer(_load(name), scenario_path=str(EXAMPLES / f"{name}.json"), config=None)
+        cases.append({"name": name, "payload": viewer.build()})
+
+    # 0.2 的用例。**上面五份全是 0.1**——`payload.m1 == null`，于是烟测里所有 `if (payload.m1)`
+    # 的分支一条都没跑过，而 §11 要的那几屏恰好全在里面：DRAM 那条容量曲线、SSD 那条
+    # 「一条泳道两个方向」、逐域副本账、交付状态。没有这一段，M1 的 GUI 是「写完了没人验过」。
+    #
+    # 挑的六份对着 §11 那五条展示要求：
+    #   ① CPU→GPU→DRAM 的交付        → `m1-b-hybrid`
+    #   ② 两段权重流水                → `m1-e-dram128`（显存装不下，逼出 DRAM 那一段）
+    #   ③ 容量导致放置反转            → `m1-f-dram96`（同一张图，容量一变放置就换）
+    #   ④ 写完 → 释放 → 读回          → `m1-g-spill-dram96`
+    #   ⑤ SSD 输出交付（CPU 出 / GPU 出）→ `m1-h-ssd-cpu` / `m1-h-ssd-gpu`
+    # 外加 `m1-a-cpu6`（纯 CPU，GPU 泳道整条空着——这条最容易被前端误画成「没有这一泳道」）。
+    for name in ("m1-a-cpu6", "m1-b-hybrid", "m1-e-dram128", "m1-f-dram96",
+                 "m1-g-spill-dram96", "m1-h-ssd-cpu", "m1-h-ssd-gpu"):
         viewer = Viewer(_load(name), scenario_path=str(EXAMPLES / f"{name}.json"), config=None)
         cases.append({"name": name, "payload": viewer.build()})
 
@@ -1489,11 +1643,7 @@ class Viewer:
     def build(self, params: dict[str, Any] | None = None, *, mode: str = "live") -> dict[str, Any]:
         params = self.last_params if params is None else params
         scenario = edit_scenario(self.base_scenario, params)
-        states, seconds = budget_from(
-            params,
-            scenario.mapper.max_expanded_states,
-            scenario.mapper.wall_time_limit_s,
-        )
+        states, seconds = budget_from(params, *gui_budget_defaults(scenario))
         bridge = vp.bridge_table(
             scenario,
             config=self.config,

@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.2",
+  "id": "m1-h-ssd-gpu",
+  "workload_file": "m1-relu-vram.workload.json",
+  "comment": "M1_ACCEPTANCE.md 9, GPU row: x is already in VRAM and the answer has to end up on the SSD, so the plan leaves the GPU, comes back through DRAM, and only then writes. The D2H target is a full 16-byte allocation in its own right; shrinking DRAM below that must make the case infeasible rather than quietly let the write borrow the buffer.",
+  "architecture": {
+    "dram_capacity_bytes": 256,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {
+    "output_locations": {
+      "y": "ssd"
+    }
+  },
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "c1": {
+        "gpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 0
+        }
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {},
+      "vram_to_dram": {
+        "y": {
+          "duration_ns": 1000000
+        }
+      },
+      "ssd_to_dram": {},
+      "dram_to_ssd": {
+        "y": {
+          "duration_ns": 2000000
+        }
+      }
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "c1": [
+        "gpu"
+      ]
+    },
+    "allowed_transfers": {
+      "dram_to_vram": [],
+      "vram_to_dram": [
+        "y"
+      ],
+      "ssd_to_dram": [],
+      "dram_to_ssd": [
+        "y"
+      ]
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  }
+}

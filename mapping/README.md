@@ -1,6 +1,8 @@
 # mapping：GGML 计算图的执行映射与搜索
 
-状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试，共 202 项。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)（该报告记录验收当时的 181 项；此后新增的 21 项见下）。日期：2026-09-25。
+状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)（该报告记录验收当时的 181 项；此后新增的 21 项见下）。日期：2026-09-25。
+
+其后是 **M1（`schema_version = "0.2"`）**：混合 CPU/GPU 计算、有限 DRAM 容量、SSD 访存（SSD 读写细节不模拟，只用平均有效读写速度）。规则见根目录 [M1_DESIGN.md](../M1_DESIGN.md)，逐条验收见 [M1_ACCEPTANCE.md](../M1_ACCEPTANCE.md)，实测记录见 [M1_VERIFICATION.md](M1_VERIFICATION.md)。0.1 的语义与验收数字**一个都没动**：0.2 是一个新 schema，两份并存，旧 scenario 照旧加载。本目录测试 **345 项**（0.1 那 202 项全部保留，另加 `tests/test_m1.py` 139 项与 `tests/test_mapper.py` 里 0.2 相关的 4 项），`modeling` 侧 57 项。日期：2026-09-26。
 
 其后一轮「对照轮」把旧的窗口规则接进了 `modeling` 的张量内核（[ALIGNMENT_IMPLEMENTATION.md](ALIGNMENT_IMPLEMENTATION.md)）：`modeling` 侧新增 `llm_infer_model.tensor` 子包（`spec` / `engine` / `layer_costs`），本目录新增 `tensor_mapping/policies.py`（窗口策略）与 `tools/demo_window_vs_search.py`（三份结果并排对照）。新加的 21 项测试落在 `tests/test_policies.py`，`modeling/tests/test_tensor_layer_costs.py` 另有 19 项。
 
@@ -128,10 +130,51 @@ python -m tensor_mapping search --scenario examples/ggml/chain-cap160.json \
 
 `outputs/` 已被根 `.gitignore` 忽略（`mapping/outputs/`），产物不入库，全量可复跑重建。
 
+### M1 复跑（0.2：混合计算 · 有限内存 · SSD）
+
+同一个 `search` 入口，换一份 0.2 的 scenario 就行；产物文件名与 0.1 完全一样，只是 `stats.json` 里多出第二域（DRAM）与 SSD 方向的字节数。
+
+```bash
+cd mapping
+# H：目标域是 SSD，所以要写完 SSD 才算交付
+python -m tensor_mapping search --scenario examples/m1-h-ssd-cpu.json --out outputs/m1-h-cpu
+#   → status=optimal  makespan_ns=3000000  peak_vram=0  peak_dram=32  ssd_write=16  ssd_read=0
+# G：DRAM 只有 96 B，中间值 h 必须写完 SSD、释放、再读回来
+python -m tensor_mapping search --scenario examples/m1-g-spill-dram96.json --out outputs/m1-g
+#   → status=optimal  makespan_ns=10000000  peak_dram=96  ssd_read=80  ssd_write=16  h2d=0  d2h=0
+# F：DRAM 96 B，`y=W*x` 落在 CPU（再收紧到 80 B 就会翻成 GPU，见下）
+python -m tensor_mapping search --scenario examples/m1-f-dram96.json --out outputs/m1-f
+#   → status=optimal  makespan_ns=6000000  peak_dram=96  ssd_read=64
+```
+
+`examples/m1-*.workload.json` 是这些 scenario 对应的**输入图**。**容量与设备变体不再各存一份 JSON**（96 / 80 / 95 B、CPU-only / GPU-only 这些）——它们是同一张图换一个旋钮，所以按 `M1_ACCEPTANCE.md` §12.2 的要求参数化在 `tests/test_m1.py` 里：**一个类管一节验收**（`ComputeDeviceChoice` 对 §2、`HybridDelivery` 对 §3……`SsdOutputDelivery` 对 §9），每张验收表在同一个类里逐行钉住。下面这张表是随包的 11 份 scenario 跑出来的实数，正对着上表的「最优」那一列。
+
+`examples/m1-f-dram96.json` 是 96 B 那一行；80 B 与 95 B 在 `CapacityDrivenPlacement` 里现造。人工计划同理**不单独存 JSON**，在测试里逐动作构造再 `model` 回放——`M1_ACCEPTANCE.md` §5～§9 每个「人工方案 / 人工计划」都是这么验的（比如 `test_the_hand_plan_replays_to_the_stated_ledger` 把 §8 那份 10 ms 计划按动作对齐账本）。
+
+**时长仍然是合成的**：下面这些数字来自 scenario 自己带的成本表（`costs.source = "synthetic_fixed"`），不是任何真机实测，也不能标成预测——`M1_ACCEPTANCE.md` 结尾那句正是这个意思。SSD 也只建了「平均有效读写速度」这一个数，读写细节（页、擦除、队列深度）不在模型里。
+
+随包 11 份 0.2 scenario 跑 `search` 的实测结果（就是上面那条命令，逐份换 `--scenario`；`ssd_r`/`ssd_w` 是 SSD 读/写的字节数，单位 B）：
+
+| scenario | status | makespan_ns | peak_vram | peak_dram | h2d | d2h | ssd_r | ssd_w | actions |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `m1-a-cpu6`（A） | `optimal` | 6000000 | 0 | 96 | 0 | 0 | 0 | 0 | 2 |
+| `m1-b-hybrid`（B） | `optimal` | 5000000 | 32 | 48 | 16 | 16 | 0 | 0 | 8 |
+| `m1-c-fork`（C） | `optimal` | 6000000 | 32 | 64 | 0 | 16 | 0 | 0 | 8 |
+| `m1-c-two-outputs`（C） | `optimal` | 6000000 | 48 | 48 | 16 | 16 | 0 | 0 | 8 |
+| `m1-d-dram96`（D） | `optimal` | 7000000 | 0 | 96 | 0 | 0 | 64 | 0 | 8 |
+| `m1-e-dram128`（E） | `optimal` | 13000000 | 160 | 128 | 128 | 0 | 128 | 0 | 13 |
+| `m1-f-dram96`（F） | `optimal` | 6000000 | 0 | 96 | 0 | 0 | 64 | 0 | 4 |
+| `m1-g-spill-dram96`（G） | `optimal` | 10000000 | 0 | 96 | 0 | 0 | 80 | 16 | 15 |
+| `m1-h-ssd-cpu`（H） | `optimal` | 3000000 | 0 | 32 | 0 | 0 | 0 | 16 | 4 |
+| `m1-h-ssd-gpu`（H） | `optimal` | 4000000 | 32 | 16 | 0 | 16 | 0 | 16 | 6 |
+| `m1-recovery-shared` | `optimal` | 9000000 | 0 | 144 | 0 | 0 | 64 | 0 | 8 |
+
+十一份全是 `goal_popped`（证过最优），每一行都对得上 `M1_ACCEPTANCE.md` §2～§9 里那张表的最优值。`m1-recovery-shared` 不在 A～H 表里，是 §10 末尾要求的「共享权重从 SSD 重读恢复」那个额外用例。
+
 ### 跑测试
 
 ```bash
-cd mapping && python -m unittest discover -s tests -t .    # 202 项
+cd mapping && python -m unittest discover -s tests -t .    # 345 项（0.1 那 202 项 + M1 的 143 项）
 ```
 
 这里的 `python` 指装好两个包的开发环境（见上文「安装（开发）」）；本仓库自用的那个在 `modeling/.venv`。没装就只会跑到 6 个 import 错误，报 `No module named 'llm_infer_model'`。
@@ -215,7 +258,7 @@ python tools/viewer.py --self-check        # 无头自检，退出 0/1（装了 
 
 起一个**只绑 `127.0.0.1`** 的本地服务（`--port 0` 让内核挑端口，`--no-browser` 不弹窗口）。五块屏**全部常驻在同一页上**，栏上那排是**跳转条不是标签页**——点一下只是 `scrollIntoView`，`aria-current` 跟着滚动位置走。屏序是 **搜索树 → 计算图 → 时间线 → 时长来源 → 参数**：先看策略长什么样，再看它把算子与张量排成什么形状，再看它花掉多少时间，最后才问那些时长是哪来的。
 
-**顶栏上能直接换计算图**，不用回命令行重起：名字右边那一格列出**当前这份 scenario 所在目录**里的其它 scenario（`examples/` 下是 5 份），选一下就换过去。几件刻意的事：**旋钮不动**——VRAM、预算、桥的开关都跟着走，「同一套设置换一张图看看」正是它存在的理由；**名单只列同一目录下的兄弟文件**，`*.workload.json` / `*.mapping.json` 是同一个 scenario 的另两种形态、不是另一张图，排除掉，而载不进来的那份**照样列着**（它就在那个目录里，从屏上抹掉它才是骗人，点下去会得到一次带原因的拒绝）；换图前后那一格会**改口叫「换图前后」并写明两张图不可比大小**，而不是继续挂着「重跑前后·同一套代码路径」；导出的快照里它是**禁用的**并写着为什么。换个名字（名字走白名单，不拼路径——这个键是从 HTTP 进来的）或那份载不进来，都是一次 422 + 横幅，且**这一侧退回原来那份**：屏上是哪张图，选择器就写着哪张。
+**顶栏上能直接换计算图**，不用回命令行重起：名字右边那一格列出**当前这份 scenario 所在目录**里的其它 scenario（`examples/` 下是 16 份），选一下就换过去。几件刻意的事：**旋钮不动**——VRAM、预算、桥的开关都跟着走，「同一套设置换一张图看看」正是它存在的理由；**名单只列同一目录下的兄弟文件**，`*.workload.json` / `*.mapping.json` 是同一个 scenario 的另两种形态、不是另一张图，排除掉，而载不进来的那份**照样列着**（它就在那个目录里，从屏上抹掉它才是骗人，点下去会得到一次带原因的拒绝）；换图前后那一格会**改口叫「换图前后」并写明两张图不可比大小**，而不是继续挂着「重跑前后·同一套代码路径」；导出的快照里它是**禁用的**并写着为什么。换个名字（名字走白名单，不拼路径——这个键是从 HTTP 进来的）或那份载不进来，都是一次 422 + 横幅，且**这一侧退回原来那份**：屏上是哪张图，选择器就写着哪张。
 
 - **搜索树**：每个创建过的状态一个节点，解路径高亮，被支配剪掉的边点线。**节点可点**——点任一个，下面的计算图与时间线一起搬到那条路径上（走带随之切到单步）。
 - **计算图**：**横轴是拓扑层、纵轴是先后**。算子按拓扑层分列，张量**贴在消费它的算子左边一列**——于是同一个算子的父张量上下叠着（不是前后排开），同一列里先加载的在左上；算子的行取它父张量里最靠下那一行，**它产出的张量与它同一行**，所以依赖边只会朝右下走（`residual` 那条残差边 `x → add` 是唯一的跨列例外：`x` 被 `c1` 与 `add` 共用，只能贴在最早那个消费者左边）。紧凑是从这几条里掉出来的，不是另调的参数：五份用例都落到 2~3 行（`residual` 从 602px 高降到 146px），方块占画布 28%~33%。**张量用琥珀、算子用蓝**，与时间线那两条泳道同色；状态在族内用底色深浅与边线虚实表达，不借别的色系。排布基准取**解路径**而非当前游标——按游标实时重排会让拖动走带时整张图不停跳位。
@@ -232,6 +275,14 @@ python tools/viewer.py --self-check        # 无头自检，退出 0/1（装了 
 游标有两种模式，**视觉上刻意区分**，混同就是这类工具开始骗人的起点：**回放**走烤好的计划（只读）；**单步**走一条自己点出来的分支路径——游标是一条 id 数组而不是一个整数，因为整数表达不了「已经离开计划分叉出去」。切到单步时甘特与显存**整体替换**成该路径的，并挂一条「正在探索：这不是搜索出的计划」的横幅。
 
 同一套前端既是活页面也是导出物：`app.js` 末尾只有一处分叉（`window.__BAKED__` 有就用它，没有才 `fetch('api/payload')`），所以「导出当前视图」就是读三个文件拼一次，把载荷和 CSS/JS 内联进 `index.html`。**导出的快照双击即可离线打开**，没有 CDN、没有 `http://` 外链，此时参数页与顶栏的换图选择器**一起禁用**并说明原因（没有 Python 侧可调）。
+
+**0.2（M1）在屏上多出来的东西**，对着 `M1_ACCEPTANCE.md` §11 那两句逐项：
+
+- **内存那格画布只对 0.2 露出来**。0.1 只有一个域（VRAM），凭空多画一条 DRAM 容量曲线就是编了一格账。显存那条曲线的每个折点按 `used_vram_bytes` 落位、内存那条按 `used_dram_bytes`，两条各对各的账本。
+- **SSD 只有一条泳道，读与写靠线型和箭头分**：读挂 `↓` 走实线，写挂 `↑` 走虚线（未走到的那一段是浅色 `3 2`，与方向无关）。SSD **没有容量上限**，所以不画第三条容量曲线——`M1_DESIGN.md` 里 SSD 就是「平均有效读写速度」，没有容量这个量。
+- 各域的副本状态、锁定原因、操作设备、以及**「输出是否已交付」**都在事件说明与柱子标题里。
+- **CPU/GPU 的本地访存成本没有在前端再算一次**：柱子上的时长直接取载荷里那份（0.2 的 `compute` / `transfer` 两级表），单步那一帧的柱高也是内核给的剩余时长，前端只负责画。
+- 「时长来源」那一屏对 0.2 会显示**第五类、刻意不编号**的拒绝：0.2 的成本表是两级形状（`M1Costs`：`compute[op][device]` / `transfer[route][tensor]`），成本桥只产 0.1 的一级形状，两者结构上不同构，所以这一屏在 0.2 上**不推**——不是推不出来，是「该不该推」本身是个建模决定（选哪台设备的 flops、哪条路线的带宽），不该由查看器替用户定。**补救栏写的就是「不用补救」**：0.2 的时长本来就在 scenario 自带的成本表里，时间线、计算图、状态图照常画，缺的只是「从硬件参数再推一遍」这条对照。
 
 一处刻意的取舍：两条甘特**不画在同一条时间轴上**。mapping 的 `makespan_ns` 是极小图上单 token 的排程，modeling 的 `makespan_seconds` 是 v0.8 的逐层窗口模型——它们不只是单位不同，是两个宇宙；画一条轴等于断言一个只在**逐算子**层面建立过的等价。唯一的定量联系在时长来源那一屏的表格里。
 
