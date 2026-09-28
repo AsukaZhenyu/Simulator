@@ -4,7 +4,7 @@
 
 报告日期 2026-09-25，代码状态见文末「本次对应的代码状态」。所有命令都在 `mapping/` 目录下执行，解释器为本机 `python`。
 
-**结论先说**：`ACCEPTANCE.md` §7 六条中，1～5 条已具备并有本轮实测证据；第 6 条即本文件。`DESIGN.md` §9:285 要求的集成验证「GGML 编译 → 实际导出 → 模拟/搜索」**本轮从零走通**：编译腿在全新空目录里 configure + build，导出腿用这个新构建的二进制重新导出四张图，产物与已入库文件逐字节相同。已知的环境限制只剩时钟粒度那一条（第三节 3.2），它不影响任何 M0 验收数字。
+**结论先说**：`ACCEPTANCE.md` §7 六条中，1～5 条已具备并有本轮实测证据；第 6 条即本文件。`DESIGN.md` §9:285 要求的集成验证「GGML 编译 → 实际导出 → 模拟/搜索」**本轮从零走通**：编译腿在全新空目录里 configure + build，导出腿用这个新构建的二进制重新导出四张图，产物与已入库文件逐字节相同。当时已知的环境限制只剩时钟粒度那一条（第三节 3.2），**它已在 2026-09-28 修掉**（见该节的更正块），且本来就不影响任何 M0 验收数字。
 
 ---
 
@@ -254,6 +254,16 @@ Windows 上 `time.monotonic()` 实测是 `GetTickCount64()`，分辨率 **15.625
 - `--wall-time-limit-s` 取小于一个 tick 的值时**永远不会触发**，所以 `ACCEPTANCE.md` §6:110 的「预算不足 → unknown」只能用 `--max-expanded-states` 复现（见 2.5），时间预算那条在本机没有端到端证据。
 
 这不影响任何 M0 验收数字——那些全是模拟时间 `_ns`。要修得动 `mapper.WallClock` 的时钟源（换 `perf_counter`），属核心改动，留待后续；`README.md` 的「命令行上的已知限制」记着同一条。
+
+> **2026-09-28 更正：这一条已修，本节记录的是当时的实测状态。**
+> `WallClock` 与 `mapper.search` 的计时起点改用了 `time.perf_counter()`（实测 1 µs 粒度，
+> 仍是单调时钟）。上面两条后果因此都不成立：1 ms 预算实测 **1.05～1.08 ms / 6 次展开**
+> （旧为 7.8～16.4 ms / 43～100 次），5 ms 预算 **5.01～5.14 ms**，超出量由「一次展开」
+> 而不是「一个 tick」定；`wall_time_s` 不再量化成 `0.0`。`ACCEPTANCE.md` §6:110 的
+> 「预算不足 → unknown」现在用 `--wall-time-limit-s` 就能端到端复现，不再只能靠
+> `--max-expanded-states`。前因是 `M1_DESIGN.md:225` 本来就要求用高分辨率
+> `perf_counter`，本文件记录的是当时按 `monotonic` 实现的偏差。网见
+> `mapping/tests/test_mapper.py::test_the_real_clock_can_enforce_a_budget_below_one_tick`。
 
 ### 3.3 明确不属于 M0 的部分
 

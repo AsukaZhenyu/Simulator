@@ -232,6 +232,32 @@ class BudgetTests(unittest.TestCase):
                 statuses.add(result.status)
         self.assertIn(STATUS_FEASIBLE, statuses)
 
+    def test_the_real_clock_can_enforce_a_budget_below_one_tick(self) -> None:
+        """A budget the clock cannot see is not a budget.
+
+        ``test_a_time_budget_behaves_like_a_state_budget`` drives the cut with a
+        fake clock, so it holds whatever the real clock does. This one uses the
+        real clock and a limit far under one tick of it. With ``time.monotonic``
+        (``GetTickCount64``, a 64 Hz tick on Windows) every ``elapsed_s()`` under
+        the tick read exactly 0.0, so the check could not fire: a 1 ms limit ran
+        the search to completion and reported ``optimal``.
+
+        The assertion is on the *stopping*, not on a duration -- a wall-clock
+        number is a statement about the machine, and this has to hold on a busy
+        one too.
+        """
+        unbounded = search(self.scenario)
+        self.assertEqual(unbounded.status, STATUS_OPTIMAL)
+
+        for limit in (0.0001, 0.0005):
+            with self.subTest(wall_time_limit_s=limit):
+                result = search(self.scenario, wall_time_limit_s=limit)
+                self.assertLess(result.expanded_states, unbounded.expanded_states)
+                self.assertNotEqual(result.status, STATUS_OPTIMAL)
+                # Running out of budget is a statement about the search, never a
+                # verdict about the scenario (DESIGN.md §7).
+                self.assertNotEqual(result.status, STATUS_INFEASIBLE)
+
     def test_an_unlimited_budget_is_the_default(self) -> None:
         result = search(self.scenario)
         self.assertEqual(result.max_expanded_states, 0)

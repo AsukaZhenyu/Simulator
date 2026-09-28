@@ -5,7 +5,7 @@
 逐条验收是 `M1_ACCEPTANCE.md`。
 
 一句话结论：**11 份随包 0.2 scenario 全部 `optimal` / `goal_popped`，与 §2～§9 表里的
-最优值逐字段相同；`mapping` 侧测试 202 → 345 项、`modeling` 侧 57 项、查看器自检
+最优值逐字段相同；`mapping` 侧测试 202 → 346 项（时钟修正又加 1 项，见第 7 节）、`modeling` 侧 57 项、查看器自检
 975 项 + 4 处跳过、`demo_window_vs_search.py` 全部对照一致，全绿。**
 
 **全部时长都是合成的。** 下面每一个 `makespan_ns` 都来自 scenario 自带的成本表
@@ -48,11 +48,11 @@ cd ../mapping && ../modeling/.venv/Scripts/python.exe -m unittest discover -s te
 | `test_cli.py` | 30 | 30 | 0 |
 | `test_engine.py` | 54 | 54 | 0 |
 | `test_ggml.py` | 13 | 13 | 0 |
-| `test_mapper.py` | 25 | 29 | +4（0.2 的映射同一性/指纹） |
+| `test_mapper.py` | 25 | 30 | +4（0.2 的映射同一性/指纹）+1（时钟，见第 7 节） |
 | `test_policies.py` | 21 | 21 | 0 |
 | `test_spec.py` | 59 | 59 | 0 |
 | `test_m1.py` | —（不存在） | **139** | +139 |
-| **合计** | **202** | **345** | **+143** |
+| **合计** | **202** | **346** | **+144** |
 
 **0.1 那 202 项一个都没删、一个都没改。** 验法是 `git diff -U0 -- mapping/tests` 里
 `^-.*def test_` 的条数为 **0**。`M1_ACCEPTANCE.md` 那句「不能改旧预期数字来适配 M1」
@@ -179,12 +179,55 @@ cd ../mapping && ../modeling/.venv/Scripts/python.exe -m unittest discover -s te
   与脚本路径换进去）。它们**没有被检入**，所以从一次干净 clone 出发复现不了——
   所以第 5 节把每一处注入**它要抓的那个 bug** 逐条写了出来（不是只写「改了 12 处」），
   照着重做即可。这是本记录最弱的一环，明写在这里。
-* **没有做过的事**：没跑 `model` 子命令对 0.2 的映射做独立重放（`search` 内部已经
-  `evaluate_mapping`，但没像 0.1 那样另起一份对照脚本）；没有对 0.2 做墙钟/内存的
-  规模测试（`m1-e-dram128` 展开 301 个状态，是 11 份里最大的）；没有验证查看器在
-  0.2 下的**导出快照**（`--export`）与在线状态逐字段一致——自检覆盖的是在线的
-  975 项。
+* **没有做过的事**：没有对 0.2 做墙钟/内存的规模测试（`m1-e-dram128` 展开 301 个状态，
+  是 11 份里最大的）；没有验证查看器在 0.2 下的**导出快照**（`--export`）与在线状态
+  逐字段一致——自检覆盖的是在线的 975 项（快照能出、233 KB、能换图，但没做逐字段比对）。
+  这两条进入重复层计算图之前应补测。
+* **由审阅补做的一项**：0.2 的搜索产物（G、H、E）连同旧 M0 场景，已交给 `model`
+  子命令独立重放，事件、状态与主要统计量一致。这不是本文件跑的，记在这里是为了不让
+  上面那句「没跑过 `model` 重放」被读成仍然成立。
 * **上游没动**：`llama.cpp` 私有分支、旧 simulator、历史实验数据、`examples/` 里
   已有的 M0 文件都没改；推导出的 `Costs` 只在内存里，不写盘，`outputs/*/mapping.json`
   的指纹因此不受影响。
 
+
+---
+
+## 7. 收尾修正：搜索时钟（2026-09-28）
+
+审阅指出 `WallClock` 用 `time.monotonic()`，本机粒度为 15.625 ms。**实测确认为真，而且比
+「不准确」更严重：小于一个 tick 的时间预算根本不会触发。** 本机 `monotonic` 在 300 ms
+里只出现过两种步进（16000 µs ×12、15000 µs ×7），`perf_counter` 出现 92 种、最常见
+1 µs；`m1-e-dram128` 上设 1 ms 预算，实测跑满 **7.8～16.4 ms / 43～100 次展开**——那段时间里
+`elapsed_s()` 一直读到 0.0。
+
+`M1_DESIGN.md:225` 本来就写明「搜索的实际耗时和预算使用单调高分辨率壁钟，例如
+`time.perf_counter()`」，所以这是实现与设计不符，不是取舍。改了两处：
+`modeling/llm_infer_model/tensor/engine.py` 的 `WallClock` 与
+`mapping/tensor_mapping/mapper.py` 的 `search` 计时起点。`perf_counter` 仍是单调时钟
+（`QueryPerformanceCounter` 不受系统时钟调整影响），换掉不损失这条性质。
+
+修前 / 修后（`m1-e-dram128`，无预算时 301 次展开）：
+
+| 预算 | 修前实际耗时 | 修前展开 | 修后实际耗时 | 修后展开 |
+|---|---:|---:|---:|---:|
+| 0.5 ms | ~16 ms | 43～100 | **0.51～0.70 ms** | 3～4 |
+| 1 ms | 7.8～16.4 ms | 43～100 | **1.05～1.08 ms** | 6 |
+| 5 ms | 13.9～16.8 ms | ~76 | **5.01～5.14 ms** | 27～28 |
+| 50 ms | 48～63.8 ms | 224 | **50.67～50.78 ms** | 260～267 |
+
+超出量从此由「一次展开」（约 3%）而不是「一个 tick」（约 1500%）定。
+
+网：`tests/test_mapper.py::test_the_real_clock_can_enforce_a_budget_below_one_tick`。
+断言落在**停得下来**上（`expanded_states` 小于无预算那趟、状态不是 `optimal`、也不是
+`infeasible`），不落在某个墙钟数字上——墙钟数字是关于机器的陈述，在忙的机器上也得成立。
+证伪：把 `mapper.WallClock` 在内存里换回 `monotonic` 版本，这张网**当场变红**；换回
+`perf_counter` 即绿。**没有改动任何既有的预期数字**，也没有删改既有用例。
+
+顺带更正了三处**记录**（不是删掉旧结论，是在原处加日期更正，历史实测状态仍然可读）：
+`mapping/M0_VERIFICATION.md` §3.2 与开头、`mapping/README.md`「命令行上的已知限制」与
+开头、`MODELING_MAPPING_BRIEF.md` 的「验收与限制」；`viewer.py` 的 `FakeClock` 与
+`viewer_payload.py` 的 `clock` 参数说明也改了——假时钟的理由不再是「真时钟做不到」，
+而是 `M1_DESIGN.md:225` 那句「避免依赖某台机器恰好跑多快」。
+
+`mapping` 侧因此 345 → **346** 项，`modeling` 侧仍 57 项。

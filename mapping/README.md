@@ -2,11 +2,11 @@
 
 状态：M0 全部组件（数据契约、状态转移、固定 mapping 评价、精确搜索、GGML 导出器、`model`/`search` 两个入口与四份产物）已实现并有测试。`ACCEPTANCE.md` §7 的六条逐条对照见 [M0_VERIFICATION.md](M0_VERIFICATION.md)（该报告记录验收当时的 181 项；此后新增的 21 项见下）。日期：2026-09-25。
 
-其后是 **M1（`schema_version = "0.2"`）**：混合 CPU/GPU 计算、有限 DRAM 容量、SSD 访存（SSD 读写细节不模拟，只用平均有效读写速度）。规则见根目录 [M1_DESIGN.md](../M1_DESIGN.md)，逐条验收见 [M1_ACCEPTANCE.md](../M1_ACCEPTANCE.md)，实测记录见 [M1_VERIFICATION.md](M1_VERIFICATION.md)。0.1 的语义与验收数字**一个都没动**：0.2 是一个新 schema，两份并存，旧 scenario 照旧加载。本目录测试 **345 项**（0.1 那 202 项全部保留，另加 `tests/test_m1.py` 139 项与 `tests/test_mapper.py` 里 0.2 相关的 4 项），`modeling` 侧 57 项。日期：2026-09-26。
+其后是 **M1（`schema_version = "0.2"`）**：混合 CPU/GPU 计算、有限 DRAM 容量、SSD 访存（SSD 读写细节不模拟，只用平均有效读写速度）。规则见根目录 [M1_DESIGN.md](../M1_DESIGN.md)，逐条验收见 [M1_ACCEPTANCE.md](../M1_ACCEPTANCE.md)，实测记录见 [M1_VERIFICATION.md](M1_VERIFICATION.md)。0.1 的语义与验收数字**一个都没动**：0.2 是一个新 schema，两份并存，旧 scenario 照旧加载。本目录测试 **346 项**（0.1 那 202 项全部保留，另加 `tests/test_m1.py` 139 项、`tests/test_mapper.py` 里 0.2 相关的 4 项与时钟修正的 1 项），`modeling` 侧 57 项。日期：2026-09-28。
 
 其后一轮「对照轮」把旧的窗口规则接进了 `modeling` 的张量内核（[ALIGNMENT_IMPLEMENTATION.md](ALIGNMENT_IMPLEMENTATION.md)）：`modeling` 侧新增 `llm_infer_model.tensor` 子包（`spec` / `engine` / `layer_costs`），本目录新增 `tensor_mapping/policies.py`（窗口策略）与 `tools/demo_window_vs_search.py`（三份结果并排对照）。新加的 21 项测试落在 `tests/test_policies.py`，`modeling/tests/test_tensor_layer_costs.py` 另有 19 项。
 
-测试全绿**不等于** M0 整体验收，所以验收按 `ACCEPTANCE.md` §7.6 要求分三类留了证据。`DESIGN.md` §9:285 的集成验证「编译 → 导出 → 模拟/搜索」已从零走通：编译腿在全新空目录 configure + build（32.7 s + 37.6 s），导出腿用这个新二进制重导出四张图，产物与已入库文件**逐字节相同**，`tests.test_ggml` 13 项零 skip。剩下的环境限制只有一条：`--wall-time-limit-s` 在本机因时钟粒度（15.625 ms）无法端到端验证，详见验证报告 3.2。
+测试全绿**不等于** M0 整体验收，所以验收按 `ACCEPTANCE.md` §7.6 要求分三类留了证据。`DESIGN.md` §9:285 的集成验证「编译 → 导出 → 模拟/搜索」已从零走通：编译腿在全新空目录 configure + build（32.7 s + 37.6 s），导出腿用这个新二进制重导出四张图，产物与已入库文件**逐字节相同**，`tests.test_ggml` 13 项零 skip。当时剩下的环境限制只有时钟粒度那一条（详见验证报告 3.2），**它已在 2026-09-28 修掉**（`WallClock` 换 `perf_counter`），所以 `--wall-time-limit-s` 现在端到端可测。
 
 目标：给定 GGML 小计算图、硬件资源、固定动作成本和受限动作空间，检查一种执行映射是否合法，计算其执行时间，并搜索最短的合法映射。
 
@@ -174,7 +174,7 @@ python -m tensor_mapping search --scenario examples/m1-f-dram96.json --out outpu
 ### 跑测试
 
 ```bash
-cd mapping && python -m unittest discover -s tests -t .    # 345 项（0.1 那 202 项 + M1 的 143 项）
+cd mapping && python -m unittest discover -s tests -t .    # 346 项（0.1 那 202 项 + M1 与时钟修正的 144 项）
 ```
 
 这里的 `python` 指装好两个包的开发环境（见上文「安装（开发）」）；本仓库自用的那个在 `modeling/.venv`。没装就只会跑到 6 个 import 错误，报 `No module named 'llm_infer_model'`。
@@ -320,7 +320,7 @@ result = evaluate_mapping(scenario, actions)        # 合法性与时间推进�
 
 ### 命令行上的已知限制
 
-- **`search.wall_time_s` 在本机被时钟粒度量化**：Windows 上 `time.monotonic()` 实测是 `GetTickCount64()`，分辨率 **15.625 ms**，连续 2000 次调用返回同一个值。所以小图搜索的 `wall_time_s` 常常正好是 `0.0`（不是搜索瞬时的意思），`--wall-time-limit-s` 小于一个 tick 时**永远不会触发**。这不影响任何 M0 验收数字（那些全是模拟时间 `_ns`），但用时间预算时要心里有数。要修得动 `mapper.WallClock` 的时钟源（`perf_counter`），属核心改动，留待后续。
+- **`search.wall_time_s` 曾被时钟粒度量化 —— 2026-09-28 已修。** 旧实现用 `time.monotonic()`，在 Windows 上实测是 `GetTickCount64()`：粒度 15.6 / 16.0 ms，连续 2000 次调用返回同一个值。后果有两层，第二层才是真问题：(a) 小图搜索的 `wall_time_s` 常常正好是 `0.0`，而那不是「搜索瞬时完成」；(b) **小于一个 tick 的时间预算永远不会触发**——`--wall-time-limit-s 0.001` 实测跑满 7.8～16.4 ms / 43～100 次展开才停，也就是那段时间里 `elapsed_s()` 一直读到 0.0。现改用 `perf_counter`（实测 1 µs 粒度，仍是单调时钟，`QueryPerformanceCounter` 不受系统时钟调整影响），预算因此真的可执行：1 ms → **1.05～1.08 ms / 6 次展开**，5 ms → **5.01～5.14 ms**，超出量从此由「一次展开」而不是「一个 tick」定。`tests/test_mapper.py::test_the_real_clock_can_enforce_a_budget_below_one_tick` 钉住这条（`mapping/M0_VERIFICATION.md` §3.2 与 `MODELING_MAPPING_BRIEF.md` 里那两处旧记录也一并加了更正）。这不影响任何 M0 验收数字——那些全是模拟时间 `_ns`。
 - **`examples/chain.mapping.json` 与 `examples/ggml/chain.mapping.json` 都不带指纹**，所以它们只靠 `scenario_id` 做身份检查，而 fixture 与 ggml 两个 scenario 的 id 恰好相同（`chain-cap160`），互相回放不会被拦。这不影响正确性——两份 workload 按设计逐字段等价，回放数字本来就一样——但说明**手写 mapping 没有跨图保护**；`search` 产出的 mapping 带两个指纹，互相回放会被 `identity_mismatch` 拒绝（退出 1）。
 
 ## 后续路线

@@ -204,7 +204,12 @@ def search(
     if clock is None:
         clock = WallClock(time_limit)
 
-    started = time.monotonic()
+    # ``perf_counter``, same clock as ``WallClock``: with ``monotonic`` (a 64 Hz
+    # tick on Windows) a small search reported ``wall_time_s`` as exactly 0.0 --
+    # the elapsed time was under one tick and the clock never moved. Reporting a
+    # duration of zero for a search that did run is a wrong number, not a
+    # rounded one.
+    started = time.perf_counter()
     expanded = 0
     best_cost: dict[StateKey, int] = {}
 
@@ -227,7 +232,7 @@ def search(
             evaluation=evaluation,
             expanded_states=expanded,
             visited_states=len(best_cost),
-            wall_time_s=time.monotonic() - started,
+            wall_time_s=time.perf_counter() - started,
             scenario_fingerprint=scenario_fingerprint(scenario),
             workload_fingerprint=workload_fingerprint(scenario.workload),
             max_expanded_states=state_limit,

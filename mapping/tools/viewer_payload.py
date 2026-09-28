@@ -658,10 +658,11 @@ def explore(
     另算的，它就是这趟搜索的过程记录。分开拿会在调用方手里重新长出「再搜一次」的余地，
     而那正是 ``M1_ACCEPTANCE.md`` §11 要拆掉的东西。
 
-    ``clock`` 只在自检里用：Windows 上 ``time.monotonic()`` 实测是 ``GetTickCount64()``
-    （分辨率 15.625 ms），所以 ``wall_time_limit_s=1e-9`` 这种极小预算**永远不触发**
-    ——第一次 ``elapsed_s()`` 就返回 0.0。想确定性地走一遍 ``time_budget_exhausted``
-    就得注入一个假时钟，和 ``mapper.search`` 的测试同一个做法。
+    ``clock`` 只在自检里用：极小的 ``wall_time_limit_s`` 下跑到第几次展开才停取决于
+    机器，注入一个假时钟才能确定性地走一遍 ``time_budget_exhausted``——``M1_DESIGN.md``
+    :225 要的就是这个（预算测试不依赖某台机器恰好跑多快），与 ``mapper.search``
+    的做法一致。真时钟本身现在是可用的（``WallClock`` 用 1 µs 粒度的 ``perf_counter``；
+    2026-09-28 之前用粒度 15.625 ms 的 ``monotonic``，那时极小预算**永远不触发**）。
     """
     recorder = _TreeRecorder(scenario, max_nodes)
     result = search(

@@ -2065,19 +2065,27 @@ def _failure(
 
 
 class WallClock:
-    """Monotonic wall-clock budget.
+    """Monotonic high-resolution wall-clock budget.
 
     Kept here rather than in the mapper so tests can substitute a deterministic
-    clock. ``time.monotonic`` because the search budget must not be affected by
-    system clock adjustments.
+    clock (``M1_DESIGN.md``:225 asks for exactly that, so no budget test depends
+    on how fast the machine happens to be).
+
+    ``perf_counter`` and **not** ``monotonic``: on Windows ``monotonic`` is
+    ``GetTickCount64``, whose resolution is one 64 Hz tick (measured 15.6 / 16.0
+    ms on this machine, with 2000 consecutive calls returning the same value).
+    Below one tick every ``elapsed_s()`` reads 0.0, so a budget of a few
+    milliseconds never fired at all -- a 1 ms limit ran ~16 ms of search. It is
+    still monotonic -- ``QueryPerformanceCounter`` is not moved by system clock
+    adjustments -- so the property this class needs is kept.
     """
 
     def __init__(self, limit_s: float) -> None:
         self.limit_s = limit_s
-        self._start = time.monotonic()
+        self._start = time.perf_counter()
 
     def elapsed_s(self) -> float:
-        return time.monotonic() - self._start
+        return time.perf_counter() - self._start
 
     def expired(self) -> bool:
         return self.limit_s > 0 and self.elapsed_s() >= self.limit_s

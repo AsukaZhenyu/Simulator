@@ -374,9 +374,10 @@ class Checks:
 class FakeClock:
     """永远「已经超时」的时钟，用来确定性地走一遍 ``time_budget_exhausted``。
 
-    真时钟在 Windows 上做不到这件事：``time.monotonic()`` 实测是 ``GetTickCount64()``，
-    分辨率 15.625 ms，所以 ``wall_time_limit_s=1e-9`` 这种极小预算第一次检查时
-    ``elapsed_s()`` 仍然返回 0.0，**永远不触发**（``mapping/README.md`` 记了这条）。
+    ``M1_DESIGN.md``:225 要的正是这个：预算测试注入假时钟，**避免依赖某台机器
+    恰好跑多快**。真时钟做不到「确定性」这件事——就算 ``WallClock`` 现在用的是
+    1 µs 粒度的 ``perf_counter``（2026-09-28 从粒度 15.625 ms 的 ``monotonic``
+    换过来），极小预算下跑到第几次展开才停仍然取决于机器。
     """
 
     def elapsed_s(self) -> float:
