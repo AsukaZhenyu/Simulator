@@ -143,6 +143,20 @@ using `plan.runtime_policy(MyPolicy)`. Callbacks get public observations.
 Unsaved notebook/REPL classes are rejected because source binding is required.
 Python callbacks are trusted caller code, not a security sandbox.
 
+The legacy layer-calibration helper can also be used from an installed wheel
+with caller-provided measurements and configurations:
+
+```python
+from llm_infer_model.calibration import calibrate_configs
+calibrate_configs("my-measurements.json", "calibrated",
+                  config_root="my-input-directory")
+```
+
+The explicit root anchors referenced configuration, Nsight and context files
+and relative output directories. Omitting it preserves the old source-checkout
+maintenance default; the installed `llm-sim` workflow never calls this helper
+or loads those historical measurements implicitly.
+
 ## Results and source lifetime
 
 `result.success` requires valid evaluation and reaching the goal. Invalid or

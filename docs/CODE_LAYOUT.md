@@ -4,6 +4,10 @@
 
 ```text
 Simulator/
+├── pyproject.toml             统一发行包与 llm-sim 安装入口
+├── src/llm_simulator/         对外 API、显式分析成本、无 profile 示例
+├── tests/                    公开 API 与干净发行包安装验收
+├── examples/library/         安装后可移出源码树运行的教程
 ├── mapping/
 │   ├── tensor_mapping/         策略前端、IR、编译、policy、有限搜索
 │   ├── examples/               当前与历史策略输入
@@ -31,7 +35,7 @@ Simulator/
 └── docs/                      当前导航和维护记录
 ```
 
-这里只明确现有边界，没有新增一套抽象或重命名所有运行模块。各包保持原来的公开导入路径，现有脚本和示例继续使用。
+对外从 `llm_simulator` 使用统一入口；内部三个模块继续共用原有执行规则。`tensor_mapping` 与 `llm_infer_model` 导入路径保持兼容。可安装库入口见[使用指南](LIBRARY_GUIDE.md)，源码维护工具与独立 profiling 按下面的模块边界保留。
 
 ## 当前策略怎样运行
 

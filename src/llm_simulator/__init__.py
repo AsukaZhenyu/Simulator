@@ -17,7 +17,7 @@ from tensor_mapping.python_frontend import (
 )
 from tensor_mapping.reconfiguration import ReconfigurationSpec
 
-__version__ = "0.1.0a1"
+__version__ = "0.1.0a2"
 
 __all__ = [
     "__version__", "AnalyticalCosts", "Cache", "CompiledPlan",

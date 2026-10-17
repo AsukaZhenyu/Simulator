@@ -674,10 +674,22 @@ def fit_kv_storage_tiers(
 def calibrate_configs(
     measurements_path: str | Path,
     output_dir: str | Path,
+    *,
+    config_root: str | Path | None = None,
 ) -> tuple[list[Path], dict[str, Any]]:
+    """Fit supplied measurements without requiring repository-local inputs.
+
+    ``config_root`` anchors relative model configurations, Nsight decomposition
+    files, contextual measurements and ``output_dir``. Absolute paths are used
+    unchanged. The measurements file itself is resolved from the working
+    directory. Leaving the root unspecified preserves the source maintenance
+    workflow's historical modeling-directory default; installed callers should
+    pass the directory containing their inputs explicitly.
+    """
     measurement_file = Path(measurements_path).resolve()
     measurements = _read_json(measurement_file)
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = (Path(config_root).resolve() if config_root is not None
+                    else Path(__file__).resolve().parents[1])
     destination = Path(output_dir)
     if not destination.is_absolute():
         destination = project_root / destination

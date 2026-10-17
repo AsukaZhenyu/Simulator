@@ -18,10 +18,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from llm_infer_model.analytical import analyze_decode
 from llm_infer_model.calibration import calibrate_configs
@@ -207,10 +209,50 @@ class CalibratedPipelineTests(unittest.TestCase):
         cls._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         cls.addClassCleanup(cls._tmp.cleanup)
         cls.calibration_dir = Path(cls._tmp.name)
-        _, cls.report = calibrate_configs(MEASUREMENTS, cls.calibration_dir)
+        _, cls.report = calibrate_configs(MEASUREMENTS, cls.calibration_dir, config_root=ROOT)
 
     def config_path(self, model_id: str) -> Path:
         return self.calibration_dir / f"qwen35_{model_id}_q4_k_m_rtx4070.json"
+
+    def test_explicit_root_works_with_relocated_inputs_and_installed_module(self) -> None:
+        """Resolve every referenced input independently of the package location."""
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            inputs = temporary / "user-inputs"
+            measurements = read_json(MEASUREMENTS)
+            references: set[str] = set()
+            for model in measurements["models"]:
+                references.update((model["config"], model["nsys_decomposition"]))
+                context = model.get("context_validation")
+                if context is not None:
+                    references.add(context["baseline"])
+                    references.update(context["points"])
+            for reference in references:
+                destination = inputs / reference
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / reference, destination)
+            measurement_file = temporary / "outside-input-root.json"
+            measurement_file.write_text(json.dumps(measurements), encoding="utf-8", newline="\n")
+            # This directory has no configs or measurements. A lookup using the
+            # installed package's parent, rather than the explicit root, fails.
+            installed = temporary / "site-packages/llm_infer_model/calibration.py"
+            with patch("llm_infer_model.calibration.__file__", str(installed)):
+                generated, report = calibrate_configs(
+                    measurement_file, "calibrated", config_root=inputs,
+                )
+            self.assertEqual(len(generated), len(MODEL_IDS))
+            self.assertTrue(all(path.parent == inputs / "calibrated" for path in generated))
+            self.assertAlmostEqual(
+                report["pipeline_service_fit"]["effective_bandwidth_bytes_per_s"],
+                self.report["pipeline_service_fit"]["effective_bandwidth_bytes_per_s"],
+            )
+            storage_fit = report["kv_storage_fit"]["rows"][0]
+            self.assertTrue(Path(storage_fit["baseline_file"]).is_relative_to(inputs))
+            self.assertTrue(all(Path(row["file"]).is_relative_to(inputs) for row in storage_fit["rows"]))
+            # A mistaken explicit root must not silently fall back to the repo.
+            with self.assertRaises(FileNotFoundError):
+                calibrate_configs(measurement_file, temporary / "wrong-output",
+                                  config_root=temporary / "missing-inputs")
 
     def test_simulation_is_between_analytical_bounds(self) -> None:
         for model_id in MODEL_IDS:

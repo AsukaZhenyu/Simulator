@@ -1,6 +1,6 @@
-# Simulator 0.1.0a1
+# Simulator 0.1.0a2
 
-First unified Python research-library distribution. Python 3.10+, MIT-licensed
+Unified Python research-library alpha. Python 3.10+, MIT-licensed
 original code, no core third-party runtime dependencies.
 
 ## Included
@@ -20,7 +20,7 @@ original code, no core third-party runtime dependencies.
 Download the `.whl` from this release and run:
 
 ```bash
-python -m pip install llm_infer_simulator-0.1.0a1-py3-none-any.whl
+python -m pip install llm_infer_simulator-0.1.0a2-py3-none-any.whl
 llm-sim demo --model dense --out dense-demo
 llm-sim demo --model moe --out moe-demo
 ```
@@ -28,8 +28,16 @@ llm-sim demo --model moe --out moe-demo
 Or install directly from the matching Git tag:
 
 ```bash
-python -m pip install "git+https://github.com/AsukaZhenyu/Simulator.git@v0.1.0a1"
+python -m pip install "git+https://github.com/AsukaZhenyu/Simulator.git@v0.1.0a2"
 ```
+
+## Changes since 0.1.0a1
+
+Legacy repository calibration accepts an explicit configuration root, so its
+relative configuration, Nsight decomposition and context-validation inputs
+remain usable when the runtime is installed from a wheel. Its regression
+tests now supply that root explicitly. The original source-maintenance default
+is retained; the public no-profile simulation API is unchanged.
 
 ## Research status
 

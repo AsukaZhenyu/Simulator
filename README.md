@@ -17,7 +17,7 @@ llm-sim demo --model dense --out dense-demo
 llm-sim demo --model moe --out moe-demo
 ```
 
-Alternatively, download the repository ZIP, extract it, and run `python -m pip install .` inside it. A built wheel can be installed with `python -m pip install path/to/llm_infer_simulator-0.1.0a1-py3-none-any.whl`. This project has **not been published to PyPI**; a bare `pip install llm-infer-simulator` is not the documented installation path.
+Alternatively, download the repository ZIP, extract it, and run `python -m pip install .` inside it. Downloadable wheels and source archives are available from [GitHub Releases](https://github.com/AsukaZhenyu/Simulator/releases). A wheel can be installed with `python -m pip install path/to/llm_infer_simulator-0.1.0a2-py3-none-any.whl`. This project has **not been published to PyPI**; a bare `pip install llm-infer-simulator` is not the documented installation path.
 
 For development use `python -m pip install -e .`. There is one installation entry point; installing the two internal subprojects separately is unnecessary.
 

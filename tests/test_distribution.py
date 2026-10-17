@@ -87,7 +87,7 @@ class DistributionTests(unittest.TestCase):
                 scripts = configparser.ConfigParser()
                 scripts.read_string(archive.read(metadata_path.replace("METADATA", "entry_points.txt")).decode())
             self.assertEqual(metadata["Name"], "llm-infer-simulator")
-            self.assertEqual(metadata["Version"], "0.1.0a1")
+            self.assertEqual(metadata["Version"], "0.1.0a2")
             self.assertIn("MIT License", metadata["License"])
             self.assertIn("llm_simulator/py.typed", members)
             self.assertTrue(any(name.endswith("/LICENSE") and ".dist-info/" in name for name in members))
@@ -160,7 +160,7 @@ class DistributionTests(unittest.TestCase):
                  "root=pathlib.Path(sys.prefix).resolve(); names=json.loads(sys.argv[1]); "
                  "origins={name: str(pathlib.Path(importlib.import_module(name).__file__).resolve()) for name in names}; "
                  "assert all(pathlib.Path(path).is_relative_to(root) for path in origins.values()), origins; "
-                 "assert importlib.metadata.version('llm-infer-simulator')=='0.1.0a1'; "
+                 "assert importlib.metadata.version('llm-infer-simulator')=='0.1.0a2'; "
                  "assert importlib.util.find_spec('numpy') is None; "
                  "assert importlib.util.find_spec('gguf') is None; "
                  "print(json.dumps(origins, sort_keys=True))",
@@ -177,7 +177,7 @@ class DistributionTests(unittest.TestCase):
             help_result = self._run([str(executable), "--help"], cwd=temporary)
             self.assertIn("usage:", help_result.stdout)
             version_result = self._run([str(executable), "--version"], cwd=temporary)
-            self.assertIn("0.1.0a1", version_result.stdout)
+            self.assertIn("0.1.0a2", version_result.stdout)
             for model in ("dense", "moe"):
                 output = temporary / (model + "-simulation")
                 demo = self._run([str(executable), "demo", "--model", model, "--out", str(output)], cwd=temporary)

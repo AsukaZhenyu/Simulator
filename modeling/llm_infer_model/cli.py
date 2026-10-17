@@ -442,7 +442,9 @@ def command_benchmark_h2d(args: argparse.Namespace) -> None:
 
 
 def command_calibrate_configs(args: argparse.Namespace) -> None:
-    generated, report = calibrate_configs(args.measurements, args.output_dir)
+    generated, report = calibrate_configs(
+        args.measurements, args.output_dir, config_root=getattr(args, "config_root", None),
+    )
     _write_json(report, args.report)
     print(f"wrote {len(generated)} calibrated configs and report {args.report}")
 
@@ -752,6 +754,7 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--measurements", required=True)
     calibrate.add_argument("--output-dir", required=True)
     calibrate.add_argument("--report", required=True)
+    calibrate.add_argument("--config-root", help="base directory for relative config, Nsight and context inputs")
     calibrate.set_defaults(func=command_calibrate_configs)
 
     analyze_nsys = subparsers.add_parser(
