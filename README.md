@@ -1,10 +1,10 @@
-# 面向异构硬件平台的大模型推理系统模拟器
+# A Simulator for Large Language Model Inference Systems on Heterogeneous Hardware Platforms
 
 **Simulator** is a Python research library for expressing, compiling and simulating LLM execution and storage strategies on heterogeneous hardware.
 
 **Python strategy → IR → compiler → one tensor/resource runtime → timeline and memory accounting.**
 
-目前提供可安装的研究原型：无需下载模型权重、无需已有 profile，也无需本机安装 CUDA，即可模拟声明的 CPU/GPU 平台。分析结果是**未经硬件校准的估计**；通过语义回归不代表性能准确。
+An installable research prototype is currently available: it can simulate a declared CPU/GPU platform without downloading model weights, using an existing profile, or installing CUDA locally. The analysis produces **estimates that have not been calibrated against hardware**; passing semantic regression tests does not establish performance accuracy.
 
 ## Install
 
