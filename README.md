@@ -106,6 +106,10 @@ python -B -m unittest discover -s profiling/tests
 
 Distribution checks build wheel/sdist and run Dense/MoE in a fresh virtual environment outside the source tree, without profiles. CI checks the library and semantic regressions. Optional native/GGUF tests retain explicit prerequisites.
 
+## Research experiments
+
+The [research evidence report](docs/RESEARCH_EVIDENCE_20261017.md) separates independent strategy checks, measured-component replay, analytical design exploration and hardware acceptance. Reusable source-checkout experiments include [strategy fidelity](docs/STRATEGY_FIDELITY.md), [hardware sensitivity](docs/HARDWARE_SENSITIVITY.md) and [repeated completed-work calibration](profiling/batched_calibration/README.md). Analytical curves illustrate declared assumptions; successful compilation or replay does not establish hardware accuracy. A policy that cannot advance is reported as a policy dead end, without claiming that every mapping on the hardware is infeasible.
+
 ## License and research use
 
 Original code uses the [MIT License](LICENSE). Attributed third-party data retains its own license; see [public routing data](profiling/data/public-routes/README.md). This is an **alpha research library**, with no associated accepted paper or accuracy claim. Citation metadata: [CITATION.cff](CITATION.cff).

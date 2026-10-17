@@ -11,6 +11,7 @@ import sys
 from llm_infer_model.m2.routing_scores import ScoredCausalSession, parse_routing_scores
 from llm_infer_model.m2.row_execution import parse_execution_spec
 from llm_infer_model.tensor.runtime import dispatch_command
+from llm_infer_model.tensor.environment import CODE_NO_PROGRESS
 from llm_infer_model.tensor.services import parse_services
 from llm_infer_model.tensor.spec import InvalidInput, SpecError, Unsupported
 
@@ -265,7 +266,8 @@ def run_unified_strategy(compiled, *, checkpoint=None, max_decisions=None, polic
     for index in range(len(records), len(records) + budget):
         observation = session.observe()
         if observation.complete or observation.error_code:
-            reason = "goal_reached" if observation.complete else "runtime_failure"
+            reason = ("goal_reached" if observation.complete else
+                      "policy_dead_end" if observation.error_code == CODE_NO_PROGRESS else "runtime_failure")
             break
         try:
             decision = policy(observation)
@@ -280,7 +282,7 @@ def run_unified_strategy(compiled, *, checkpoint=None, max_decisions=None, polic
         records.append(DecisionRecord(index, observation_hash(observation), observation, decision, command.action,
                                       step.ok, step.error_code, step.error_message))
         if not step.ok:
-            reason = "runtime_failure"
+            reason = "policy_dead_end" if step.error_code == CODE_NO_PROGRESS else "runtime_failure"
             break
     if session.observe().complete:
         reason = "goal_reached"

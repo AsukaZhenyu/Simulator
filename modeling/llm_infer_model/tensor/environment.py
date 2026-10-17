@@ -27,6 +27,11 @@ from .spec import (
 
 CODE_EXTERNAL_MEMORY_CONFLICT = "external_memory_conflict"
 CODE_ENVIRONMENT_DEADLOCK = "environment_deadlock"
+# A session can distinguish an unfinished, idle clock with no future event
+# from a malformed tensor command. This says nothing about whether a different
+# policy or placement could complete the workload. The legacy fixed evaluator
+# retains its existing ILLEGAL_ACTION semantics for an empty ADVANCE.
+CODE_NO_PROGRESS = "no_progress"
 CODE_INFORMATION_NOT_KNOWN = "information_not_known"
 CODE_RECLAIM_ADMISSION = "reclaim_admission_blocked"
 CODE_CONTROL_BUSY = "control_busy"
@@ -642,7 +647,9 @@ class SimulationSession:
                 return self._fail(CODE_ENVIRONMENT_DEADLOCK,
                                   "all running tasks are paused and no future environment event can resume them",
                                   action_index=action_index)
-            return self._fail(CODE_ILLEGAL_ACTION, "ADVANCE has no running task or future environment event",
+            return self._fail(CODE_NO_PROGRESS,
+                              "unfinished execution has no running work or future environment event to advance; "
+                              "the current policy made no progress, not a proof of global infeasibility",
                               action_index=action_index)
         destination = min(times)
         before = self._state

@@ -39,6 +39,18 @@ jobs:
         run: python -m unittest discover -s tests -p test_library.py -v
       - name: Analytical input tests
         run: python -m unittest discover -s tests -p test_analytical_inputs.py -v
+      - name: Independent strategy references
+        run: python -m unittest discover -s tests -p test_strategy_fidelity.py -v
+      - name: Policy dead-end diagnostics
+        run: python -m unittest discover -s tests -p test_policy_no_progress.py -v
+      - name: Analytical exploration protocol
+        run: python -m unittest discover -s tests -p test_hardware_sensitivity.py -v
+      - name: Measured replay contracts without hardware
+        run: python -m unittest discover -s profiling/execution_calibration/tests -v
+      - name: Batch sample units and profile-only freezing
+        run: python -m unittest discover -s profiling/batched_calibration/tests -v
+      - name: Native batch source generation without CUDA
+        run: python -m unittest discover -s profiling/native/execution_transforms_batch -p 'test_*.py' -v
       - name: Modeling tests
         run: python -m unittest discover -s modeling/tests -v
       - name: Mapping tests

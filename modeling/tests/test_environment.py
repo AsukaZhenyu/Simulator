@@ -5,11 +5,12 @@ import json
 import unittest
 
 from llm_infer_model.tensor.engine import (
-    Action, CODE_CAPACITY_EXCEEDED, CODE_RESOURCE_BUSY, CODE_TENSOR_IN_USE,
+    Action, CODE_CAPACITY_EXCEEDED, CODE_ILLEGAL_ACTION,
+    CODE_RESOURCE_BUSY, CODE_TENSOR_IN_USE,
     advance_elapsed, evaluate_mapping, initial_state, transition,
 )
 from llm_infer_model.tensor.environment import (
-    CODE_ENVIRONMENT_DEADLOCK, CODE_EXTERNAL_MEMORY_CONFLICT, CODE_INFORMATION_NOT_KNOWN,
+    CODE_ENVIRONMENT_DEADLOCK, CODE_EXTERNAL_MEMORY_CONFLICT, CODE_INFORMATION_NOT_KNOWN, CODE_NO_PROGRESS,
     EnvironmentEvent, SimulationSession,
 )
 from llm_infer_model.tensor.spec import (
@@ -231,13 +232,31 @@ class EnvironmentSessionTests(unittest.TestCase):
 
     def test_rejected_empty_advance_is_recorded_without_success_event(self):
         runtime = SimulationSession(scene())
-        runtime.advance(source_index=23)
+        step = runtime.advance(source_index=23)
+        self.assertEqual(step.error_code, CODE_NO_PROGRESS)
         result = runtime.result()
         self.assertEqual(result.evaluation.error_action_index, 0)
         self.assertEqual(result.evaluation.actions, (Action("ADVANCE"),))
         self.assertEqual(result.action_sources, (23,))
         self.assertEqual(result.evaluation.events, ())
         self.assertEqual(result.nominal_ends, ())
+
+    def test_empty_advance_keeps_legacy_fixed_evaluator_error_code(self):
+        # Only the stateful environment session gains the richer diagnosis.
+        legacy = evaluate_mapping(scene(), (Action("ADVANCE"),))
+        self.assertEqual(legacy.error_code, CODE_ILLEGAL_ACTION)
+
+    def test_no_progress_does_not_replace_malformed_tensor_command_codes(self):
+        scenario = scene()
+        # A repeated output computation remains an illegal tensor action.
+        runtime = SimulationSession(scenario)
+        runtime.submit(CPU)
+        runtime.advance()
+        self.assertEqual(runtime.submit(CPU).error_code, CODE_ILLEGAL_ACTION)
+        # A known tensor without a ready source retains its readiness error.
+        runtime = SimulationSession(scenario)
+        self.assertEqual(runtime.submit(Action("COMPUTE", "missing", device="cpu")).error_code,
+                         CODE_ILLEGAL_ACTION)
 
     def test_t_zero_updates_are_applied_before_policy_and_cpu_start_is_rejected(self):
         runtime = SimulationSession(scene(), environment_events=(
