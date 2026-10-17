@@ -1,0 +1,9 @@
+{
+  "format_version": "environment-trace-0.1",
+  "events": [
+    {
+      "t_ns": 500000,
+      "dram_external_bytes": 4096
+    }
+  ]
+}

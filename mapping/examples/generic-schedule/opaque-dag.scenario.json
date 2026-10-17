@@ -1,0 +1,101 @@
+{
+  "schema_version": "0.2",
+  "id": "opaque-fork-join",
+  "architecture": {
+    "dram_capacity_bytes": 4096,
+    "vram_capacity_bytes": 4096,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {
+    "output_locations": {
+      "out": "dram"
+    }
+  },
+  "costs": {
+    "source": "synthetic_fixed",
+    "compute": {
+      "alpha": {
+        "cpu": {
+          "duration_ns": 5000000,
+          "workspace_bytes": 16
+        }
+      },
+      "beta": {
+        "gpu": {
+          "duration_ns": 5000000,
+          "workspace_bytes": 16
+        }
+      },
+      "omega": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 16
+        }
+      }
+    },
+    "transfer": {
+      "ssd_to_dram": {
+        "a": {
+          "duration_ns": 3000000
+        },
+        "b": {
+          "duration_ns": 3000000
+        }
+      },
+      "dram_to_vram": {
+        "b": {
+          "duration_ns": 100000
+        }
+      },
+      "vram_to_dram": {
+        "v": {
+          "duration_ns": 100000
+        }
+      },
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "alpha": [
+        "cpu"
+      ],
+      "beta": [
+        "gpu"
+      ],
+      "omega": [
+        "cpu"
+      ]
+    },
+    "allowed_transfers": {
+      "ssd_to_dram": [
+        "a",
+        "b"
+      ],
+      "dram_to_vram": [
+        "b"
+      ],
+      "vram_to_dram": [
+        "v"
+      ],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 1000,
+    "wall_time_limit_s": 1
+  },
+  "workload_file": "opaque-dag.workload.json"
+}

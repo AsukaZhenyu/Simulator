@@ -1,0 +1,41 @@
+{
+  "format_version": "m2-layer-0.5",
+  "id": "denseL0-prefill",
+  "layer": "denseL0",
+  "layer_file": "denseL0.layer.json",
+  "costs_file": "dense.costs.json",
+  "phase": "prefill",
+  "devices": [
+    "cpu",
+    "gpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 1048576,
+    "vram_capacity_bytes": 1048576,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 0,
+      "tokens": 3,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 0,
+        "version": 1,
+        "state_location": "dram",
+        "blocks": []
+      }
+    ]
+  },
+  "comment": "All durations and macro scratch are synthetic. Initial weights and input are DRAM; KV delivery is DRAM."
+}

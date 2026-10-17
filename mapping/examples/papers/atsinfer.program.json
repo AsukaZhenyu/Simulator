@@ -1,0 +1,131 @@
+{
+  "format_version": "service-program-0.1",
+  "id": "atsinfer-promotion",
+  "scenario_file": "atsinfer.scenario.json",
+  "services_file": "atsinfer.services.json",
+  "environment_file": "../causal/no-disturbance.environment.json",
+  "information_mode": "offline_fixed",
+  "pcie_cost_source": "services_payload_rates",
+  "program": [
+    {
+      "kind": "transfer",
+      "tensor_id": "W1",
+      "src": "dram",
+      "dst": "vram",
+      "engine": "ce"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "X",
+      "src": "dram",
+      "dst": "vram",
+      "engine": "sm"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "W1",
+          "location": "vram"
+        },
+        {
+          "tensor_id": "X",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "stage0",
+      "device": "gpu"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "stage0"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "stage1",
+      "device": "gpu"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "stage1"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "release",
+      "tensor_id": "W1",
+      "location": "vram"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "W2",
+      "src": "dram",
+      "dst": "vram",
+      "engine": "ce"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "H1",
+      "src": "vram",
+      "dst": "dram",
+      "engine": "sm"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "W2",
+          "location": "vram"
+        },
+        {
+          "tensor_id": "H1",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "cpu_tail",
+      "device": "cpu"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "stage2",
+      "device": "gpu"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "cpu_tail",
+        "stage2"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "OUT",
+      "src": "vram",
+      "dst": "dram",
+      "engine": "sm"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "OUT",
+          "location": "dram"
+        }
+      ]
+    }
+  ]
+}

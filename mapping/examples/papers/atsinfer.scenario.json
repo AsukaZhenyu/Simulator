@@ -1,0 +1,222 @@
+{
+  "schema_version": "0.2",
+  "id": "atsinfer-promotion",
+  "workload_file": "atsinfer.workload.json",
+  "architecture": {
+    "dram_capacity_bytes": 512,
+    "vram_capacity_bytes": 512,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "costs": {
+    "source": "synthetic_service_mechanism",
+    "compute": {
+      "stage0": {
+        "gpu": {
+          "duration_ns": 100,
+          "workspace_bytes": 16
+        }
+      },
+      "stage1": {
+        "gpu": {
+          "duration_ns": 100,
+          "workspace_bytes": 16
+        }
+      },
+      "stage2": {
+        "gpu": {
+          "duration_ns": 100,
+          "workspace_bytes": 16
+        }
+      },
+      "cpu_tail": {
+        "cpu": {
+          "duration_ns": 100,
+          "workspace_bytes": 16
+        }
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {
+        "W0": {
+          "duration_ns": 16
+        },
+        "W1": {
+          "duration_ns": 32
+        },
+        "W2": {
+          "duration_ns": 16
+        },
+        "X": {
+          "duration_ns": 32
+        },
+        "H0": {
+          "duration_ns": 32
+        },
+        "H1": {
+          "duration_ns": 32
+        },
+        "OUT": {
+          "duration_ns": 32
+        },
+        "AUX": {
+          "duration_ns": 32
+        }
+      },
+      "vram_to_dram": {
+        "W0": {
+          "duration_ns": 16
+        },
+        "W1": {
+          "duration_ns": 32
+        },
+        "W2": {
+          "duration_ns": 16
+        },
+        "X": {
+          "duration_ns": 32
+        },
+        "H0": {
+          "duration_ns": 32
+        },
+        "H1": {
+          "duration_ns": 32
+        },
+        "OUT": {
+          "duration_ns": 32
+        },
+        "AUX": {
+          "duration_ns": 32
+        }
+      },
+      "ssd_to_dram": {
+        "W0": {
+          "duration_ns": 16
+        },
+        "W1": {
+          "duration_ns": 32
+        },
+        "W2": {
+          "duration_ns": 16
+        },
+        "X": {
+          "duration_ns": 32
+        },
+        "H0": {
+          "duration_ns": 32
+        },
+        "H1": {
+          "duration_ns": 32
+        },
+        "OUT": {
+          "duration_ns": 32
+        },
+        "AUX": {
+          "duration_ns": 32
+        }
+      },
+      "dram_to_ssd": {
+        "W0": {
+          "duration_ns": 16
+        },
+        "W1": {
+          "duration_ns": 32
+        },
+        "W2": {
+          "duration_ns": 16
+        },
+        "X": {
+          "duration_ns": 32
+        },
+        "H0": {
+          "duration_ns": 32
+        },
+        "H1": {
+          "duration_ns": 32
+        },
+        "OUT": {
+          "duration_ns": 32
+        },
+        "AUX": {
+          "duration_ns": 32
+        }
+      }
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "stage0": [
+        "gpu"
+      ],
+      "stage1": [
+        "gpu"
+      ],
+      "stage2": [
+        "gpu"
+      ],
+      "cpu_tail": [
+        "cpu"
+      ]
+    },
+    "allowed_transfers": {
+      "dram_to_vram": [
+        "W0",
+        "W1",
+        "W2",
+        "X",
+        "H0",
+        "H1",
+        "OUT",
+        "AUX"
+      ],
+      "vram_to_dram": [
+        "W0",
+        "W1",
+        "W2",
+        "X",
+        "H0",
+        "H1",
+        "OUT",
+        "AUX"
+      ],
+      "ssd_to_dram": [
+        "W0",
+        "W1",
+        "W2",
+        "X",
+        "H0",
+        "H1",
+        "OUT",
+        "AUX"
+      ],
+      "dram_to_ssd": [
+        "W0",
+        "W1",
+        "W2",
+        "X",
+        "H0",
+        "H1",
+        "OUT",
+        "AUX"
+      ]
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true
+  },
+  "goal": {
+    "output_locations": {
+      "OUT": "dram",
+      "AUX": "dram"
+    }
+  },
+  "mapper": {
+    "algorithm": "uniform_cost"
+  }
+}

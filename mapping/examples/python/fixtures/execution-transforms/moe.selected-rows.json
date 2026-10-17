@@ -1,0 +1,531 @@
+{
+  "format_version": "moe-execution-0.2",
+  "variant": "selected_rows",
+  "expert_variant": "swiglu_staged",
+  "provenance": "synthetic_execution",
+  "intermediate_bytes_per_token": 32,
+  "entries": [
+    {
+      "kind": "combine_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "combine_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "combine_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "combine_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_down",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_down",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_down",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_down",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_gate",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_gate",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_gate",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_gate",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_swiglu",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_swiglu",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_swiglu",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_swiglu",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_up",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_up",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_up",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "expert_up",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "gather_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "gather_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "gather_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "gather_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "scatter_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "scatter_rows",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "scatter_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 1,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "scatter_rows",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "token_count": 2,
+      "hidden_bytes_per_token": 16,
+      "intermediate_bytes_per_token": 32,
+      "duration_ns": 200,
+      "workspace_bytes": 4
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    }
+  ],
+  "index_storage_contract": "stage_workspace_includes_row_index_temporaries",
+  "weight_storage_contract": "materialized_partition_replaces_parent",
+  "subweights": [
+    {
+      "parent_weight_id": "w:moe-small:E0",
+      "parent_version": 1,
+      "matrices": [
+        {
+          "stage": "gate",
+          "tensor_id": "w:moe-small:E0:v1:gate",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 0,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "up",
+          "tensor_id": "w:moe-small:E0:v1:up",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 128,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "down",
+          "tensor_id": "w:moe-small:E0:v1:down",
+          "dtype": "F32",
+          "physical_shape": [
+            8,
+            4
+          ],
+          "byte_offset": 256,
+          "byte_length": 128,
+          "version": 1
+        }
+      ],
+      "source_evidence": {
+        "kind": "synthetic_layout_manifest",
+        "id": "test-F32-H4-I8",
+        "sha256": "f004f426212ddc2224e9e8e4adafa1f1fc55d7595bc2169f1f63e076821edc1a"
+      }
+    },
+    {
+      "parent_weight_id": "w:moe-small:E1",
+      "parent_version": 1,
+      "matrices": [
+        {
+          "stage": "gate",
+          "tensor_id": "w:moe-small:E1:v1:gate",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 0,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "up",
+          "tensor_id": "w:moe-small:E1:v1:up",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 128,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "down",
+          "tensor_id": "w:moe-small:E1:v1:down",
+          "dtype": "F32",
+          "physical_shape": [
+            8,
+            4
+          ],
+          "byte_offset": 256,
+          "byte_length": 128,
+          "version": 1
+        }
+      ],
+      "source_evidence": {
+        "kind": "synthetic_layout_manifest",
+        "id": "test-F32-H4-I8",
+        "sha256": "e26cb18efd37c6feec299a98cba8f1691a9bb9503fd687c1dbb5b3d245825faa"
+      }
+    },
+    {
+      "parent_weight_id": "w:moe-small:E2",
+      "parent_version": 1,
+      "matrices": [
+        {
+          "stage": "gate",
+          "tensor_id": "w:moe-small:E2:v1:gate",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 0,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "up",
+          "tensor_id": "w:moe-small:E2:v1:up",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 128,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "down",
+          "tensor_id": "w:moe-small:E2:v1:down",
+          "dtype": "F32",
+          "physical_shape": [
+            8,
+            4
+          ],
+          "byte_offset": 256,
+          "byte_length": 128,
+          "version": 1
+        }
+      ],
+      "source_evidence": {
+        "kind": "synthetic_layout_manifest",
+        "id": "test-F32-H4-I8",
+        "sha256": "94b125f823d3f68f725045657ef6e84864f466b10c9498ae199db03be8831c1a"
+      }
+    },
+    {
+      "parent_weight_id": "w:moe-small:E3",
+      "parent_version": 1,
+      "matrices": [
+        {
+          "stage": "gate",
+          "tensor_id": "w:moe-small:E3:v1:gate",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 0,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "up",
+          "tensor_id": "w:moe-small:E3:v1:up",
+          "dtype": "F32",
+          "physical_shape": [
+            4,
+            8
+          ],
+          "byte_offset": 128,
+          "byte_length": 128,
+          "version": 1
+        },
+        {
+          "stage": "down",
+          "tensor_id": "w:moe-small:E3:v1:down",
+          "dtype": "F32",
+          "physical_shape": [
+            8,
+            4
+          ],
+          "byte_offset": 256,
+          "byte_length": 128,
+          "version": 1
+        }
+      ],
+      "source_evidence": {
+        "kind": "synthetic_layout_manifest",
+        "id": "test-F32-H4-I8",
+        "sha256": "67fe080da7d8c474ef8b2452e53b47c4555428ff374a744bf11913668dfd4a26"
+      }
+    }
+  ]
+}

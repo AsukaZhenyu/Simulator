@@ -1,0 +1,16 @@
+{
+  "format_version": "paper-strategy-0.1",
+  "id": "neo-mechanism",
+  "paper": "neo",
+  "invocation_files": [
+    "r_cpu.invocation.json",
+    "r_gpu0.invocation.json",
+    "r_gpu1.invocation.json"
+  ],
+  "environment_file": "../causal/no-disturbance.environment.json",
+  "execution_file": "neo.execution.json",
+  "policy_file": "neo.policy.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "max_decisions": 400
+}

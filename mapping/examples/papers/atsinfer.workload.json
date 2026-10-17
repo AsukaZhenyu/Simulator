@@ -1,0 +1,231 @@
+{
+  "schema_version": "0.2",
+  "id": "atsinfer-promotion",
+  "origin": {
+    "kind": "synthetic_layer"
+  },
+  "tensors": [
+    {
+      "id": "W0",
+      "name": "W0",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "vram",
+        "dram"
+      ]
+    },
+    {
+      "id": "W1",
+      "name": "W1",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "W2",
+      "name": "W2",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "X",
+      "name": "X",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "H0",
+      "name": "H0",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": []
+    },
+    {
+      "id": "H1",
+      "name": "H1",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": []
+    },
+    {
+      "id": "OUT",
+      "name": "OUT",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": []
+    },
+    {
+      "id": "AUX",
+      "name": "AUX",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        8,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        32,
+        32,
+        32
+      ],
+      "storage_bytes": 32,
+      "initial_locations": []
+    }
+  ],
+  "operations": [
+    {
+      "id": "stage0",
+      "semantic_op": "dense_ffn",
+      "ggml_op": "SYNTHETIC_MACRO",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W0",
+        "X"
+      ],
+      "output": "H0"
+    },
+    {
+      "id": "stage1",
+      "semantic_op": "dense_ffn",
+      "ggml_op": "SYNTHETIC_MACRO",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W1",
+        "H0"
+      ],
+      "output": "H1"
+    },
+    {
+      "id": "stage2",
+      "semantic_op": "dense_ffn",
+      "ggml_op": "SYNTHETIC_MACRO",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W2",
+        "H1"
+      ],
+      "output": "OUT"
+    },
+    {
+      "id": "cpu_tail",
+      "semantic_op": "dense_ffn",
+      "ggml_op": "SYNTHETIC_MACRO",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "H1"
+      ],
+      "output": "AUX"
+    }
+  ],
+  "outputs": [
+    "OUT",
+    "AUX"
+  ]
+}

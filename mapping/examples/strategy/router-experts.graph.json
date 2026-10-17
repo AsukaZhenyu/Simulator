@@ -1,0 +1,152 @@
+{
+  "schema_version": "0.2",
+  "id": "fixed-router-independent-experts",
+  "origin": {
+    "kind": "synthetic_layer",
+    "ggml_version": null,
+    "sample": "hand-declared fixed-plan raw DAG; synthetic prices, no real LLM compiler"
+  },
+  "tensors": [
+    {
+      "id": "input",
+      "name": "input",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "vram"
+      ]
+    },
+    {
+      "id": "W:expert",
+      "name": "W:expert",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        64,
+        64
+      ],
+      "storage_bytes": 64,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "route",
+      "name": "route",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "expert:gpu:out",
+      "name": "expert:gpu:out",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "expert:cpu:out",
+      "name": "expert:cpu:out",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "router",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": [
+        "input"
+      ],
+      "output": "route"
+    },
+    {
+      "id": "expert-gpu",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W:expert",
+        "route"
+      ],
+      "output": "expert:gpu:out"
+    },
+    {
+      "id": "expert-cpu",
+      "semantic_op": "RELU",
+      "ggml_op": "GGML_OP_UNARY",
+      "unary_op": "GGML_UNARY_OP_RELU",
+      "op_params": [],
+      "inputs": [
+        "route"
+      ],
+      "output": "expert:cpu:out"
+    }
+  ],
+  "outputs": [
+    "expert:gpu:out",
+    "expert:cpu:out"
+  ]
+}

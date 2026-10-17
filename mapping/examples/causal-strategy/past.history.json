@@ -1,0 +1,35 @@
+{
+  "format_version": "causal-history-0.1",
+  "entries": [
+    {
+      "request_id": "completed-request",
+      "layer_id": "moe-small",
+      "absolute_position": 0,
+      "expert_ids": [
+        3,
+        0
+      ],
+      "scores": null
+    },
+    {
+      "request_id": "completed-request",
+      "layer_id": "moe-small",
+      "absolute_position": 1,
+      "expert_ids": [
+        3,
+        1
+      ],
+      "scores": null
+    },
+    {
+      "request_id": "completed-request",
+      "layer_id": "moe-small",
+      "absolute_position": 2,
+      "expert_ids": [
+        3,
+        2
+      ],
+      "scores": null
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "format_version": "m2-layer-0.1",
+  "source": "fcd-synthetic",
+  "provenance": "synthetic_layer",
+  "entries": [
+    {
+      "kind": "projection",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 2000000,
+      "workspace_bytes": 0
+    },
+    {
+      "kind": "attention",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 3000000,
+      "workspace_bytes": 0
+    },
+    {
+      "kind": "dense_ffn",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 0
+    },
+    {
+      "kind": "projection",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 2000000,
+      "workspace_bytes": 0
+    },
+    {
+      "kind": "attention",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 3000000,
+      "workspace_bytes": 0
+    },
+    {
+      "kind": "dense_ffn",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 5000000,
+      "workspace_bytes": 0
+    }
+  ],
+  "comment": "六个合成条目：三种宏任务 × (prefill 3 token 零历史 / decode 1 token 三 token 历史)。2/3/5 ms 是验收 §2 直接当断言用的那三个数，所以它们同时也是这段链的形状证据——每个任务只被计一次。visible_history 对每个任务类型都是「本次调用开始时该序列的 next_position」，不按类型换含义。全是 synthetic_layer：任何拿这张表跑出来的结论只能写成「合成成本下的调度比较」。"
+}

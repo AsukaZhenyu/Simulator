@@ -1,0 +1,230 @@
+{
+  "format_version": "unified-strategy-0.2",
+  "id": "neo-selected-cpu-request-decode-branch",
+  "model": {
+    "kind": "m2",
+    "file": "neo.invocation.json"
+  },
+  "execution": [
+    {
+      "scope_id": "single",
+      "spec": {
+        "format_version": "dense-attention-execution-0.1",
+        "variant": "pure_attention",
+        "provenance": "synthetic_execution",
+        "invocation_files": [
+          "neo.invocation.json"
+        ],
+        "frontend_config": {
+          "hidden": 16,
+          "intermediate": 32,
+          "heads": 4,
+          "kv_heads": 2,
+          "head_dim": 4,
+          "rope_dims": 4,
+          "attention_gate": "sigmoid",
+          "qk_norm": "rms",
+          "rope_mode": "normal",
+          "rope_base": 10000.0,
+          "norm_epsilon": 9.999999974752427e-07,
+          "weight_dtypes": {
+            "input_norm": "f32",
+            "q": "f32",
+            "k": "f32",
+            "v": "f32",
+            "output": "f32",
+            "post_attention_norm": "f32",
+            "gate": "f32",
+            "up": "f32",
+            "down": "f32",
+            "gate_proj": "f32",
+            "q_norm": "f32",
+            "k_norm": "f32"
+          }
+        },
+        "batch_contract": "independent_requests_not_fused_batch_kernel",
+        "subbatches": [
+          {
+            "id": "selected-cpu-request",
+            "request_ids": [
+              "r_cpu"
+            ],
+            "attention_device": "cpu"
+          }
+        ],
+        "entries": [
+          {
+            "kind": "attention_core",
+            "device": "cpu",
+            "phase": "decode",
+            "batch": 1,
+            "tokens": 1,
+            "visible_history": 3,
+            "duration_ns": 1800,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_core",
+            "device": "gpu",
+            "phase": "decode",
+            "batch": 1,
+            "tokens": 1,
+            "visible_history": 3,
+            "duration_ns": 600,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_output",
+            "device": "cpu",
+            "phase": "decode",
+            "batch": 1,
+            "tokens": 1,
+            "visible_history": 3,
+            "duration_ns": 1000,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_output",
+            "device": "gpu",
+            "phase": "decode",
+            "batch": 1,
+            "tokens": 1,
+            "visible_history": 3,
+            "duration_ns": 500,
+            "workspace_bytes": 64
+          }
+        ],
+        "transfer_entries": [
+          {
+            "route": "dram_to_vram",
+            "storage_bytes": 32,
+            "duration_ns": 64
+          },
+          {
+            "route": "dram_to_vram",
+            "storage_bytes": 64,
+            "duration_ns": 128
+          },
+          {
+            "route": "dram_to_vram",
+            "storage_bytes": 128,
+            "duration_ns": 256
+          },
+          {
+            "route": "vram_to_dram",
+            "storage_bytes": 32,
+            "duration_ns": 64
+          },
+          {
+            "route": "vram_to_dram",
+            "storage_bytes": 64,
+            "duration_ns": 128
+          },
+          {
+            "route": "vram_to_dram",
+            "storage_bytes": 128,
+            "duration_ns": 256
+          }
+        ]
+      }
+    }
+  ],
+  "policy": {
+    "placements": {
+      "projection": "gpu",
+      "attention_core": "execution_binding",
+      "attention_output": "gpu",
+      "dense_ffn": "gpu"
+    },
+    "request_placements": {},
+    "experts": {
+      "device_rule": "fixed",
+      "selection_unit": "expert_region"
+    },
+    "release": {
+      "rule": "last_use"
+    }
+  },
+  "cache": {
+    "rule": "none",
+    "unit": "tensor",
+    "budget_bytes": null,
+    "alpha": null,
+    "top_p": null
+  },
+  "prefetch": {
+    "enabled": false,
+    "scope": "none",
+    "lookahead_layers": 0,
+    "max_count": 0,
+    "ranking": "history_frequency",
+    "include_dense_weights": false
+  },
+  "transport": {
+    "rules": [
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      }
+    ],
+    "slot_reuse": "disabled",
+    "boundary_release": "declared_dead_intermediates"
+  },
+  "services_file": null,
+  "environment_file": "steady.environment.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "max_decisions": 1000
+}

@@ -1,0 +1,23 @@
+{
+  "format_version": "m2-schedule-episode-0.1",
+  "id": "moe-generic-prefill-decode",
+  "invocation_files": [
+    "moe-overlap-small-call-0.json",
+    "moe-overlap-small-call-1.json"
+  ],
+  "state_binding": "declared_first_then_previous_state_out",
+  "reusable_cache_capacity_bytes": {
+    "dram": 192,
+    "vram": 192
+  },
+  "placement_mode": "fixed_first_declared",
+  "prefetch_depth": 2,
+  "overlap": true,
+  "baseline_policies": [
+    "serial_lru",
+    "demand_overlap_lru",
+    "prefetch_lru",
+    "prefetch_fifo",
+    "prefetch_farthest"
+  ]
+}

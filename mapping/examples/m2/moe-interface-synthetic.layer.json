@@ -1,0 +1,90 @@
+{
+  "format_version": "m2-layer-0.6",
+  "id": "moe-small",
+  "provenance": "synthetic_layer",
+  "hidden_size": 4,
+  "hidden_bytes_per_token": 16,
+  "kv_bytes_per_token": 16,
+  "attention": "full_causal",
+  "ffn": "moe",
+  "ffn_params": {
+    "experts": 4,
+    "top_k": 2,
+    "expert_weight_bytes": 64,
+    "expert_weights": [
+      "E0",
+      "E1",
+      "E2",
+      "E3"
+    ]
+  },
+  "weights": [
+    {
+      "id": "W_proj",
+      "storage_bytes": 32,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_router",
+      "storage_bytes": 16,
+      "initial_location": "dram"
+    },
+    {
+      "id": "E0",
+      "storage_bytes": 64,
+      "initial_location": "ssd"
+    },
+    {
+      "id": "E1",
+      "storage_bytes": 64,
+      "initial_location": "ssd"
+    },
+    {
+      "id": "E2",
+      "storage_bytes": 64,
+      "initial_location": "ssd"
+    },
+    {
+      "id": "E3",
+      "storage_bytes": 64,
+      "initial_location": "ssd"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "proj",
+      "kind": "projection",
+      "depends_on": [],
+      "weight": "W_proj"
+    },
+    {
+      "id": "attn",
+      "kind": "attention",
+      "depends_on": [
+        "proj"
+      ]
+    },
+    {
+      "id": "router",
+      "kind": "router",
+      "depends_on": [
+        "attn"
+      ],
+      "weight": "W_router"
+    },
+    {
+      "id": "expert",
+      "kind": "expert_ffn",
+      "depends_on": [
+        "router"
+      ]
+    },
+    {
+      "id": "combine",
+      "kind": "combine",
+      "depends_on": [
+        "expert"
+      ]
+    }
+  ]
+}

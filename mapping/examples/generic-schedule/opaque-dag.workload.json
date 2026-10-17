@@ -1,0 +1,151 @@
+{
+  "schema_version": "0.2",
+  "id": "opaque-fork-join",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "generic scheduling protocol"
+  },
+  "tensors": [
+    {
+      "id": "a",
+      "name": "a",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "ssd"
+      ]
+    },
+    {
+      "id": "b",
+      "name": "b",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "ssd"
+      ]
+    },
+    {
+      "id": "u",
+      "name": "u",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "v",
+      "name": "v",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "out",
+      "name": "out",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "alpha",
+      "semantic_op": "RELU",
+      "ggml_op": "UNARY",
+      "unary_op": "RELU",
+      "op_params": [],
+      "inputs": [
+        "a"
+      ],
+      "output": "u"
+    },
+    {
+      "id": "beta",
+      "semantic_op": "RELU",
+      "ggml_op": "UNARY",
+      "unary_op": "RELU",
+      "op_params": [],
+      "inputs": [
+        "b"
+      ],
+      "output": "v"
+    },
+    {
+      "id": "omega",
+      "semantic_op": "ADD",
+      "ggml_op": "ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "u",
+        "v"
+      ],
+      "output": "out"
+    }
+  ],
+  "outputs": [
+    "out"
+  ]
+}

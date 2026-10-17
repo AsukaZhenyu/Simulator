@@ -22,15 +22,16 @@
 入口遇到非零值会**明确拒绝**，而不是静默丢弃或折成一个任意总开销——静默丢弃会让
 算出来的时延偏小，而偏小的数字没有任何提示。
 
-单位边界：旧 API 一律浮点**秒**，内核一律整数**纳秒**，转换只发生在本模块里。
+单位边界：旧 API 一律浮点**秒**，内核一律整数**纳秒**；本桥接使用
+``llm_infer_model.units.seconds_to_ns`` 完成统一转换，并保留旧导入路径。
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 
 from ..model import HardwareSpec, LayerSpec, ModelConfig
+from ..units import seconds_to_ns
 from .spec import (
     ROLE_WEIGHT,
     ComputeCost,
@@ -54,33 +55,6 @@ __all__ = [
 # 写进 ``Costs.source``。M0 只把它当自由字符串，但下游（产物、绘图脚本）靠它
 # 区分「合成固定值」与「来自层级成本模型」，所以这里用模块路径做稳定标识。
 SOURCE_LAYER_COSTS = "llm_infer_model.layer_costs"
-
-_NS_PER_SECOND = 1_000_000_000
-
-
-def seconds_to_ns(seconds: float, what: str) -> int:
-    """把秒换成整数纳秒，拒绝让转换**悄悄地**产出 0 或负数。
-
-    ``round`` 的静默是这里唯一的风险：一个 4e-10 秒的时长会变成 0 ns，而
-    0 ns 的动作在核心里是合法的（不推进时间），于是它会变成一个「这个动作不花
-    时间」的假事实，而不是一个错误。所以取整后非正也要拒绝。
-    """
-    try:
-        value = float(seconds)
-    except (TypeError, ValueError):
-        raise InvalidInput(f"{what}: 不是数值（{seconds!r}）") from None
-    if not math.isfinite(value):
-        raise InvalidInput(f"{what}: 必须是有限值，得到 {value!r}")
-    if value <= 0:
-        raise InvalidInput(f"{what}: 必须为正，得到 {value!r} 秒")
-    nanoseconds = round(value * _NS_PER_SECOND)
-    if nanoseconds <= 0:
-        raise InvalidInput(
-            f"{what}: {value!r} 秒取整到整数纳秒后为 {nanoseconds}，无法表达；"
-            "内核的时间单位是整数纳秒，不接受非正时长"
-        )
-    return nanoseconds
-
 
 def costs_from_layers(
     hardware: HardwareSpec,

@@ -1,0 +1,93 @@
+{
+  "format_version": "block-execution-0.1",
+  "id": "flexgen-layer-major",
+  "provenance": "synthetic_block_template",
+  "generations": 2,
+  "initial_kv_positions": 1,
+  "layers": [
+    {
+      "id": "L0",
+      "weight_storage_bytes": 64,
+      "weight_home": "ssd",
+      "duration_ns": 1000000,
+      "workspace_bytes": 16
+    },
+    {
+      "id": "L1",
+      "weight_storage_bytes": 64,
+      "weight_home": "ssd",
+      "duration_ns": 1000000,
+      "workspace_bytes": 16
+    }
+  ],
+  "microbatches": [
+    {
+      "id": "B0",
+      "hidden_storage_bytes": 16,
+      "kv_storage_bytes": 16
+    },
+    {
+      "id": "B1",
+      "hidden_storage_bytes": 16,
+      "kv_storage_bytes": 16
+    }
+  ],
+  "activation_home": "ssd",
+  "kv_home": "ssd",
+  "order": "layer_major",
+  "weight_release": "after_group",
+  "hardware": {
+    "dram_capacity_bytes": 1024,
+    "vram_capacity_bytes": 256,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 16,
+      "duration_ns": 1000000
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 64,
+      "duration_ns": 2000000
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 16,
+      "duration_ns": 1000000
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 2000000
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 16,
+      "duration_ns": 1000000
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 2000000
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 16,
+      "duration_ns": 1000000
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 64,
+      "duration_ns": 2000000
+    }
+  ]
+}

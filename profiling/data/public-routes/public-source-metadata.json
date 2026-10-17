@@ -1,0 +1,333 @@
+{
+  "dataset": "aswinkumar99/qwen3.8-flash-next-expert-traces",
+  "revision": "fee2af4ea0da212d853d82943dad3897653066a2",
+  "license": "CC-BY-4.0",
+  "model": "RadixArk/Qwen3.8-Flash-Next-NVFP4",
+  "trace_path": "diagnostic/smoke-batched-8way/trace.bin",
+  "source_url": "https://huggingface.co/datasets/aswinkumar99/qwen3.8-flash-next-expert-traces/tree/fee2af4ea0da212d853d82943dad3897653066a2",
+  "publisher_manifest_record": {
+    "batch_size": 8,
+    "bytes_per_decode_token": 307138,
+    "candidate_records": 12784,
+    "candidates_source": "lm_head logits, softmax at T=1, taken after the forward and BEFORE the sampler applies temperature/top_p/top_k; ids are vocabulary ids",
+    "candidates_top_n": 8,
+    "category": "code/systems-cpp (batched 8-way smoke)",
+    "caveats": [
+      "decode_tokens (10,088) is the runner's last live read of the trace before the writer flushed; recorded.decode_tokens (12,784) is the count in the file",
+      "no warm-up: the whole trace is workload; slots_in_use_final 20,498 of 24,576 after 12.8k decode tokens (cold-start misses throughout)",
+      "the 8 prompts of a round share the plan prompt and differ only by a numbered variant line, so the prefix cache serves the shared prefix (TTFT 9.2 s -> 5.5 s in round 1) and the 8 trajectories are closer than the corpus's batched stream will be (050: 8 different plans per round there)",
+      "validate_v3's candidate check pairs rows within req_id (c0072cd); the first run of the validator on this trace paired file-order rows and reported 0.014"
+    ],
+    "decode_tokens": 12784,
+    "engine": "FreeToken 0.1.2 (branch expert-trace-study)",
+    "files": [
+      {
+        "bytes": 2012,
+        "path": "diagnostic/smoke-batched-8way/experiment.json",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      },
+      {
+        "bytes": 10350,
+        "path": "diagnostic/smoke-batched-8way/prompts.jsonl",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      },
+      {
+        "bytes": 5094,
+        "path": "diagnostic/smoke-batched-8way/run.json",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      },
+      {
+        "bytes": 45347,
+        "path": "diagnostic/smoke-batched-8way/server.log",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      },
+      {
+        "bytes": 3926455448,
+        "path": "diagnostic/smoke-batched-8way/trace.bin",
+        "sha256": "e97d6063aee6e4c7e620980193e850e58a6a100998dc0e024a0fcc0be6aabf95",
+        "sha256_match": true,
+        "size_match": true,
+        "verification": "sha256+size"
+      },
+      {
+        "bytes": 9241,
+        "path": "diagnostic/smoke-batched-8way/trace.bin.stats.json",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      },
+      {
+        "bytes": 1830,
+        "path": "diagnostic/smoke-batched-8way/validate_v3.json",
+        "sha256": null,
+        "sha256_match": null,
+        "size_match": true,
+        "verification": "size only (not an LFS object)"
+      }
+    ],
+    "hit_mask_caveat": "all experts resident (--moe-cache-rate 1.0), so the LRU never evicts: every miss is a cold-start first touch, not deployment cache behaviour",
+    "layer_time_records": 14704,
+    "layer_time_slots": 3,
+    "model": "RadixArk/Qwen3.8-Flash-Next-NVFP4",
+    "note": null,
+    "pass": 0,
+    "path": "diagnostic/smoke-batched-8way/",
+    "prefill_rows_with_states": 484,
+    "prefill_state_stride": 4,
+    "prefill_to_decode_ratio": 0.15,
+    "prefill_tokens": 1920,
+    "probes_per_token": 49,
+    "prompt_source": "study task bank (training_100k_plans.json), authored for this project",
+    "prompt_text_included": true,
+    "requests": 16,
+    "run_id": "smoke-batched-8way",
+    "sampling": {
+      "temperature": 0.2,
+      "top_k": -1,
+      "top_p": 1
+    },
+    "sha256": "e97d6063aee6e4c7e620980193e850e58a6a100998dc0e024a0fcc0be6aabf95",
+    "slots_in_use_at_first_workload_token": null,
+    "slots_in_use_final": 20498,
+    "slots_total": 24576,
+    "state_dtype": "bfloat16",
+    "state_layers": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      255
+    ],
+    "state_records": 650132,
+    "stream": "batched",
+    "trace_bytes": 3926455448,
+    "trace_version": 3,
+    "validated": true,
+    "warmup_decode_tokens": null,
+    "warmup_requests": 0
+  },
+  "publisher_run": {
+    "batch_size": 8,
+    "category": "code/systems-cpp",
+    "decode_target_max": 4800,
+    "decode_target_min": 4000,
+    "decode_tokens": 10088,
+    "finished_at": "2026-09-07T12:57:15.451169+00:00",
+    "format": 1,
+    "name": "b01-cpp-ring-threadpool",
+    "pass": 0,
+    "prefill_tokens": 1920,
+    "recorded": {
+      "bytes_per_decode_token": 307138,
+      "bytes_per_recorded_token": 267033,
+      "candidate_records": 12784,
+      "decode_tokens": 12784,
+      "first_workload_token_index": null,
+      "hit_mask_caveat": "all experts resident (--moe-cache-rate 1.0), so the LRU never evicts: every miss is a cold-start first touch, not deployment cache behaviour",
+      "layer_time_records": 14704,
+      "prefill_rows_with_states": 484,
+      "prefill_state_stride": 4,
+      "prefill_to_decode_ratio": 0.15,
+      "prefill_tokens": 1920,
+      "probes_per_token": 49,
+      "slots_in_use_at_first_workload_token": null,
+      "slots_in_use_final": 20498,
+      "slots_total": 24576,
+      "state_dtype": "bfloat16",
+      "state_records": 650132,
+      "trace_bytes": 3926455448,
+      "trace_sha256": "e97d6063aee6e4c7e620980193e850e58a6a100998dc0e024a0fcc0be6aabf95",
+      "trace_version": 3,
+      "warmup_decode_tokens": null,
+      "warmup_requests": 0,
+      "workload_boundary_note": "no warmup.json: the whole trace is workload"
+    },
+    "rounds": [
+      {
+        "decode_added": 2624,
+        "requests": [
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 27.963052602950484,
+            "ttft_s": 9.205073933000676
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 27.96319754200522,
+            "ttft_s": 9.216173409018666
+          },
+          {
+            "chunks": 797,
+            "error": null,
+            "total_s": 27.962134837987833,
+            "ttft_s": 9.215247215004638
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 27.960596336983144,
+            "ttft_s": 9.213866743026301
+          },
+          {
+            "chunks": 797,
+            "error": null,
+            "total_s": 27.959704961976968,
+            "ttft_s": 9.212885667919181
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 27.959064695052803,
+            "ttft_s": 9.211943533970043
+          },
+          {
+            "chunks": 795,
+            "error": null,
+            "total_s": 27.95837103901431,
+            "ttft_s": 9.210945239057764
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 27.957232336048037,
+            "ttft_s": 9.210501472000033
+          }
+        ],
+        "round": 0,
+        "wall_s": 28
+      },
+      {
+        "decode_added": 7464,
+        "requests": [
+          {
+            "chunks": 795,
+            "error": null,
+            "total_s": 23.103818733943626,
+            "ttft_s": 5.540789075894281
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 23.10408490302507,
+            "ttft_s": 5.592741808039136
+          },
+          {
+            "chunks": 798,
+            "error": null,
+            "total_s": 23.103179428027943,
+            "ttft_s": 5.592039982089773
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 23.102775480947457,
+            "ttft_s": 5.592072941944934
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 23.10244818299543,
+            "ttft_s": 5.591576145030558
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 23.10177369590383,
+            "ttft_s": 5.590810828958638
+          },
+          {
+            "chunks": 799,
+            "error": null,
+            "total_s": 23.10113074001856,
+            "ttft_s": 5.590020723058842
+          },
+          {
+            "chunks": 796,
+            "error": null,
+            "total_s": 23.10082994203549,
+            "ttft_s": 5.589507105993107
+          }
+        ],
+        "round": 1,
+        "wall_s": 23.1
+      }
+    ],
+    "sampling": {
+      "temperature": 0.2,
+      "top_k": -1,
+      "top_p": 1
+    },
+    "seed": 621073116,
+    "started_at": "2026-09-07T12:56:20.034303+00:00",
+    "status": "complete",
+    "stream": "batched",
+    "variant": "Constraints for this session: target the oldest language standard the task allows, keep a flat module layout, and model the core data as arrays of records.",
+    "caveats": [
+      "decode_tokens (10,088) is the runner's last live read of the trace before the writer flushed; recorded.decode_tokens (12,784) is the count in the file",
+      "no warm-up: the whole trace is workload; slots_in_use_final 20,498 of 24,576 after 12.8k decode tokens (cold-start misses throughout)",
+      "the 8 prompts of a round share the plan prompt and differ only by a numbered variant line, so the prefix cache serves the shared prefix (TTFT 9.2 s -> 5.5 s in round 1) and the 8 trajectories are closer than the corpus's batched stream will be (050: 8 different plans per round there)",
+      "validate_v3's candidate check pairs rows within req_id (c0072cd); the first run of the validator on this trace paired file-order rows and reported 0.014"
+    ],
+    "decode_tokens_recorded": 12784
+  },
+  "source_format_document": "public-trace-format.md"
+}

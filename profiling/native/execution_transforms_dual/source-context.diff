@@ -1,0 +1,48 @@
+--- frozen_dual_compute.cpp
++++ compute_context.cpp
+@@ -1,3 +1,6 @@
++// Execution-context variant copied from dual compute.cpp SHA256:
++// fd5659470a8c27280bfb9e06f6bcad4bb61d2332314a6e6aa482a9da48ed6834
++// Only isolated GPU-shard profile dispatch context and its evidence differ.
+ // Dual-logical-CPU variant copied from execution_transforms/compute.cpp SHA256:
+ // de455ca3f5963bc9427496cf560c6cc95044eb920bfecc1f575fa221123b1b92
+ // Mathematical graph/reference code is unchanged; only affinity and its metadata differ.
+@@ -137,6 +140,7 @@
+     std::map<std::string,std::pair<size_t,std::string>> ports;
+     std::map<std::string,int64_t> diagnostic;
+     uint64_t observed_worker_mask=0,observed_worker_group=0;
++    uint64_t observed_gpu_profile_mask=0,observed_gpu_profile_group=0;
+     void inventory(const std::string&prefix,const Session&s,const Data&data){
+         for(auto&p:s.graphs)workspace[prefix+p.first]={p.second->internal+p.second->work.size(),s.gpu};
+         for(auto&p:s.ports)ports[prefix+p.first]={ggml_nbytes(p.second),digest(data.at(p.first))};
+@@ -156,7 +160,19 @@
+     HostTransfer transfer(maxbytes);Worker worker(o.device,t.dispatch_cpu_id);
+     for(auto name:{"gate","up","activation","down"}){
+         times["cpu/shard_"+std::string(name)]=measure(o,[&](){cpu.compute(name);});
+-        times["gpu/shard_"+std::string(name)]=measure(o,[&](){gpu.compute(name);});
++        std::vector<int64_t> worker_samples;
++        worker.start([&](){
++#if defined(_WIN32)
++            GROUP_AFFINITY profile_affinity{};
++            if(!GetThreadGroupAffinity(GetCurrentThread(),&profile_affinity) || profile_affinity.Group!=0 || profile_affinity.Mask!=(DWORD_PTR(1)<<t.dispatch_cpu_id))throw std::runtime_error("GPU-shard profile dispatch affinity readback differs");
++            result.observed_gpu_profile_mask=profile_affinity.Mask;result.observed_gpu_profile_group=profile_affinity.Group;
++#else
++            throw std::runtime_error("GPU-shard profile affinity unavailable on this OS");
++#endif
++            worker_samples=measure(o,[&](){gpu.compute(name);});
++        });
++        worker.wait();
++        times["gpu/shard_"+std::string(name)]=std::move(worker_samples);
+         times["gpu/full_"+std::string(name)]=measure(o,[&](){all.compute(name);});
+     }
+     auto copy_shard=[&](){transfer.d2h(gpu.ports.at("output"),partial->data);};
+@@ -249,6 +265,9 @@
+     std::cout<<",\"observed_affinity\":{\"process_mask\":"<<t.observed_process_mask<<",\"main_thread_mask\":"<<t.observed_main_mask<<",\"main_thread_group\":"<<t.observed_main_group<<",\"dispatch_worker_created\":"<<(o.family=="ffn"?"true":"false")<<",\"dispatch_thread_mask\":";
+     if(o.family=="ffn")std::cout<<r.observed_worker_mask;else std::cout<<"null";
+     std::cout<<",\"dispatch_thread_group\":";if(o.family=="ffn")std::cout<<r.observed_worker_group;else std::cout<<"null";std::cout<<'}';
++    std::cout<<",\"profile_gpu_shard_thread\":\""<<(o.family=="ffn"?"dispatch_worker_same_as_parallel_strategy":"not_applicable_attention_has_no_shard")<<"\",\"profile_gpu_shard_affinity_mask\":";
++    if(o.family=="ffn")std::cout<<r.observed_gpu_profile_mask;else std::cout<<"null";
++    std::cout<<",\"profile_gpu_shard_affinity_group\":";if(o.family=="ffn")std::cout<<r.observed_gpu_profile_group;else std::cout<<"null";
+     std::cout<<",\"matmul_precision\":\"GGML_PREC_F32_explicit\",\"nvidia_tf32_override\":";
+     if(!tf32)std::cout<<"null";else if(std::string(tf32)=="0"||std::string(tf32)=="1")std::cout<<'"'<<tf32<<'"';else std::cout<<"\"unrecognized\"";
+     std::cout<<",\"all_checks_passed\":"<<(passed?"true":"false")<<",\"gpu_capacity_proved\":false,\"control_overhead_separately_identified\":false}\n";return passed?0:2;

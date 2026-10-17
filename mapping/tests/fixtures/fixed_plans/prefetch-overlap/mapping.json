@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.2",
+  "scenario_id": "prefetch-overlap",
+  "workload_fingerprint": "a290a2d03ece59957eecd9c2d91b5383c13edfbc2b058a1f9ff8c46cc72be880",
+  "scenario_fingerprint": "c937969fdded00892798705b71fdd9d427e1af23dba4a1c88b3bc97919bf88e5",
+  "actions": [
+    {
+      "kind": "COMPUTE",
+      "operation_id": "layer0",
+      "device": "gpu"
+    },
+    {
+      "kind": "COPY",
+      "tensor_id": "W:L1",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "ADVANCE"
+    },
+    {
+      "kind": "ADVANCE"
+    },
+    {
+      "kind": "EVICT",
+      "tensor_id": "W:L0",
+      "location": "vram"
+    },
+    {
+      "kind": "COMPUTE",
+      "operation_id": "layer1",
+      "device": "gpu"
+    },
+    {
+      "kind": "ADVANCE"
+    }
+  ],
+  "comment": "Hand-declared fixed plan; no search/optimality or real-performance claim."
+}

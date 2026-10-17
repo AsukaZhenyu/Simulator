@@ -1,0 +1,22 @@
+.measurement.lock
+/native/build/
+/native/build-cpu/
+/native/build-error/
+/native/build-error-warm/
+/native/build-error-single/
+/native/build-gpu/
+/native/build-gpu-memory/
+/native/build-moe-cpu/
+/native/build-moe-cpu-v2/
+/native/execution_transforms/build-local/
+/native/execution_transforms_dual/build-local/
+
+# Measurement results stay local. Small redistributable inputs live in data/.
+results/
+**/results/
+**/build-*/
+**/build-local/
+# Generated workstation-specific build identity, not reusable source inputs.
+/native/**/source-provenance.json
+/native/**/source-context-provenance.json
+/reconfiguration/allocator-build.json

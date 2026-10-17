@@ -1,0 +1,14 @@
+{
+  "format_version": "paper-strategy-0.1",
+  "id": "hybrimoe-mechanism",
+  "paper": "hybrimoe",
+  "invocation_files": [
+    "moe.invocation.json"
+  ],
+  "environment_file": "../causal/no-disturbance.environment.json",
+  "execution_file": "rows.execution.json",
+  "policy_file": "hybrimoe.policy.json",
+  "history_file": null,
+  "routing_scores_file": "router.scores.json",
+  "max_decisions": 400
+}

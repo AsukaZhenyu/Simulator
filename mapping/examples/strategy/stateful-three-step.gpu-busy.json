@@ -1,0 +1,208 @@
+{
+  "schema_version": "0.2",
+  "id": "stateful-three-step",
+  "architecture": {
+    "dram_capacity_bytes": 512,
+    "vram_capacity_bytes": 256,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 80,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {
+    "output_locations": {
+      "hidden:L1:s0": "dram",
+      "kv:L0:s0:v1": "dram",
+      "kv:L1:s0:v1": "dram",
+      "hidden:L1:s1": "dram",
+      "kv:L0:s1:v2": "dram",
+      "kv:L1:s1:v2": "dram",
+      "hidden:L1:s2": "dram",
+      "kv:L0:s2:v3": "dram",
+      "kv:L1:s2:v3": "dram"
+    }
+  },
+  "costs": {
+    "source": "synthetic_strategy_ir_fixture_gpu_busy",
+    "compute": {
+      "L0:hidden:s0": {
+        "cpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L0:kv:s0": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:hidden:s0": {
+        "gpu": {
+          "duration_ns": 6000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:kv:s0": {
+        "gpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L0:hidden:s1": {
+        "cpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L0:kv:s1": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:hidden:s1": {
+        "gpu": {
+          "duration_ns": 6000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:kv:s1": {
+        "gpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L0:hidden:s2": {
+        "cpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L0:kv:s2": {
+        "cpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:hidden:s2": {
+        "gpu": {
+          "duration_ns": 6000000,
+          "workspace_bytes": 16
+        }
+      },
+      "L1:kv:s2": {
+        "gpu": {
+          "duration_ns": 2000000,
+          "workspace_bytes": 16
+        }
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {
+        "hidden:L0:s0": {
+          "duration_ns": 1000000
+        },
+        "hidden:L0:s1": {
+          "duration_ns": 1000000
+        },
+        "hidden:L0:s2": {
+          "duration_ns": 1000000
+        }
+      },
+      "vram_to_dram": {
+        "hidden:L1:s0": {
+          "duration_ns": 1000000
+        },
+        "kv:L1:s0:v1": {
+          "duration_ns": 1000000
+        },
+        "hidden:L1:s1": {
+          "duration_ns": 1000000
+        },
+        "kv:L1:s1:v2": {
+          "duration_ns": 1000000
+        },
+        "hidden:L1:s2": {
+          "duration_ns": 1000000
+        },
+        "kv:L1:s2:v3": {
+          "duration_ns": 1000000
+        }
+      },
+      "ssd_to_dram": {},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "L0:hidden:s0": [
+        "cpu"
+      ],
+      "L0:kv:s0": [
+        "cpu"
+      ],
+      "L1:hidden:s0": [
+        "gpu"
+      ],
+      "L1:kv:s0": [
+        "gpu"
+      ],
+      "L0:hidden:s1": [
+        "cpu"
+      ],
+      "L0:kv:s1": [
+        "cpu"
+      ],
+      "L1:hidden:s1": [
+        "gpu"
+      ],
+      "L1:kv:s1": [
+        "gpu"
+      ],
+      "L0:hidden:s2": [
+        "cpu"
+      ],
+      "L0:kv:s2": [
+        "cpu"
+      ],
+      "L1:hidden:s2": [
+        "gpu"
+      ],
+      "L1:kv:s2": [
+        "gpu"
+      ]
+    },
+    "allowed_transfers": {
+      "dram_to_vram": [
+        "hidden:L0:s0",
+        "hidden:L0:s1",
+        "hidden:L0:s2"
+      ],
+      "vram_to_dram": [
+        "hidden:L1:s0",
+        "kv:L1:s0:v1",
+        "hidden:L1:s1",
+        "kv:L1:s1:v2",
+        "hidden:L1:s2",
+        "kv:L1:s2:v3"
+      ],
+      "ssd_to_dram": [],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  },
+  "workload_file": "stateful-three-step.graph.json"
+}

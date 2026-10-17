@@ -1,0 +1,10 @@
+{
+  "format_version": "causal-strategy-0.1",
+  "id": "warm-cache-pressure",
+  "invocation_file": "warm-cache.invocation.json",
+  "environment_file": "../causal/no-disturbance.environment.json",
+  "execution_file": "rows.execution.json",
+  "policy_file": "warm-cache.policy.json",
+  "history_file": null,
+  "max_decisions": 250
+}

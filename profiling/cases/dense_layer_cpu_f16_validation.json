@@ -1,0 +1,134 @@
+{
+  "schema_version": "dense_layer_measurement_suite_v1",
+  "comment": "Native numerical validation only: CPU B1, F16 matrix weights/F32 gamma and activations/KV, disabled attention gate and QK normalization, existing history. Hidden H=12 differs from heads*D=16. Four complete stages at the same explicit prefill q3/history2 shape; generated tensors, not original pretrained model contents.",
+  "cases": [
+    {
+      "id": "f16_no_optional_projection_prefill_q3_h2",
+      "kind": "projection",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 2,
+      "config": {
+        "hidden": 12,
+        "intermediate": 24,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "none",
+        "qk_norm": "none",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.00001,
+        "weight_dtypes": {
+          "input_norm": "f32",
+          "q": "f16",
+          "k": "f16",
+          "v": "f16",
+          "output": "f16",
+          "post_attention_norm": "f32",
+          "gate": "f16",
+          "up": "f16",
+          "down": "f16"
+        }
+      }
+    },
+    {
+      "id": "f16_no_optional_attention_prefill_q3_h2",
+      "kind": "attention",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 2,
+      "config": {
+        "hidden": 12,
+        "intermediate": 24,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "none",
+        "qk_norm": "none",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.00001,
+        "weight_dtypes": {
+          "input_norm": "f32",
+          "q": "f16",
+          "k": "f16",
+          "v": "f16",
+          "output": "f16",
+          "post_attention_norm": "f32",
+          "gate": "f16",
+          "up": "f16",
+          "down": "f16"
+        }
+      }
+    },
+    {
+      "id": "f16_no_optional_dense_ffn_prefill_q3_h2",
+      "kind": "dense_ffn",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 2,
+      "config": {
+        "hidden": 12,
+        "intermediate": 24,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "none",
+        "qk_norm": "none",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.00001,
+        "weight_dtypes": {
+          "input_norm": "f32",
+          "q": "f16",
+          "k": "f16",
+          "v": "f16",
+          "output": "f16",
+          "post_attention_norm": "f32",
+          "gate": "f16",
+          "up": "f16",
+          "down": "f16"
+        }
+      }
+    },
+    {
+      "id": "f16_no_optional_block_prefill_q3_h2",
+      "kind": "block",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 2,
+      "config": {
+        "hidden": 12,
+        "intermediate": 24,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "none",
+        "qk_norm": "none",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.00001,
+        "weight_dtypes": {
+          "input_norm": "f32",
+          "q": "f16",
+          "k": "f16",
+          "v": "f16",
+          "output": "f16",
+          "post_attention_norm": "f32",
+          "gate": "f16",
+          "up": "f16",
+          "down": "f16"
+        }
+      }
+    }
+  ]
+}

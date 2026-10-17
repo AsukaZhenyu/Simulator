@@ -1,0 +1,113 @@
+{
+  "format_version": "m2-layer-0.6",
+  "id": "moe-prefill",
+  "layer": "moe-small",
+  "layer_file": "../m2/moe-interface-synthetic.layer.json",
+  "costs_file": "../m2/moe-interface-synthetic.costs.json",
+  "phase": "prefill",
+  "devices": [
+    "cpu",
+    "gpu"
+  ],
+  "route_trace": [
+    {
+      "request_id": "r0",
+      "layer_id": "moe-small",
+      "absolute_position": 0,
+      "expert_ids": [
+        0,
+        1
+      ]
+    },
+    {
+      "request_id": "r0",
+      "layer_id": "moe-small",
+      "absolute_position": 1,
+      "expert_ids": [
+        1,
+        2
+      ]
+    }
+  ],
+  "route_source": "synthetic_exact_top_k_fixture",
+  "information_mode": "causal_replay",
+  "hardware": {
+    "dram_capacity_bytes": 4096,
+    "vram_capacity_bytes": 4096,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 0,
+      "tokens": 2,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 0,
+        "version": 1,
+        "state_location": "dram",
+        "blocks": []
+      }
+    ],
+    "weight_copies": [
+      {
+        "id": "W_proj",
+        "version": 1,
+        "storage_bytes": 32,
+        "locations": [
+          "dram"
+        ]
+      },
+      {
+        "id": "W_router",
+        "version": 1,
+        "storage_bytes": 16,
+        "locations": [
+          "dram"
+        ]
+      },
+      {
+        "id": "E0",
+        "version": 1,
+        "storage_bytes": 64,
+        "locations": [
+          "ssd",
+          "vram"
+        ]
+      },
+      {
+        "id": "E1",
+        "version": 1,
+        "storage_bytes": 64,
+        "locations": [
+          "ssd"
+        ]
+      },
+      {
+        "id": "E2",
+        "version": 1,
+        "storage_bytes": 64,
+        "locations": [
+          "ssd"
+        ]
+      },
+      {
+        "id": "E3",
+        "version": 1,
+        "storage_bytes": 64,
+        "locations": [
+          "ssd"
+        ]
+      }
+    ]
+  }
+}

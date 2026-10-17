@@ -1,0 +1,624 @@
+{
+  "format_version": "ffn-execution-0.1",
+  "target_kinds": [
+    "dense_ffn"
+  ],
+  "intermediate_size": 32,
+  "shards": [
+    {
+      "id": "host",
+      "start": 0,
+      "end": 8,
+      "device": "cpu"
+    },
+    {
+      "id": "accelerator",
+      "start": 8,
+      "end": 32,
+      "device": "gpu"
+    }
+  ],
+  "merge_input_count": 2,
+  "preprocess_device": "gpu",
+  "merge_device": "gpu",
+  "provenance": "synthetic_execution",
+  "weight_storage_contract": "materialized_partition_replaces_parent",
+  "entries": [
+    {
+      "kind": "ffn_down",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 37,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_down",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 38,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_down",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 39,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_down",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 40,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_down",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 41,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_down",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 42,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 43,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 44,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 45,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 46,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 47,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 48,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 49,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 50,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 51,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 52,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 53,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_norm",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 54,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 55,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 56,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 57,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 58,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 59,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 60,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 61,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 62,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 63,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 64,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 65,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 66,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 67,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 68,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 69,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 70,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 71,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 72,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 73,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 74,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 75,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 76,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 77,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "ffn_up",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 78,
+      "workspace_bytes": 4
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 1536,
+      "duration_ns": 15360
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 1536,
+      "duration_ns": 15360
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 32,
+      "duration_ns": 320
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 640
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 96,
+      "duration_ns": 960
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 512,
+      "duration_ns": 5120
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 1536,
+      "duration_ns": 15360
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 2048,
+      "duration_ns": 20480
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 32,
+      "duration_ns": 320
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 64,
+      "duration_ns": 640
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 96,
+      "duration_ns": 960
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 128,
+      "duration_ns": 1280
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 512,
+      "duration_ns": 5120
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 1536,
+      "duration_ns": 15360
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 2048,
+      "duration_ns": 20480
+    }
+  ]
+}

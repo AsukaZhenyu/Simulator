@@ -1,0 +1,49 @@
+{
+  "format_version": "m2-layer-0.1",
+  "id": "fcd",
+  "provenance": "synthetic_layer",
+  "hidden_size": 4,
+  "hidden_bytes_per_token": 16,
+  "kv_bytes_per_token": 16,
+  "attention": "full_causal",
+  "ffn": "dense",
+  "weights": [
+    {
+      "id": "W_proj",
+      "name": "W_proj",
+      "storage_bytes": 64,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_ffn",
+      "name": "W_ffn",
+      "storage_bytes": 64,
+      "initial_location": "dram"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "projection",
+      "kind": "projection",
+      "depends_on": [],
+      "weight": "W_proj"
+    },
+    {
+      "id": "attention",
+      "kind": "attention",
+      "depends_on": [
+        "projection"
+      ]
+    },
+    {
+      "id": "dense_ffn",
+      "kind": "dense_ffn",
+      "depends_on": [
+        "attention"
+      ],
+      "weight": "W_ffn"
+    }
+  ],
+  "workspace_bytes": 0,
+  "comment": "full_causal + dense 单层。hidden=4 个 f32 = 16 B/token，KV 16 B/token——只有 KV 那个数字是验收 §1 钉死的（48 B/64 B 两块账都由它推出），hidden 与权重的大小是本 fixture 的合成选择。任务图就是验收 §2 的三段链 projection -> attention -> dense_ffn，attention 不读权重（它读历史 KV），所以那份依赖在展开后才看得见。"
+}

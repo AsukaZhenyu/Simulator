@@ -1,0 +1,292 @@
+{
+  "format_version": "ffn-execution-0.1",
+  "target_kinds": [
+    "dense_ffn"
+  ],
+  "intermediate_size": 32,
+  "shards": [
+    {
+      "id": "host",
+      "start": 0,
+      "end": 8,
+      "device": "cpu"
+    },
+    {
+      "id": "accelerator",
+      "start": 8,
+      "end": 32,
+      "device": "gpu"
+    }
+  ],
+  "merge_input_count": 2,
+  "preprocess_device": "gpu",
+  "merge_device": "gpu",
+  "provenance": "synthetic_execution",
+  "weight_storage_contract": "materialized_partition_replaces_parent",
+  "entries": [
+    {
+      "kind": "ffn_norm",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 31,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 59,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_gate",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 53,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_up",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 61,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_up",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 47,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 19,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_swiglu",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 17,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_down",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 8,
+      "duration_ns": 67,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_down",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 24,
+      "duration_ns": 57,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_sum",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 23,
+      "workspace_bytes": 16
+    },
+    {
+      "kind": "ffn_residual",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden_size": 16,
+      "intermediate_size": 32,
+      "duration_ns": 13,
+      "workspace_bytes": 16
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 4,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 12,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 16,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 32,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 64,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 96,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 144,
+      "duration_ns": 17
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 192,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 288,
+      "duration_ns": 23
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 512,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 1024,
+      "duration_ns": 10
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 1536,
+      "duration_ns": 31
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 2048,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 4,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 12,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 16,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 32,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 96,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 144,
+      "duration_ns": 17
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 192,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 288,
+      "duration_ns": 23
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 512,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 1024,
+      "duration_ns": 10
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 1536,
+      "duration_ns": 31
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 2048,
+      "duration_ns": 10
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "format_version": "environment-trace-0.2",
+  "events": [
+    {
+      "t_ns": 3500,
+      "cpu_available": false
+    },
+    {
+      "t_ns": 3600,
+      "cpu_available": true
+    },
+    {
+      "t_ns": 16000,
+      "vram_external_bytes": 0
+    }
+  ],
+  "requests": [
+    {
+      "id": "m2-external-app",
+      "domain": "vram",
+      "t_notice_ns": 3400,
+      "target_external_bytes": 1046000,
+      "deadline_ns": 14000
+    }
+  ],
+  "control_costs": {
+    "ack_ns": 3,
+    "decline_ns": 1,
+    "decision_ns": 2,
+    "source": "synthetic_control_cost_not_hardware_measured",
+    "timing_scope": "dedicated_serial_control_resource"
+  }
+}

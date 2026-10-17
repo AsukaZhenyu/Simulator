@@ -1,0 +1,18 @@
+{
+  "format_version": "global-execution-0.1",
+  "id": "moe-execution-transform-example",
+  "rounds": [
+    {
+      "id": "prefill",
+      "input_mode": "initial_supplied_hidden",
+      "gate_cost": null,
+      "invocations": [
+        {
+          "id": "moe-prefill",
+          "invocation_file": "moe.prefill.json",
+          "execution_file": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "format_version": "reconfiguration-measurement-suite-0.1",
+  "ffn_suite": {
+    "format_version": "matched-mechanisms-suite-0.1",
+    "cases": [
+      {"id": "ffn-h64-i128-t1", "family": "ffn", "backend": "hybrid", "hidden": 64, "intermediate": 128, "tokens": 1, "history": 0, "heads": 0, "kv_heads": 0, "head_dim": 0, "dtype": "f32"},
+      {"id": "ffn-h256-i512-t1", "family": "ffn", "backend": "hybrid", "hidden": 256, "intermediate": 512, "tokens": 1, "history": 0, "heads": 0, "kv_heads": 0, "head_dim": 0, "dtype": "f32"}
+    ],
+    "compute_protocol": {"threads": 1, "cpu_id": 0, "device": 0, "warmup": 10, "samples": 30, "min_warmup_ms": 50, "cuda_graphs": "disabled"},
+    "transfers": [],
+    "profile_seeds": [17],
+    "heldout_seeds": [29],
+    "repeats": 2,
+    "quality": {"max_within_process_cv": 0.15, "max_between_process_cv": 0.2, "max_heldout_relative_error": 0.2},
+    "bootstrap": {"iterations": 1000, "seed": 7}
+  },
+  "allocator_cases": [
+    {"id": "weights-98304", "bytes": 98304, "device": 0, "warmup": 3, "samples": 30, "seed": 17},
+    {"id": "weights-1572864", "bytes": 1572864, "device": 0, "warmup": 3, "samples": 30, "seed": 29}
+  ],
+  "allocator_repeats": 2,
+  "run_context": "normal shared desktop; parallel agent coding and tests may occur; no user applications, clocks, or services changed; no exclusive-device guarantee"
+}

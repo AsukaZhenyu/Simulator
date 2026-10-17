@@ -1,0 +1,183 @@
+{
+  "format_version": "m2-layer-0.3",
+  "id": "dense-block-f16",
+  "provenance": "synthetic_layer",
+  "hidden_size": 12,
+  "hidden_bytes_per_token": 48,
+  "kv_bytes_per_token": 64,
+  "attention": "full_causal",
+  "ffn": "dense",
+  "weights": [
+    {
+      "id": "W_input_norm",
+      "name": "W_input_norm",
+      "dtype": "f32",
+      "shape": [
+        12
+      ],
+      "storage_bytes": 48,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_q",
+      "name": "W_q",
+      "dtype": "f16",
+      "shape": [
+        12,
+        16
+      ],
+      "storage_bytes": 384,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_k",
+      "name": "W_k",
+      "dtype": "f16",
+      "shape": [
+        12,
+        8
+      ],
+      "storage_bytes": 192,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_v",
+      "name": "W_v",
+      "dtype": "f16",
+      "shape": [
+        12,
+        8
+      ],
+      "storage_bytes": 192,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_output",
+      "name": "W_output",
+      "dtype": "f16",
+      "shape": [
+        16,
+        12
+      ],
+      "storage_bytes": 384,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_post_attention_norm",
+      "name": "W_post_attention_norm",
+      "dtype": "f32",
+      "shape": [
+        12
+      ],
+      "storage_bytes": 48,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_gate",
+      "name": "W_gate",
+      "dtype": "f16",
+      "shape": [
+        12,
+        24
+      ],
+      "storage_bytes": 576,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_up",
+      "name": "W_up",
+      "dtype": "f16",
+      "shape": [
+        12,
+        24
+      ],
+      "storage_bytes": 576,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_down",
+      "name": "W_down",
+      "dtype": "f16",
+      "shape": [
+        24,
+        12
+      ],
+      "storage_bytes": 576,
+      "initial_location": "dram"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "proj",
+      "kind": "projection",
+      "depends_on": []
+    },
+    {
+      "id": "attn",
+      "kind": "attention",
+      "depends_on": [
+        "proj"
+      ]
+    },
+    {
+      "id": "ffn",
+      "kind": "dense_ffn",
+      "depends_on": [
+        "attn"
+      ]
+    }
+  ],
+  "physical": {
+    "contract": "ggml_cpu_dense_decoder_block_v1",
+    "scope": "complete_declared_decoder_block",
+    "input_boundary": "hidden_activation",
+    "port_layout": "materialized_stage_ports",
+    "kv_allocation": "logical_blocks",
+    "activation_dtype": "f32",
+    "kv_dtype": "f32",
+    "config": {
+      "hidden": 12,
+      "intermediate": 24,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 4,
+      "rope_dims": 4,
+      "attention_gate": "none",
+      "qk_norm": "none",
+      "rope_mode": "normal",
+      "rope_base": 10000.0,
+      "norm_epsilon": 9.999999747378752e-06,
+      "weight_dtypes": {
+        "input_norm": "f32",
+        "q": "f16",
+        "k": "f16",
+        "v": "f16",
+        "output": "f16",
+        "post_attention_norm": "f32",
+        "gate": "f16",
+        "up": "f16",
+        "down": "f16"
+      }
+    },
+    "threads": 2,
+    "weight_groups": {
+      "projection": {
+        "input_norm": "W_input_norm",
+        "q": "W_q",
+        "k": "W_k",
+        "v": "W_v"
+      },
+      "attention": {
+        "output": "W_output"
+      },
+      "dense_ffn": {
+        "post_attention_norm": "W_post_attention_norm",
+        "gate": "W_gate",
+        "up": "W_up",
+        "down": "W_down"
+      }
+    },
+    "excluded_operations": []
+  },
+  "comment": "CPU B=1 declared decoder variant, deterministic generated weights/inputs; geometry source: profiling/cases/dense_layer_cpu_f16_validation.json. Three separately materialized stages. Not the original pretrained model execution path."
+}

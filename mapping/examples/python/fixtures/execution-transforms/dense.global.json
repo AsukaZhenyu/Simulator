@@ -1,0 +1,18 @@
+{
+  "format_version": "global-execution-0.1",
+  "id": "dense-execution-transform-example",
+  "rounds": [
+    {
+      "id": "decode",
+      "input_mode": "initial_supplied_hidden",
+      "gate_cost": null,
+      "invocations": [
+        {
+          "id": "dense-decode",
+          "invocation_file": "../../../m2/hybrid-interface-synthetic-decode-1.json",
+          "execution_file": null
+        }
+      ]
+    }
+  ]
+}

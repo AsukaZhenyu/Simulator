@@ -1,0 +1,136 @@
+{
+  "format_version": "strategy-ir-0.1",
+  "id": "m2-hybrid-prefill",
+  "scenario_file": "../m2/hybrid-interface-synthetic-prefill-3.json",
+  "information_mode": "offline_fixed",
+  "regions": [
+    {
+      "id": "dense-layer",
+      "kind": "dense_macro_package",
+      "members": [
+        "op:hybrid-interface-synthetic:r0:proj",
+        "op:hybrid-interface-synthetic:r0:attn",
+        "op:hybrid-interface-synthetic:r0:ffn"
+      ]
+    }
+  ],
+  "placements": {
+    "op:hybrid-interface-synthetic:r0:proj": "cpu",
+    "op:hybrid-interface-synthetic:r0:attn": "gpu",
+    "op:hybrid-interface-synthetic:r0:ffn": "cpu"
+  },
+  "program": [
+    {
+      "kind": "compute",
+      "operation_id": "op:hybrid-interface-synthetic:r0:proj"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "w:hybrid-interface-synthetic:W_output",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:proj.q",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:proj.k",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:proj.v",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:proj.gate",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:in.hidden",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:hybrid-interface-synthetic:r0:attn"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "t:hybrid-interface-synthetic:r0:attn",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:hybrid-interface-synthetic:r0:ffn"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:hybrid-interface-synthetic:r0:0",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:hybrid-interface-synthetic:r0:1",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:hybrid-interface-synthetic:r0:2",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    }
+  ],
+  "device_states": {}
+}

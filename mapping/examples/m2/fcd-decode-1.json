@@ -1,0 +1,68 @@
+{
+  "format_version": "m2-layer-0.1",
+  "id": "fcd-decode-1",
+  "layer": "fcd",
+  "layer_file": "fcd.layer.json",
+  "costs_file": "fcd.costs.json",
+  "phase": "decode",
+  "devices": [
+    "cpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 4096,
+    "vram_capacity_bytes": 4096,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 3,
+      "tokens": 1,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 3,
+        "version": 2,
+        "state_location": "dram",
+        "blocks": [
+          {
+            "id": "kv:fcd:r0:0",
+            "first_position": 0,
+            "tokens": 1,
+            "storage_bytes": 16,
+            "locations": [
+              "dram"
+            ]
+          },
+          {
+            "id": "kv:fcd:r0:1",
+            "first_position": 1,
+            "tokens": 1,
+            "storage_bytes": 16,
+            "locations": [
+              "dram"
+            ]
+          },
+          {
+            "id": "kv:fcd:r0:2",
+            "first_position": 2,
+            "tokens": 1,
+            "storage_bytes": 16,
+            "locations": [
+              "dram"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "comment": "第二次调用：state_in 就是 fcd-prefill-3 的 state_out——块名、首位置、字节数与副本位置都原样接过来（test_m2 里有一条断言逐字段比这两份文档）。position_start=3 必须等于 next_position=3。这次追加的是第 4 块 kv:fcd:r0:3，前三块是叶子、没有生产者，所以「把 48 B 整份重写」在内核里是结构上做不到的。"
+}

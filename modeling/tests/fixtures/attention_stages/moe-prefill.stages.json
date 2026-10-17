@@ -1,0 +1,282 @@
+{
+  "format_version": "attention-stages-0.1",
+  "variant": "qk_softmax_pv",
+  "provenance": "synthetic_execution",
+  "geometry": {
+    "hidden": 4,
+    "heads": 2,
+    "kv_heads": 1,
+    "head_dim": 2,
+    "attention_gate": "none"
+  },
+  "frontend": {
+    "contract": "synthetic_f32_qkv_rope_output_pack_v1",
+    "weight_id": "W_proj",
+    "rope_dims": 2,
+    "rope_base": 10000.0
+  },
+  "entries": [
+    {
+      "kind": "attention_output",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_output",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 101,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_projection",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 110,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_projection",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 111,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_pv",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 120,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_pv",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 121,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_qk",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 130,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_qk",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 131,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_softmax",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 140,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_softmax",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 141,
+      "workspace_bytes": 4
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 4,
+      "duration_ns": 5
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 96,
+      "duration_ns": 97
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 512,
+      "duration_ns": 513
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 1024,
+      "duration_ns": 1025
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 4,
+      "duration_ns": 5
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 96,
+      "duration_ns": 97
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 512,
+      "duration_ns": 513
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 1024,
+      "duration_ns": 1025
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 4,
+      "duration_ns": 5
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 96,
+      "duration_ns": 97
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 512,
+      "duration_ns": 513
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 1024,
+      "duration_ns": 1025
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 4,
+      "duration_ns": 5
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 96,
+      "duration_ns": 97
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 512,
+      "duration_ns": 513
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 1024,
+      "duration_ns": 1025
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "format_version": "strategy-ir-0.1",
+  "id": "ssd-prefetch",
+  "scenario_file": "ssd-prefetch.scenario.json",
+  "information_mode": "offline_fixed",
+  "regions": [
+    {
+      "id": "two-layer-package",
+      "kind": "demonstration_package",
+      "members": [
+        "layer0",
+        "layer1"
+      ]
+    }
+  ],
+  "placements": {
+    "layer0": "gpu",
+    "layer1": "gpu"
+  },
+  "program": [
+    {
+      "kind": "compute",
+      "operation_id": "layer0"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "W:L1",
+      "src": "ssd",
+      "dst": "vram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "layer0"
+      ],
+      "copies": [
+        {
+          "tensor_id": "W:L1",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "release",
+      "tensor_id": "W:L0",
+      "location": "vram"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "layer1"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "layer1"
+      ],
+      "copies": []
+    }
+  ],
+  "device_states": {}
+}

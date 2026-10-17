@@ -1,0 +1,69 @@
+{
+  "format_version": "m2-layer-0.5",
+  "id": "neo-r_gpu0",
+  "layer": "hybrid-interface-synthetic",
+  "layer_file": "../m2/hybrid-interface-synthetic.layer.json",
+  "costs_file": "../m2/hybrid-interface-synthetic.costs.json",
+  "phase": "decode",
+  "devices": [
+    "cpu",
+    "gpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 1048576,
+    "vram_capacity_bytes": 1048576,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r_gpu0",
+      "position_start": 3,
+      "tokens": 1,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r_gpu0",
+        "next_position": 3,
+        "version": 2,
+        "state_location": "vram",
+        "blocks": [
+          {
+            "id": "kv:hybrid-interface-synthetic:r_gpu0:0",
+            "first_position": 0,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          },
+          {
+            "id": "kv:hybrid-interface-synthetic:r_gpu0:1",
+            "first_position": 1,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          },
+          {
+            "id": "kv:hybrid-interface-synthetic:r_gpu0:2",
+            "first_position": 2,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "comment": "state_in is the exact output of the synthetic CPU/GPU/CPU prefill; both actual KV copies are retained."
+}

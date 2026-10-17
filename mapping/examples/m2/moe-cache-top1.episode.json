@@ -1,0 +1,24 @@
+{
+  "format_version": "m2-moe-cache-episode-0.1",
+  "id": "moe-cache-top1-five-calls",
+  "invocation_files": [
+    "moe-cache-top1-call-0.json",
+    "moe-cache-top1-call-1.json",
+    "moe-cache-top1-call-2.json",
+    "moe-cache-top1-call-3.json",
+    "moe-cache-top1-call-4.json"
+  ],
+  "state_binding": "declared_first_then_previous_state_out",
+  "expert_cache_capacity_bytes": {
+    "dram": 128,
+    "vram": 128
+  },
+  "placement_mode": "fixed_first_declared",
+  "baseline_policies": [
+    "keep_all",
+    "drop_all",
+    "lru",
+    "fifo",
+    "offline_farthest"
+  ]
+}

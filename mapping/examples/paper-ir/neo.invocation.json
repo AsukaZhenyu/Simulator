@@ -1,0 +1,69 @@
+{
+  "format_version": "m2-layer-0.5",
+  "id": "neo-selected-cpu-request-decode-branch",
+  "layer": "hybrid-interface-synthetic",
+  "layer_file": "neo.layer.json",
+  "costs_file": "../m2/hybrid-interface-synthetic.costs.json",
+  "phase": "decode",
+  "devices": [
+    "cpu",
+    "gpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 1048576,
+    "vram_capacity_bytes": 1048576,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r_cpu",
+      "position_start": 3,
+      "tokens": 1,
+      "input_location": "vram",
+      "output_location": "vram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r_cpu",
+        "next_position": 3,
+        "version": 2,
+        "state_location": "dram",
+        "blocks": [
+          {
+            "id": "kv:hybrid-interface-synthetic:r_cpu:0",
+            "first_position": 0,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "dram"
+            ]
+          },
+          {
+            "id": "kv:hybrid-interface-synthetic:r_cpu:1",
+            "first_position": 1,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "dram"
+            ]
+          },
+          {
+            "id": "kv:hybrid-interface-synthetic:r_cpu:2",
+            "first_position": 2,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "dram"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "comment": "Synthetic selected CPU-request branch of NEO: resident GPU model weights; DRAM historical KV; no asymmetric fused subbatch or online scheduler claim."
+}

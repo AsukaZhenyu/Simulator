@@ -1,0 +1,145 @@
+{
+  "schema_version": "0.2",
+  "id": "fixed-two-layer-prefetch",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "hand-declared fixed-plan raw DAG; synthetic prices, no real LLM compiler"
+  },
+  "tensors": [
+    {
+      "id": "x",
+      "name": "x",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "vram"
+      ]
+    },
+    {
+      "id": "W:L0",
+      "name": "W:L0",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        64,
+        64
+      ],
+      "storage_bytes": 64,
+      "initial_locations": [
+        "dram",
+        "vram"
+      ]
+    },
+    {
+      "id": "W:L1",
+      "name": "W:L1",
+      "role": "weight",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        4,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        64,
+        64
+      ],
+      "storage_bytes": 64,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "hidden:L0",
+      "name": "hidden:L0",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L1",
+      "name": "hidden:L1",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "layer0",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W:L0",
+        "x"
+      ],
+      "output": "hidden:L0"
+    },
+    {
+      "id": "layer1",
+      "semantic_op": "MUL_MAT",
+      "ggml_op": "GGML_OP_MUL_MAT",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "W:L1",
+        "hidden:L0"
+      ],
+      "output": "hidden:L1"
+    }
+  ],
+  "outputs": [
+    "hidden:L1"
+  ]
+}

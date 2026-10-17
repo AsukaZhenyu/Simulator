@@ -1,0 +1,23 @@
+{
+  "format_version": "causal-policy-0.2",
+  "placements": {
+    "projection": "gpu",
+    "attention": "gpu",
+    "dense_ffn": "gpu"
+  },
+  "request_placements": {},
+  "experts": {
+    "device_rule": "fixed"
+  },
+  "cache": {
+    "rule": "lru"
+  },
+  "prefetch": {
+    "enabled": false,
+    "max_count": 0,
+    "cache_budget_bytes": 0
+  },
+  "release": {
+    "rule": "none"
+  }
+}

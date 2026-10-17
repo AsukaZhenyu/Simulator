@@ -1,0 +1,24 @@
+{
+  "format_version": "m2-schedule-episode-0.1",
+  "id": "dense-generic-prefill-decode",
+  "invocation_files": [
+    "hybrid-interface-synthetic-prefill-3.json",
+    "hybrid-interface-synthetic-decode-1.json"
+  ],
+  "state_binding": "declared_first_then_previous_state_out",
+  "reusable_cache_capacity_bytes": {
+    "dram": null,
+    "vram": 6208
+  },
+  "placement_mode": "enumerate",
+  "prefetch_depth": 1,
+  "overlap": true,
+  "baseline_policies": [
+    "serial_lru",
+    "demand_overlap_lru",
+    "prefetch_lru",
+    "prefetch_fifo",
+    "prefetch_farthest",
+    "prefetch_gpu"
+  ]
+}

@@ -1,0 +1,162 @@
+{
+  "schema_version": "dense_layer_measurement_suite_v1",
+  "cases": [
+    {
+      "id": "small_prefill_q3_h0",
+      "kind": "block",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "config": {
+        "hidden": 16,
+        "intermediate": 32,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "sigmoid",
+        "qk_norm": "rms",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.000001,
+        "weight_dtypes": {
+          "q": "f32",
+          "k": "f32",
+          "v": "f32",
+          "output": "f32",
+          "gate": "f32",
+          "up": "f32",
+          "down": "f32",
+          "gate_proj": "f32",
+          "input_norm": "f32",
+          "post_attention_norm": "f32",
+          "q_norm": "f32",
+          "k_norm": "f32"
+        }
+      },
+      "metadata": {
+        "geometry": "small",
+        "split": "development"
+      }
+    },
+    {
+      "id": "small_decode_q1_h31",
+      "kind": "block",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 31,
+      "config": {
+        "hidden": 16,
+        "intermediate": 32,
+        "heads": 4,
+        "kv_heads": 2,
+        "head_dim": 4,
+        "attention_gate": "sigmoid",
+        "qk_norm": "rms",
+        "rope_mode": "normal",
+        "rope_dims": 4,
+        "rope_base": 10000,
+        "norm_epsilon": 0.000001,
+        "weight_dtypes": {
+          "q": "f32",
+          "k": "f32",
+          "v": "f32",
+          "output": "f32",
+          "gate": "f32",
+          "up": "f32",
+          "down": "f32",
+          "gate_proj": "f32",
+          "input_norm": "f32",
+          "post_attention_norm": "f32",
+          "q_norm": "f32",
+          "k_norm": "f32"
+        }
+      },
+      "metadata": {
+        "geometry": "small",
+        "split": "development"
+      }
+    },
+    {
+      "id": "qwen35_geometry_prefill_q3_h0",
+      "kind": "block",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "config": {
+        "hidden": 2560,
+        "intermediate": 9216,
+        "heads": 16,
+        "kv_heads": 4,
+        "head_dim": 256,
+        "attention_gate": "sigmoid",
+        "qk_norm": "rms",
+        "rope_mode": "normal",
+        "rope_dims": 64,
+        "rope_base": 10000,
+        "norm_epsilon": 0.000001,
+        "weight_dtypes": {
+          "q": "q4_k",
+          "k": "q4_k",
+          "v": "q4_k",
+          "output": "q4_k",
+          "gate": "q4_k",
+          "up": "q4_k",
+          "down": "q6_k",
+          "gate_proj": "q4_k",
+          "input_norm": "f32",
+          "post_attention_norm": "f32",
+          "q_norm": "f32",
+          "k_norm": "f32"
+        }
+      },
+      "metadata": {
+        "geometry": "qwen35_geometry",
+        "split": "development"
+      }
+    },
+    {
+      "id": "qwen35_geometry_decode_q1_h31",
+      "kind": "block",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 31,
+      "config": {
+        "hidden": 2560,
+        "intermediate": 9216,
+        "heads": 16,
+        "kv_heads": 4,
+        "head_dim": 256,
+        "attention_gate": "sigmoid",
+        "qk_norm": "rms",
+        "rope_mode": "normal",
+        "rope_dims": 64,
+        "rope_base": 10000,
+        "norm_epsilon": 0.000001,
+        "weight_dtypes": {
+          "q": "q4_k",
+          "k": "q4_k",
+          "v": "q4_k",
+          "output": "q4_k",
+          "gate": "q4_k",
+          "up": "q4_k",
+          "down": "q6_k",
+          "gate_proj": "q4_k",
+          "input_norm": "f32",
+          "post_attention_norm": "f32",
+          "q_norm": "f32",
+          "k_norm": "f32"
+        }
+      },
+      "metadata": {
+        "geometry": "qwen35_geometry",
+        "split": "development"
+      }
+    }
+  ],
+  "comment": "Predeclared development-only single-thread contrast. Same paired resident timing, explicit threads=1 and strict observed CPU binding; cannot validate or replace threads=2 costs."
+}

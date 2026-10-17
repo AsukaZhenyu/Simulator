@@ -1,0 +1,101 @@
+{
+  "format_version": "strategy-ir-0.1",
+  "id": "router-experts",
+  "scenario_file": "router-experts.scenario.json",
+  "information_mode": "offline_fixed",
+  "regions": [
+    {
+      "id": "routed-package",
+      "kind": "router_with_independent_branches",
+      "members": [
+        "router",
+        "expert-gpu",
+        "expert-cpu"
+      ]
+    }
+  ],
+  "placements": {
+    "router": "gpu",
+    "expert-gpu": "gpu",
+    "expert-cpu": "cpu"
+  },
+  "program": [
+    {
+      "kind": "compute",
+      "operation_id": "router"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "router"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "W:expert",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "W:expert",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "expert-gpu"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "route",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "route",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "expert-cpu"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "expert-gpu"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "expert:gpu:out",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "expert-cpu"
+      ],
+      "copies": [
+        {
+          "tensor_id": "expert:gpu:out",
+          "location": "dram"
+        }
+      ]
+    }
+  ],
+  "device_states": {}
+}

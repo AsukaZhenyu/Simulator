@@ -1,0 +1,12 @@
+{
+  "format_version": "environment-trace-0.2",
+  "events": [],
+  "requests": [],
+  "control_costs": {
+    "ack_ns": 3,
+    "decline_ns": 1,
+    "decision_ns": 2,
+    "source": "synthetic_control_cost_not_hardware_measured",
+    "timing_scope": "dedicated_serial_control_resource"
+  }
+}

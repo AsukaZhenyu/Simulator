@@ -1,0 +1,221 @@
+{
+  "format_version": "m2-layer-0.4",
+  "id": "qwen35-geometry-declared-block-cuda",
+  "provenance": "synthetic_layer",
+  "hidden_size": 2560,
+  "hidden_bytes_per_token": 10240,
+  "kv_bytes_per_token": 8192,
+  "attention": "full_causal",
+  "ffn": "dense",
+  "weights": [
+    {
+      "id": "W_input_norm",
+      "name": "W_input_norm",
+      "dtype": "f32",
+      "shape": [
+        2560
+      ],
+      "storage_bytes": 10240,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_q",
+      "name": "W_q",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        4096
+      ],
+      "storage_bytes": 5898240,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_k",
+      "name": "W_k",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        1024
+      ],
+      "storage_bytes": 1474560,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_v",
+      "name": "W_v",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        1024
+      ],
+      "storage_bytes": 1474560,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_output",
+      "name": "W_output",
+      "dtype": "q4_k",
+      "shape": [
+        4096,
+        2560
+      ],
+      "storage_bytes": 5898240,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_post_attention_norm",
+      "name": "W_post_attention_norm",
+      "dtype": "f32",
+      "shape": [
+        2560
+      ],
+      "storage_bytes": 10240,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_gate",
+      "name": "W_gate",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        9216
+      ],
+      "storage_bytes": 13271040,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_up",
+      "name": "W_up",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        9216
+      ],
+      "storage_bytes": 13271040,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_down",
+      "name": "W_down",
+      "dtype": "q6_k",
+      "shape": [
+        9216,
+        2560
+      ],
+      "storage_bytes": 19353600,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_gate_proj",
+      "name": "W_gate_proj",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        4096
+      ],
+      "storage_bytes": 5898240,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_q_norm",
+      "name": "W_q_norm",
+      "dtype": "f32",
+      "shape": [
+        256
+      ],
+      "storage_bytes": 1024,
+      "initial_location": "vram"
+    },
+    {
+      "id": "W_k_norm",
+      "name": "W_k_norm",
+      "dtype": "f32",
+      "shape": [
+        256
+      ],
+      "storage_bytes": 1024,
+      "initial_location": "vram"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "proj",
+      "kind": "projection",
+      "depends_on": []
+    },
+    {
+      "id": "attn",
+      "kind": "attention",
+      "depends_on": [
+        "proj"
+      ]
+    },
+    {
+      "id": "ffn",
+      "kind": "dense_ffn",
+      "depends_on": [
+        "attn"
+      ]
+    }
+  ],
+  "physical": {
+    "contract": "ggml_cuda_dense_decoder_block_v1",
+    "scope": "complete_declared_decoder_block",
+    "input_boundary": "hidden_activation",
+    "port_layout": "materialized_stage_ports",
+    "kv_allocation": "logical_blocks",
+    "activation_dtype": "f32",
+    "kv_dtype": "f32",
+    "config": {
+      "hidden": 2560,
+      "intermediate": 9216,
+      "heads": 16,
+      "kv_heads": 4,
+      "head_dim": 256,
+      "rope_dims": 64,
+      "attention_gate": "sigmoid",
+      "qk_norm": "rms",
+      "rope_mode": "normal",
+      "rope_base": 10000,
+      "norm_epsilon": 9.999999974752427e-7,
+      "weight_dtypes": {
+        "input_norm": "f32",
+        "q": "q4_k",
+        "k": "q4_k",
+        "v": "q4_k",
+        "output": "q4_k",
+        "post_attention_norm": "f32",
+        "gate": "q4_k",
+        "up": "q4_k",
+        "down": "q6_k",
+        "gate_proj": "q4_k",
+        "q_norm": "f32",
+        "k_norm": "f32"
+      }
+    },
+    "weight_groups": {
+      "projection": {
+        "input_norm": "W_input_norm",
+        "q": "W_q",
+        "k": "W_k",
+        "v": "W_v",
+        "gate_proj": "W_gate_proj",
+        "q_norm": "W_q_norm",
+        "k_norm": "W_k_norm"
+      },
+      "attention": {
+        "output": "W_output"
+      },
+      "dense_ffn": {
+        "post_attention_norm": "W_post_attention_norm",
+        "gate": "W_gate",
+        "up": "W_up",
+        "down": "W_down"
+      }
+    },
+    "excluded_operations": [],
+    "cuda_device": 0,
+    "cuda_graphs": "disabled"
+  },
+  "comment": "CUDA B1 observation descriptor, generated weights/inputs, normal RoPE and F32 KV; workspace unknown in actual measurements, not executable calibrated costs or original-model reproduction."
+}

@@ -1,0 +1,15 @@
+{
+  "format_version": "environment-trace-0.1",
+  "events": [
+    {
+      "t_ns": 500000,
+      "cpu_available": false,
+      "dram_external_bytes": 128
+    },
+    {
+      "t_ns": 2500000,
+      "cpu_available": true,
+      "dram_external_bytes": 0
+    }
+  ]
+}

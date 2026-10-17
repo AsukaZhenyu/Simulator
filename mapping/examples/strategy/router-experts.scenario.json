@@ -1,0 +1,101 @@
+{
+  "schema_version": "0.2",
+  "id": "router-experts",
+  "architecture": {
+    "dram_capacity_bytes": 4096,
+    "vram_capacity_bytes": 4096,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "cpu_compute_slots": 1,
+    "gpu_compute_slots": 1,
+    "pcie_copy_slots": 1,
+    "ssd_io_slots": 1
+  },
+  "goal": {
+    "output_locations": {
+      "expert:gpu:out": "dram",
+      "expert:cpu:out": "dram"
+    }
+  },
+  "costs": {
+    "source": "synthetic_strategy_ir_fixture",
+    "compute": {
+      "router": {
+        "gpu": {
+          "duration_ns": 1000000,
+          "workspace_bytes": 16
+        }
+      },
+      "expert-gpu": {
+        "gpu": {
+          "duration_ns": 3000000,
+          "workspace_bytes": 16
+        }
+      },
+      "expert-cpu": {
+        "cpu": {
+          "duration_ns": 3000000,
+          "workspace_bytes": 16
+        }
+      }
+    },
+    "transfer": {
+      "dram_to_vram": {
+        "W:expert": {
+          "duration_ns": 1000000
+        }
+      },
+      "vram_to_dram": {
+        "route": {
+          "duration_ns": 1000000
+        },
+        "expert:gpu:out": {
+          "duration_ns": 1000000
+        }
+      },
+      "ssd_to_dram": {},
+      "dram_to_ssd": {}
+    }
+  },
+  "mapspace": {
+    "allowed_devices": {
+      "router": [
+        "gpu"
+      ],
+      "expert-gpu": [
+        "gpu"
+      ],
+      "expert-cpu": [
+        "cpu"
+      ]
+    },
+    "allowed_transfers": {
+      "dram_to_vram": [
+        "W:expert"
+      ],
+      "vram_to_dram": [
+        "route",
+        "expert:gpu:out"
+      ],
+      "ssd_to_dram": [],
+      "dram_to_ssd": []
+    },
+    "allow_eviction": true,
+    "allow_copy_compute_overlap": true,
+    "allow_cpu_gpu_overlap": true,
+    "allow_recomputation": false,
+    "transfer_dependencies": {
+      "W:expert": [
+        "router"
+      ]
+    }
+  },
+  "mapper": {
+    "algorithm": "uniform_cost",
+    "max_expanded_states": 0,
+    "wall_time_limit_s": 0
+  },
+  "workload_file": "router-experts.graph.json"
+}

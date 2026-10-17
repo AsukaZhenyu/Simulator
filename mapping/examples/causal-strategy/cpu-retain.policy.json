@@ -1,0 +1,26 @@
+{
+  "format_version": "causal-policy-0.1",
+  "placements": {
+    "projection": "cpu",
+    "attention": "cpu",
+    "router": "cpu",
+    "gather_rows": "cpu",
+    "expert_ffn": "cpu",
+    "scatter_rows": "cpu",
+    "combine_rows": "cpu"
+  },
+  "experts": {
+    "device_rule": "fixed"
+  },
+  "cache": {
+    "rule": "none"
+  },
+  "prefetch": {
+    "enabled": false,
+    "max_count": 0,
+    "cache_budget_bytes": 0
+  },
+  "release": {
+    "rule": "none"
+  }
+}

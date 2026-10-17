@@ -1,0 +1,506 @@
+{
+  "schema_version": "0.2",
+  "id": "fixed-two-layer-three-step-kv",
+  "origin": {
+    "kind": "synthetic_fixture",
+    "ggml_version": null,
+    "sample": "hand-declared fixed-plan raw DAG; synthetic prices, no real LLM compiler"
+  },
+  "tensors": [
+    {
+      "id": "input:s0",
+      "name": "input:s0",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "input:s1",
+      "name": "input:s1",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "input:s2",
+      "name": "input:s2",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "kv:L0:init:v0",
+      "name": "kv:L0:init:v0",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "dram"
+      ]
+    },
+    {
+      "id": "kv:L1:init:v0",
+      "name": "kv:L1:init:v0",
+      "role": "input",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16,
+      "initial_locations": [
+        "vram"
+      ]
+    },
+    {
+      "id": "hidden:L0:s0",
+      "name": "hidden:L0:s0",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L1:s0",
+      "name": "hidden:L1:s0",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L0:s0:v1",
+      "name": "kv:L0:s0:v1",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L1:s0:v1",
+      "name": "kv:L1:s0:v1",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L0:s1",
+      "name": "hidden:L0:s1",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L1:s1",
+      "name": "hidden:L1:s1",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L0:s1:v2",
+      "name": "kv:L0:s1:v2",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L1:s1:v2",
+      "name": "kv:L1:s1:v2",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L0:s2",
+      "name": "hidden:L0:s2",
+      "role": "intermediate",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "hidden:L1:s2",
+      "name": "hidden:L1:s2",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L0:s2:v3",
+      "name": "kv:L0:s2:v3",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    },
+    {
+      "id": "kv:L1:s2:v3",
+      "name": "kv:L1:s2:v3",
+      "role": "output",
+      "dtype": "GGML_TYPE_F32",
+      "ne": [
+        4,
+        1,
+        1,
+        1
+      ],
+      "nb": [
+        4,
+        16,
+        16,
+        16
+      ],
+      "storage_bytes": 16
+    }
+  ],
+  "operations": [
+    {
+      "id": "L0:hidden:s0",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "input:s0",
+        "kv:L0:init:v0"
+      ],
+      "output": "hidden:L0:s0"
+    },
+    {
+      "id": "L0:kv:s0",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L0:init:v0",
+        "hidden:L0:s0"
+      ],
+      "output": "kv:L0:s0:v1"
+    },
+    {
+      "id": "L1:hidden:s0",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "hidden:L0:s0",
+        "kv:L1:init:v0"
+      ],
+      "output": "hidden:L1:s0"
+    },
+    {
+      "id": "L1:kv:s0",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L1:init:v0",
+        "hidden:L1:s0"
+      ],
+      "output": "kv:L1:s0:v1"
+    },
+    {
+      "id": "L0:hidden:s1",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "input:s1",
+        "kv:L0:s0:v1"
+      ],
+      "output": "hidden:L0:s1"
+    },
+    {
+      "id": "L0:kv:s1",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L0:s0:v1",
+        "hidden:L0:s1"
+      ],
+      "output": "kv:L0:s1:v2"
+    },
+    {
+      "id": "L1:hidden:s1",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "hidden:L0:s1",
+        "kv:L1:s0:v1"
+      ],
+      "output": "hidden:L1:s1"
+    },
+    {
+      "id": "L1:kv:s1",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L1:s0:v1",
+        "hidden:L1:s1"
+      ],
+      "output": "kv:L1:s1:v2"
+    },
+    {
+      "id": "L0:hidden:s2",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "input:s2",
+        "kv:L0:s1:v2"
+      ],
+      "output": "hidden:L0:s2"
+    },
+    {
+      "id": "L0:kv:s2",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L0:s1:v2",
+        "hidden:L0:s2"
+      ],
+      "output": "kv:L0:s2:v3"
+    },
+    {
+      "id": "L1:hidden:s2",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "hidden:L0:s2",
+        "kv:L1:s1:v2"
+      ],
+      "output": "hidden:L1:s2"
+    },
+    {
+      "id": "L1:kv:s2",
+      "semantic_op": "ADD",
+      "ggml_op": "GGML_OP_ADD",
+      "unary_op": null,
+      "op_params": [],
+      "inputs": [
+        "kv:L1:s1:v2",
+        "hidden:L1:s2"
+      ],
+      "output": "kv:L1:s2:v3"
+    }
+  ],
+  "outputs": [
+    "hidden:L1:s0",
+    "kv:L0:s0:v1",
+    "kv:L1:s0:v1",
+    "hidden:L1:s1",
+    "kv:L0:s1:v2",
+    "kv:L1:s1:v2",
+    "hidden:L1:s2",
+    "kv:L0:s2:v3",
+    "kv:L1:s2:v3"
+  ]
+}

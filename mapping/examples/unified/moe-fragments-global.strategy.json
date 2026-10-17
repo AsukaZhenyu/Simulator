@@ -1,0 +1,23 @@
+{
+  "format_version": "unified-strategy-0.1",
+  "id": "moe-fragments-global-services",
+  "model_file": "../../../modeling/tests/fixtures/global_execution/moe-fragments.global.json",
+  "execution_file": null,
+  "policy_file": "fragment.policy.json",
+  "services_file": "../../../modeling/tests/fixtures/global_execution/moe-fragments.services.json",
+  "environment_file": "global.environment.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "transport": {
+    "transfer_engines": {
+      "weight": "ce",
+      "input": "sm",
+      "intermediate": "sm",
+      "output": "sm"
+    },
+    "slot_reuse": "release_unlocked_backed_copy",
+    "boundary_release": "declared_dead_intermediates",
+    "fragment_cache_unit": "tensor"
+  },
+  "max_decisions": 1000
+}

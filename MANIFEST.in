@@ -1,0 +1,20 @@
+include README.md LICENSE pyproject.toml MANIFEST.in
+include CITATION.cff
+include docs/LIBRARY_GUIDE.md docs/OPEN_SOURCE_AND_PREPRINT.md docs/RELEASE_0_1.md
+recursive-include examples/library *.py *.md
+recursive-include src/llm_simulator *.py py.typed
+recursive-include src/llm_simulator/data *
+recursive-include mapping/tensor_mapping *.py
+recursive-include modeling/llm_infer_model *.py
+include tests/test_distribution.py tests/test_library.py tests/test_analytical_inputs.py
+prune profiling
+prune reference
+prune reference-analysis
+prune reference-pdf
+prune mapping/outputs
+prune modeling/outputs
+prune mapping/tests
+prune modeling/tests
+prune mapping/examples
+prune modeling/configs
+global-exclude __pycache__ *.py[cod] *.gguf *.safetensors *.pt *.pth *.bin

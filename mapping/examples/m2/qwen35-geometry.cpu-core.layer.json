@@ -1,0 +1,99 @@
+{
+  "format_version": "m2-layer-0.2",
+  "id": "qwen35-geometry-cpu-core",
+  "provenance": "measured_macro",
+  "hidden_size": 2560,
+  "hidden_bytes_per_token": 10240,
+  "kv_bytes_per_token": 8192,
+  "attention": "full_causal",
+  "ffn": "dense",
+  "physical": {
+    "contract": "ggml_cpu_partial_dense_macros_v1",
+    "scope": "partial_decoder_block",
+    "input_boundary": "post_positional_qkv",
+    "port_layout": "materialized_contiguous",
+    "intermediate": 9216,
+    "heads": 16,
+    "kv_heads": 4,
+    "head_dim": 256,
+    "attention_gate": "sigmoid",
+    "threads": 2,
+    "ffn_weight_policy": "explicit_per_matrix_dtypes",
+    "weight_groups": {
+      "attention": {
+        "output": "W_o"
+      },
+      "dense_ffn": {
+        "gate": "W_gate",
+        "up": "W_up",
+        "down": "W_down"
+      }
+    },
+    "activation_dtype": "f32",
+    "kv_dtype": "f32",
+    "kv_allocation": "logical_blocks",
+    "excluded_operations": [
+      "qkv_projection",
+      "normalization",
+      "RoPE",
+      "residual_add"
+    ]
+  },
+  "weights": [
+    {
+      "id": "W_o",
+      "dtype": "q4_k",
+      "shape": [
+        4096,
+        2560
+      ],
+      "storage_bytes": 5898240,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_gate",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        9216
+      ],
+      "storage_bytes": 13271040,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_up",
+      "dtype": "q4_k",
+      "shape": [
+        2560,
+        9216
+      ],
+      "storage_bytes": 13271040,
+      "initial_location": "dram"
+    },
+    {
+      "id": "W_down",
+      "dtype": "q6_k",
+      "shape": [
+        9216,
+        2560
+      ],
+      "storage_bytes": 19353600,
+      "initial_location": "dram"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "attention",
+      "kind": "attention",
+      "depends_on": []
+    },
+    {
+      "id": "dense_ffn",
+      "kind": "dense_ffn",
+      "depends_on": [
+        "attention"
+      ]
+    }
+  ],
+  "comment": "Qwen3.5 layer-3 geometry, explicit CPU F32-KV partial Attention -> FFN only. Materialized external Q/K (after positional transform), V, sigmoid gate. Excludes QKV projection, norms, RoPE, residuals; not original Flash/F16-KV graph. KV uses logical immutable blocks, not padded preallocation. Measured data exported separately with source/quality evidence."
+}

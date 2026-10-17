@@ -1,0 +1,21 @@
+{
+  "format_version": "moe-rows-reference-0.1",
+  "id": "batched-scored-shared-swiglu",
+  "dtype": "f32",
+  "hidden_size": 5,
+  "intermediate_size": 7,
+  "expert_count": 4,
+  "top_k": 2,
+  "shared_expert": true,
+  "seed": 1729,
+  "atol": 0.00002,
+  "rtol": 0.00002,
+  "work_items": [
+    {"request_id": "r0", "absolute_position": 3, "expert_ids": [0, 1], "scores": [0.8, 0.2]},
+    {"request_id": "r0", "absolute_position": 4, "expert_ids": [0, 2], "scores": [0.35, 0.65]},
+    {"request_id": "r1", "absolute_position": 0, "expert_ids": [1, 0], "scores": [0.1, 0.9]},
+    {"request_id": "r1", "absolute_position": 1, "expert_ids": [2, 1], "scores": [0.7, 0.3]},
+    {"request_id": "r1", "absolute_position": 2, "expert_ids": [0, 2], "scores": [0.45, 0.55]},
+    {"request_id": "r2", "absolute_position": 17, "expert_ids": [1, 0], "scores": [0.75, 0.25]}
+  ]
+}

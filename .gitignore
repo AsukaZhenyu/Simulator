@@ -3,11 +3,12 @@
 /reference-analysis/
 /reference-pdf/
 
-# ==================== 顶层规划文档（不入库） ====================
-# 只忽略仓库根目录的 md；mapping/*.md 是设计文档，保留
+# ==================== 顶层文档入口 ====================
 /*.md
-!/M1_DESIGN.md
-!/M1_ACCEPTANCE.md
+!/README.md
+!/CONTRIBUTING.md
+!/CHANGELOG.md
+!/THIRD_PARTY_NOTICES.md
 
 # ==================== 生成产物与本地文件（不入库） ====================
 # 仿真运行产物：结果 json/csv。由 `python -m llm_infer_model regenerate` 从
@@ -18,6 +19,11 @@ modeling/outputs/
 mapping/outputs/
 # llama.cpp 引擎导出的 pipeline KV backing file，396MB，运行时生成
 modeling/llama_pipeline_kv.bin
+# Local measurement evidence is retained on disk, not required by the library.
+# Redistributable input traces belong in profiling/data/, not results/.
+/profiling/**/results/
+# Local cleanup manifests/logs contain workstation paths and are not product docs.
+/docs/maintenance/
 
 # ==================== Python ====================
 __pycache__/
@@ -26,6 +32,7 @@ __pycache__/
 *.egg-info/
 .eggs/
 build/
+build-*/
 dist/
 .venv/
 venv/

@@ -1,0 +1,44 @@
+{
+  "format_version": "global-execution-0.1",
+  "id": "moe-fragment-two-layer-PD",
+  "rounds": [
+    {
+      "id": "prefill",
+      "input_mode": "initial_supplied_hidden",
+      "gate_cost": null,
+      "invocations": [
+        {
+          "id": "fragmentL0-prefill",
+          "invocation_file": "fragmentL0.prefill.json",
+          "execution_file": "fragmentL0.execution.json"
+        },
+        {
+          "id": "fragmentL1-prefill",
+          "invocation_file": "fragmentL1.prefill.json",
+          "execution_file": "fragmentL1.execution.json"
+        }
+      ]
+    },
+    {
+      "id": "decode",
+      "input_mode": "trace_supplied_next_token",
+      "gate_cost": {
+        "device": "cpu",
+        "duration_ns": 7,
+        "workspace_bytes": 0
+      },
+      "invocations": [
+        {
+          "id": "fragmentL0-decode",
+          "invocation_file": "fragmentL0.decode.json",
+          "execution_file": "fragmentL0.execution.json"
+        },
+        {
+          "id": "fragmentL1-decode",
+          "invocation_file": "fragmentL1.decode.json",
+          "execution_file": "fragmentL1.execution.json"
+        }
+      ]
+    }
+  ]
+}

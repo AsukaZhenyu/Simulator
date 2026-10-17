@@ -1,0 +1,40 @@
+{
+  "format_version": "m2-layer-0.1",
+  "id": "fcd-prefill-3",
+  "layer": "fcd",
+  "layer_file": "fcd.layer.json",
+  "costs_file": "fcd.costs.json",
+  "phase": "prefill",
+  "devices": [
+    "cpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 4096,
+    "vram_capacity_bytes": 4096,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 0,
+      "tokens": 3,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 0,
+        "version": 1,
+        "state_location": "dram",
+        "blocks": []
+      }
+    ]
+  },
+  "comment": "第一次调用：零历史，但那条记录必须写出来——省略它会让「这次调用有没有历史」变成猜的。容量 4096 B 远大于峰值 368 B（权重 128 + 输入 48 + 三个中间张量 144 + 三块 KV 48），所以这一刀里容量不是变量。"
+}

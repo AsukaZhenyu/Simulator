@@ -1,0 +1,307 @@
+{
+  "format_version": "strategy-ir-0.1",
+  "id": "stateful-three-step",
+  "scenario_file": "stateful-three-step.scenario.json",
+  "information_mode": "offline_fixed",
+  "regions": [
+    {
+      "id": "step-0",
+      "kind": "two_layer_state_lifetime_toy",
+      "members": [
+        "L0:hidden:s0",
+        "L0:kv:s0",
+        "L1:hidden:s0",
+        "L1:kv:s0"
+      ]
+    },
+    {
+      "id": "step-1",
+      "kind": "two_layer_state_lifetime_toy",
+      "members": [
+        "L0:hidden:s1",
+        "L0:kv:s1",
+        "L1:hidden:s1",
+        "L1:kv:s1"
+      ]
+    },
+    {
+      "id": "step-2",
+      "kind": "two_layer_state_lifetime_toy",
+      "members": [
+        "L0:hidden:s2",
+        "L0:kv:s2",
+        "L1:hidden:s2",
+        "L1:kv:s2"
+      ]
+    }
+  ],
+  "placements": {
+    "L0:hidden:s0": "cpu",
+    "L0:kv:s0": "cpu",
+    "L1:hidden:s0": "gpu",
+    "L1:kv:s0": "gpu",
+    "L0:hidden:s1": "cpu",
+    "L0:kv:s1": "cpu",
+    "L1:hidden:s1": "gpu",
+    "L1:kv:s1": "gpu",
+    "L0:hidden:s2": "cpu",
+    "L0:kv:s2": "cpu",
+    "L1:hidden:s2": "gpu",
+    "L1:kv:s2": "gpu"
+  },
+  "program": [
+    {
+      "kind": "compute",
+      "operation_id": "L0:hidden:s0"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:hidden:s0"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L0:kv:s0"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L0:s0",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:kv:s0"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L0:s0",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:hidden:s0"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:hidden:s0"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:kv:s0"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L1:s0",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:kv:s0"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L1:s0",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:L1:s0:v1",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "kv:L1:s0:v1",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "device_state",
+      "name": "gpu_busy"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L0:hidden:s1"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:hidden:s1"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L0:kv:s1"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L0:s1",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:kv:s1"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L0:s1",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:hidden:s1"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:hidden:s1"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:kv:s1"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L1:s1",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:kv:s1"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L1:s1",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:L1:s1:v2",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "kv:L1:s1:v2",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L0:hidden:s2"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:hidden:s2"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L0:kv:s2"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L0:s2",
+      "src": "dram",
+      "dst": "vram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L0:kv:s2"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L0:s2",
+          "location": "vram"
+        }
+      ]
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:hidden:s2"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:hidden:s2"
+      ],
+      "copies": []
+    },
+    {
+      "kind": "compute",
+      "operation_id": "L1:kv:s2"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "hidden:L1:s2",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [
+        "L1:kv:s2"
+      ],
+      "copies": [
+        {
+          "tensor_id": "hidden:L1:s2",
+          "location": "dram"
+        }
+      ]
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "kv:L1:s2:v3",
+      "src": "vram",
+      "dst": "dram"
+    },
+    {
+      "kind": "wait",
+      "operations": [],
+      "copies": [
+        {
+          "tensor_id": "kv:L1:s2:v3",
+          "location": "dram"
+        }
+      ]
+    }
+  ],
+  "device_states": {
+    "gpu_busy": "stateful-three-step.gpu-busy.json"
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "format_version": "attention-stages-0.1",
+  "variant": "qk_softmax_pv",
+  "provenance": "synthetic_execution",
+  "geometry": {
+    "hidden": 16,
+    "heads": 4,
+    "kv_heads": 2,
+    "head_dim": 4,
+    "attention_gate": "sigmoid"
+  },
+  "frontend": {
+    "contract": "existing_materialized_post_rope_qkv"
+  },
+  "entries": [
+    {
+      "kind": "attention_output",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 100,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_output",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 101,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_projection",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 110,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_projection",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 111,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_pv",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 120,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_pv",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 121,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_qk",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 130,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_qk",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 131,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_softmax",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 140,
+      "workspace_bytes": 4
+    },
+    {
+      "kind": "attention_softmax",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "duration_ns": 141,
+      "workspace_bytes": 4
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 8,
+      "duration_ns": 9
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 8,
+      "duration_ns": 9
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 48,
+      "duration_ns": 49
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 129
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 144,
+      "duration_ns": 145
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 256,
+      "duration_ns": 257
+    }
+  ]
+}

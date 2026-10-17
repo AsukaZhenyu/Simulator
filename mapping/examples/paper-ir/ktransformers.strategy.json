@@ -1,0 +1,109 @@
+{
+  "format_version": "unified-strategy-0.2",
+  "id": "ktransformers-fixed-CPU-routed-GPU-shared",
+  "model": {
+    "kind": "m2",
+    "file": "ktransformers.invocation.json"
+  },
+  "execution": [],
+  "policy": {
+    "placements": {
+      "projection": "gpu",
+      "attention": "gpu",
+      "router": "gpu",
+      "expert_ffn": "cpu",
+      "shared_expert_ffn": "gpu",
+      "combine": "gpu"
+    },
+    "request_placements": {},
+    "experts": {
+      "device_rule": "fixed",
+      "selection_unit": "expert_region"
+    },
+    "release": {
+      "rule": "none"
+    }
+  },
+  "cache": {
+    "rule": "none",
+    "unit": "tensor",
+    "budget_bytes": null,
+    "alpha": null,
+    "top_p": null
+  },
+  "prefetch": {
+    "enabled": false,
+    "scope": "none",
+    "lookahead_layers": 0,
+    "max_count": 0,
+    "ranking": "history_frequency",
+    "include_dense_weights": false
+  },
+  "transport": {
+    "rules": [
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": null
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": null
+      }
+    ],
+    "slot_reuse": "disabled",
+    "boundary_release": "declared_dead_intermediates"
+  },
+  "services_file": null,
+  "environment_file": "../unified/environment.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "max_decisions": 3000
+}

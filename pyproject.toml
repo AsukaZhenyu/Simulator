@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-infer-simulator"
+version = "0.1.0a1"
+description = "Composable strategy compilation and simulation for heterogeneous LLM inference"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+gguf = ["gguf>=0.19.0", "numpy>=1.26"]
+
+[project.scripts]
+llm-sim = "llm_simulator.cli:main"
+
+[project.urls]
+Repository = "https://github.com/AsukaZhenyu/Simulator"
+Issues = "https://github.com/AsukaZhenyu/Simulator/issues"
+
+[tool.setuptools]
+include-package-data = true
+packages = [
+  "llm_simulator",
+  "tensor_mapping",
+  "llm_infer_model",
+  "llm_infer_model.tensor",
+  "llm_infer_model.m2",
+  "llm_infer_model.components",
+]
+
+[tool.setuptools.package-dir]
+llm_simulator = "src/llm_simulator"
+tensor_mapping = "mapping/tensor_mapping"
+llm_infer_model = "modeling/llm_infer_model"
+
+[tool.setuptools.package-data]
+llm_simulator = ["data/*", "data/**/*", "py.typed"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*.pyo", "__pycache__/*"]

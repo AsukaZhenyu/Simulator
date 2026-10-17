@@ -1,0 +1,27 @@
+{
+  "format_version": "causal-policy-0.2",
+  "placements": {
+    "projection": "gpu",
+    "attention": "gpu",
+    "router": "gpu",
+    "gather_rows": "gpu",
+    "expert_ffn": "cpu",
+    "scatter_rows": "gpu",
+    "combine_rows": "gpu"
+  },
+  "request_placements": {},
+  "experts": {
+    "device_rule": "fiddler_paths"
+  },
+  "cache": {
+    "rule": "lru"
+  },
+  "prefetch": {
+    "enabled": false,
+    "max_count": 0,
+    "cache_budget_bytes": 0
+  },
+  "release": {
+    "rule": "last_use"
+  }
+}

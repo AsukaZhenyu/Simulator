@@ -1,0 +1,109 @@
+{
+  "format_version": "strategy-ir-0.1",
+  "id": "m2-moe-prefill",
+  "scenario_file": "../m2/moe-interface-synthetic-prefill-2.json",
+  "information_mode": "offline_fixed",
+  "regions": [
+    {
+      "id": "moe-layer",
+      "kind": "routed_macro_package",
+      "members": [
+        "op:moe-small:r0:proj",
+        "op:moe-small:r0:attn",
+        "op:moe-small:r0:router",
+        "op:moe-small:__moe_batch__:expert.0",
+        "op:moe-small:__moe_batch__:expert.1",
+        "op:moe-small:__moe_batch__:expert.2",
+        "op:moe-small:r0:combine"
+      ]
+    }
+  ],
+  "placements": {
+    "op:moe-small:r0:proj": "cpu",
+    "op:moe-small:r0:attn": "cpu",
+    "op:moe-small:r0:router": "cpu",
+    "op:moe-small:__moe_batch__:expert.0": "cpu",
+    "op:moe-small:__moe_batch__:expert.1": "cpu",
+    "op:moe-small:__moe_batch__:expert.2": "cpu",
+    "op:moe-small:r0:combine": "cpu"
+  },
+  "program": [
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:r0:proj"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:r0:attn"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:r0:router"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "w:moe-small:E0",
+      "src": "ssd",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:__moe_batch__:expert.0"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "w:moe-small:E1",
+      "src": "ssd",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:__moe_batch__:expert.1"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "transfer",
+      "tensor_id": "w:moe-small:E2",
+      "src": "ssd",
+      "dst": "dram"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:__moe_batch__:expert.2"
+    },
+    {
+      "kind": "drain"
+    },
+    {
+      "kind": "compute",
+      "operation_id": "op:moe-small:r0:combine"
+    },
+    {
+      "kind": "drain"
+    }
+  ],
+  "device_states": {}
+}

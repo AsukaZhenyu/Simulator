@@ -1,0 +1,68 @@
+{
+  "format_version": "m2-layer-0.4",
+  "id": "cuda-interface-synthetic-decode-1",
+  "layer": "cuda-interface-synthetic",
+  "layer_file": "cuda-interface-synthetic.layer.json",
+  "costs_file": "cuda-interface-synthetic.costs.json",
+  "phase": "decode",
+  "devices": [
+    "gpu"
+  ],
+  "hardware": {
+    "dram_capacity_bytes": 1,
+    "vram_capacity_bytes": 268435456,
+    "dram_alignment_bytes": 1,
+    "vram_alignment_bytes": 1,
+    "dram_runtime_reserved_bytes": 0,
+    "vram_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 3,
+      "tokens": 1,
+      "input_location": "vram",
+      "output_location": "vram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 3,
+        "version": 2,
+        "state_location": "vram",
+        "blocks": [
+          {
+            "id": "kv:cuda-interface-synthetic:r0:0",
+            "first_position": 0,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          },
+          {
+            "id": "kv:cuda-interface-synthetic:r0:1",
+            "first_position": 1,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          },
+          {
+            "id": "kv:cuda-interface-synthetic:r0:2",
+            "first_position": 2,
+            "tokens": 1,
+            "storage_bytes": 64,
+            "locations": [
+              "vram"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "comment": "合成接口验收；无搬运，输入/权重/KV驻留VRAM。请勿用于GPU性能或实际scratch容量结论。"
+}

@@ -50,6 +50,7 @@ from .spec import (
     OP_DONE,
     OP_NOT_STARTED,
     OP_RUNNING,
+    Operation,
     RESOURCE_COMPUTE,
     RESOURCE_COPY,
     RESOURCE_CPU_COMPUTE,
@@ -108,6 +109,7 @@ __all__ = [
     "legal_actions",
     "load_mapping",
     "transition",
+    "advance_elapsed",
     "used_bytes",
     "used_vram_bytes",
     "evaluate_mapping",
@@ -115,6 +117,7 @@ __all__ = [
     # 这三个字段是公开的，比较它们却要拿到这些常量，所以它们同属公开面。
     # 此前不在 __all__ 里（只是按名可导入），星号转出的兼容层会漏掉，故显式列出。
     "CODE_INPUT_NOT_READY",
+    "CODE_TRANSFER_DEPENDENCY_NOT_READY",
     "CODE_RESOURCE_BUSY",
     "CODE_CAPACITY_EXCEEDED",
     "CODE_TENSOR_IN_USE",
@@ -156,6 +159,7 @@ ACTION_WRITE_SSD = "WRITE_SSD"
 # even representable in the mapspace. Keeping the extra case separate means the
 # five model-level codes stay meaningful rather than becoming a catch-all.
 CODE_INPUT_NOT_READY = "INPUT_NOT_READY"
+CODE_TRANSFER_DEPENDENCY_NOT_READY = "TRANSFER_DEPENDENCY_NOT_READY"
 CODE_RESOURCE_BUSY = "RESOURCE_BUSY"
 CODE_CAPACITY_EXCEEDED = "CAPACITY_EXCEEDED"
 CODE_TENSOR_IN_USE = "TENSOR_IN_USE"
@@ -165,6 +169,7 @@ CODE_ILLEGAL_ACTION = "ILLEGAL_ACTION"
 REEVALUATION_CODES = frozenset(
     {
         CODE_INPUT_NOT_READY,
+        CODE_TRANSFER_DEPENDENCY_NOT_READY,
         CODE_RESOURCE_BUSY,
         CODE_CAPACITY_EXCEEDED,
         CODE_TENSOR_IN_USE,
@@ -280,6 +285,23 @@ class RunningTask:
     route: str | None = None
 
 
+def _statuses_of(
+    source: State | StateSnapshot, location: str
+) -> tuple[tuple[str, str], ...]:
+    """The ledger ``location`` is stored in, for a :class:`State` or a snapshot.
+
+    The three locations live in three differently named fields (``copy_status``
+    is the *VRAM* ledger, because that is what 0.1 called it), so the mapping is
+    written once here and both types read through it. A second copy of it would
+    be a place for "which field is vram" to be answered differently.
+    """
+    if location == LOC_DRAM:
+        return source.dram_status
+    if location == LOC_SSD:
+        return source.ssd_status
+    return source.copy_status
+
+
 @dataclass(frozen=True)
 class State:
     """An immutable model state.
@@ -352,11 +374,7 @@ class State:
 
     def statuses(self, location: str) -> tuple[tuple[str, str], ...]:
         """The whole ``location`` ledger, in the same sorted form as every field."""
-        if location == LOC_DRAM:
-            return self.dram_status
-        if location == LOC_SSD:
-            return self.ssd_status
-        return self.copy_status
+        return _statuses_of(self, location)
 
     def task_on(self, resource: str) -> RunningTask | None:
         """The task currently occupying ``resource``, if any."""
@@ -408,6 +426,15 @@ class StateSnapshot:
     # there is no usage number to report. What a reader needs is the same thing
     # the search needs -- which copies exist and whether a write has landed.
     ssd_status: tuple[tuple[str, str], ...] = ()
+
+    def statuses(self, location: str) -> tuple[tuple[str, str], ...]:
+        """The ``location`` ledger, exactly as :meth:`State.statuses` reports it.
+
+        A snapshot is what a *finished* replay hands to a reader, and a reader of
+        an artefact should not have to know that the VRAM ledger is the one
+        called ``copy_status``.
+        """
+        return _statuses_of(self, location)
 
 
 @dataclass(frozen=True)
@@ -769,6 +796,27 @@ def _check_copy(scenario: Scenario, state: State, action: Action) -> None:
         )
 
 
+def _describe_outputs(operation: Operation) -> str:
+    """The outputs of ``operation`` as one noun phrase for an error message.
+
+    A 0.1/0.2 operation has exactly one output and keeps its original wording
+    verbatim; the plural form exists only for M2 macro-tasks, which may
+    materialise several tensors at once.
+    """
+    outputs = operation.outputs
+    if len(outputs) == 1:
+        return f"{outputs[0]!r} and its workspace"
+    return f"{', '.join(repr(o) for o in outputs)} and their workspaces"
+
+
+def _describe_m1_outputs(operation: Operation) -> str:
+    """The 0.2 spelling of :func:`_describe_outputs`, for a parenthesised clause."""
+    outputs = operation.outputs
+    if len(outputs) == 1:
+        return f"output {outputs[0]!r} plus its workspace"
+    return f"outputs {', '.join(repr(o) for o in outputs)} plus their workspaces"
+
+
 def _check_compute(scenario: Scenario, state: State, action: Action) -> None:
     operation_id = action.target_id
     assert operation_id is not None
@@ -818,28 +866,33 @@ def _check_compute(scenario: Scenario, state: State, action: Action) -> None:
             operation_id=operation_id,
         )
 
-    if state.copy(operation.output) != COPY_ABSENT:
-        raise MappingError(
-            CODE_ILLEGAL_ACTION,
-            f"output {operation.output!r} of {operation_id!r} is already "
-            f"{state.copy(operation.output)}; M0 has no in-place reuse and never "
-            "writes a destination twice",
-            t_ns=state.t,
-            operation_id=operation_id,
-            tensor_id=operation.output,
-        )
+    outputs = operation.outputs
+    for produced in outputs:
+        if state.copy(produced) != COPY_ABSENT:
+            raise MappingError(
+                CODE_ILLEGAL_ACTION,
+                f"output {produced!r} of {operation_id!r} is already "
+                f"{state.copy(produced)}; M0 has no in-place reuse and never "
+                "writes a destination twice",
+                t_ns=state.t,
+                operation_id=operation_id,
+                tensor_id=produced,
+            )
 
     # Capacity is checked on the state as it is now. The engine does not
     # speculate that a currently-live tensor might be freed before this compute
     # finishes -- that would be reserving against a future the mapping has not
-    # committed to.
-    needed = scenario.size_alloc(operation.output) + scenario.workspace_alloc(operation_id)
+    # committed to. Every output is charged, and they are charged together:
+    # one task materialises all of them or none.
+    needed = sum(scenario.size_alloc(o) for o in outputs) + scenario.workspace_alloc(
+        operation_id
+    )
     used = used_vram_bytes(scenario, state)
     if used + needed > architecture.vram_capacity_bytes:
         raise MappingError(
             CODE_CAPACITY_EXCEEDED,
-            f"running {operation_id!r} needs {needed} bytes for {operation.output!r} "
-            f"and its workspace on top of {used} in use, over the "
+            f"running {operation_id!r} needs {needed} bytes for {_describe_outputs(operation)} "
+            f"on top of {used} in use, over the "
             f"{architecture.vram_capacity_bytes}-byte budget",
             t_ns=state.t,
             operation_id=operation_id,
@@ -1074,23 +1127,27 @@ def _m1_check_compute(
             operation_id=operation_id,
         )
 
-    if any(state.copy_at(operation.output, d) != COPY_ABSENT for d in DOMAINS):
-        raise MappingError(
-            CODE_ILLEGAL_ACTION,
-            f"output {operation.output!r} of {operation_id!r} already has a copy; "
-            "M1 has no in-place reuse and never writes a destination twice",
-            t_ns=state.t,
-            operation_id=operation_id,
-            tensor_id=operation.output,
-        )
+    outputs = operation.outputs
+    for produced in outputs:
+        if any(state.copy_at(produced, d) != COPY_ABSENT for d in DOMAINS):
+            raise MappingError(
+                CODE_ILLEGAL_ACTION,
+                f"output {produced!r} of {operation_id!r} already has a copy; "
+                "M1 has no in-place reuse and never writes a destination twice",
+                t_ns=state.t,
+                operation_id=operation_id,
+                tensor_id=produced,
+            )
 
-    needed = scenario.size_alloc(operation.output, domain) + scenario.workspace_alloc(
+    # Every output is charged, together: one task materialises all of them or
+    # none, so a KV append cannot be run on the strength of room for the hidden
+    # alone.
+    needed = sum(scenario.size_alloc(o, domain) for o in outputs) + scenario.workspace_alloc(
         operation_id, device
     )
     _m1_check_capacity(
         scenario, state, domain, needed,
-        what=f"running {operation_id!r} on {device} (output {operation.output!r} "
-             "plus its workspace)",
+        what=f"running {operation_id!r} on {device} ({_describe_m1_outputs(operation)})",
         operation_id=operation_id,
         tensor_id=operation.output,
     )
@@ -1159,6 +1216,17 @@ def _m1_check_transfer(
             t_ns=state.t,
             tensor_id=tensor_id,
         )
+
+    for operation_id in mapspace.transfer_dependencies.get(tensor_id, ()):
+        if state.op(operation_id) != OP_DONE:
+            raise MappingError(
+                CODE_TRANSFER_DEPENDENCY_NOT_READY,
+                f"transferring {tensor_id!r} on {route} requires "
+                f"{operation_id!r} DONE; it is {state.op(operation_id)}",
+                t_ns=state.t,
+                tensor_id=tensor_id,
+                operation_id=operation_id,
+            )
 
     source, destination = ROUTE_ENDS[route]
     resource = RESOURCE_OF_ROUTE[route]
@@ -1428,7 +1496,8 @@ def _start_compute(scenario: Scenario, state: State, operation_id: str) -> State
     ops = dict(state.op_status)
     ops[operation_id] = OP_RUNNING
     copies = dict(state.copy_status)
-    copies[operation.output] = COPY_RESERVED_OUTPUT
+    for produced in operation.outputs:
+        copies[produced] = COPY_RESERVED_OUTPUT
     running = _with_task(
         state.running,
         RunningTask(resource=RESOURCE_COMPUTE, target_id=operation_id, remaining_ns=duration),
@@ -1487,12 +1556,13 @@ def _m1_start_compute(scenario: Scenario, state: State, action: Action) -> State
     copies = dict(state.copy_status)
     dram = dict(state.dram_status)
     ssd = dict(state.ssd_status)
-    # The output is reserved *in its device's domain*, so the reservation and the
-    # completion cannot disagree about where the bytes will be.
-    _set_copy(
-        copies, dram, ssd, operation.output, DOMAIN_OF_DEVICE[action.device],
-        COPY_RESERVED_OUTPUT,
-    )
+    # The outputs are reserved *in their device's domain*, so the reservation and
+    # the completion cannot disagree about where the bytes will be.
+    for produced in operation.outputs:
+        _set_copy(
+            copies, dram, ssd, produced, DOMAIN_OF_DEVICE[action.device],
+            COPY_RESERVED_OUTPUT,
+        )
 
     running = _with_task(
         state.running,
@@ -1547,6 +1617,32 @@ def _advance(scenario: Scenario, state: State) -> State:
     simultaneous and therefore indistinguishable.
     """
     delta = min(task.remaining_ns for task in state.running)
+    return advance_elapsed(scenario, state, delta)
+
+
+def advance_elapsed(
+    scenario: Scenario, state: State, elapsed_ns: int,
+    paused_resources: Iterable[str] = (),
+) -> State:
+    """Advance up to the next active completion, preserving paused tasks.
+
+    This is shared by the fixed-cost engine and the environment session. An
+    environment boundary can occur before a completion; a paused resource
+    receives no service while time passes. Inputs, output reservations, and
+    workspace remain committed until the original completion rules run.
+    The caller must not skip an active task completion.
+    """
+    if isinstance(elapsed_ns, bool) or not isinstance(elapsed_ns, int) or elapsed_ns < 0:
+        raise InvalidInput("elapsed_ns must be a non-negative integer")
+    paused = frozenset(paused_resources)
+    resources = {RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE, RESOURCE_COPY,
+                 RESOURCE_PCIE_COPY, RESOURCE_SSD_IO}
+    if not paused <= resources:
+        raise InvalidInput("paused_resources names an unknown resource")
+    active = [task.remaining_ns for task in state.running if task.resource not in paused]
+    if active and elapsed_ns > min(active):
+        raise InvalidInput("elapsed_ns cannot skip an active task completion")
+    delta = elapsed_ns
 
     ops = dict(state.op_status)
     copies = dict(state.copy_status)
@@ -1554,7 +1650,7 @@ def _advance(scenario: Scenario, state: State) -> State:
     ssd = dict(state.ssd_status)
     still_running: list[RunningTask] = []
     for task in state.running:
-        remaining = task.remaining_ns - delta
+        remaining = task.remaining_ns - (0 if task.resource in paused else delta)
         if remaining > 0:
             # ``device``/``route`` are carried, not dropped: a 0.2 task that
             # forgets which device it is on would complete into the wrong domain.
@@ -1588,7 +1684,7 @@ def _complete(
     dram: dict[str, str],
     ssd: dict[str, str],
 ) -> None:
-    """Finish one task in place: a compute its output, a transfer its destination.
+    """Finish one task in place: a compute its outputs, a transfer its destination.
 
     One function for both rule sets. The version difference is entirely in what
     the task carries -- a 0.1 transfer has no route, so it lands in VRAM, which
@@ -1596,14 +1692,12 @@ def _complete(
     """
     if task.resource in (RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE):
         operation = scenario.workload.operation_by_id[task.target_id]
-        _set_copy(
-            copies,
-            dram,
-            ssd,
-            operation.output,
-            DOMAIN_OF_DEVICE[_task_device(scenario, task)],
-            COPY_READY,
-        )
+        # Every output becomes READY here, and only here. An M2 macro-task that
+        # materialises KV blocks alongside its hidden would otherwise leave those
+        # blocks stuck in RESERVED_OUTPUT forever, so the goal would never hold.
+        device_domain = DOMAIN_OF_DEVICE[_task_device(scenario, task)]
+        for produced in operation.outputs:
+            _set_copy(copies, dram, ssd, produced, device_domain, COPY_READY)
         ops[task.target_id] = OP_DONE
         return
     if task.route is None:

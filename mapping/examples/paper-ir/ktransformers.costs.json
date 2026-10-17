@@ -1,0 +1,440 @@
+{
+  "format_version": "m2-layer-0.6",
+  "source": "ktransformers-interface-synthetic",
+  "entries": [
+    {
+      "kind": "projection",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "projection",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "attention",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "attention",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "router",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 2000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "router",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "combine",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "combine",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 2500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 10000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "projection",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "projection",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "attention",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "attention",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "router",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 2000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "router",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "combine",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 1000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "combine",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 2,
+      "duration_ns": 500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_request"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "expert_ffn",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 2500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 2500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "cpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 10000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "gpu",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 2,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 5000000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    },
+    {
+      "kind": "shared_expert_ffn",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 0,
+      "duration_ns": 2500000,
+      "workspace_bytes": 16,
+      "provenance": "synthetic_layer",
+      "accounting": "per_expert_group"
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 16,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 32,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 64,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 16,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 32,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 16,
+      "duration_ns": 3000000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 32,
+      "duration_ns": 3000000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 3000000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 16,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 32,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 64,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 8,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 8,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "ssd_to_dram",
+      "storage_bytes": 8,
+      "duration_ns": 3000000,
+      "provenance": "synthetic_transfer"
+    },
+    {
+      "route": "dram_to_ssd",
+      "storage_bytes": 8,
+      "duration_ns": 100000,
+      "provenance": "synthetic_transfer"
+    }
+  ]
+}

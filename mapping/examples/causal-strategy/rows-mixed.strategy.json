@@ -1,0 +1,10 @@
+{
+  "format_version": "causal-strategy-0.1",
+  "id": "rows-mixed",
+  "invocation_file": "../m2/moe-interface-synthetic-prefill-2.json",
+  "environment_file": "../causal/no-disturbance.environment.json",
+  "execution_file": "rows.execution.json",
+  "policy_file": "mixed.policy.json",
+  "history_file": null,
+  "max_decisions": 250
+}

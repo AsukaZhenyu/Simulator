@@ -72,6 +72,7 @@ __all__ = [
     "aligned_size",
     "load_workload",
     "load_and_validate",
+    "build_scenario",
     "reachable_locations",
     "workload_fingerprint",
     "scenario_fingerprint",
@@ -87,6 +88,11 @@ __all__ = [
     "COPY_RESERVED_COPY",
     "COPY_RESERVED_OUTPUT",
     "DTYPE_F32",
+    "DTYPE_I32",
+    "DTYPE_F16",
+    "DTYPE_Q4_K",
+    "DTYPE_Q6_K",
+    "ggml_contiguous_layout",
     "LOC_DRAM",
     "LOC_VRAM",
     "OP_DONE",
@@ -94,6 +100,8 @@ __all__ = [
     "OP_RUNNING",
     "ORIGIN_GGML",
     "ORIGIN_SYNTHETIC",
+    "ORIGIN_SYNTHETIC_LAYER",
+    "ORIGIN_MEASURED_MACRO",
     "RESOURCE_COMPUTE",
     "RESOURCE_COPY",
     "ROLE_INPUT",
@@ -103,6 +111,15 @@ __all__ = [
     "SEMANTIC_ADD",
     "SEMANTIC_MUL_MAT",
     "SEMANTIC_RELU",
+    # M2 的宏任务语义（M2_LAYER_DESIGN.md §3）。它们不是 GGML 算子，只在一个
+    # 声明了 synthetic_layer / measured_macro 来源的负载上被接受。
+    "SEMANTIC_PROJECTION",
+    "SEMANTIC_ATTENTION",
+    "SEMANTIC_STATE_UPDATE",
+    "SEMANTIC_ROUTER",
+    "SEMANTIC_EXPERT_FFN",
+    "SEMANTIC_COMBINE",
+    "SEMANTIC_DENSE_FFN",
     # 0.2 的取值域：位置多了一个 SSD，设备、路线、资源各是一组新名字。
     # 与上面那些常量同理，调用方按名比较它们，所以属于公开面。
     "DEVICE_CPU",
@@ -145,7 +162,21 @@ SUPPORTED_SCHEMA_VERSIONS = (SCHEMA_VERSION, SCHEMA_VERSION_M1)
 # ---------------------------------------------------------------------------
 
 DTYPE_F32 = "GGML_TYPE_F32"
+DTYPE_I32 = "GGML_TYPE_I32"
+DTYPE_F16 = "GGML_TYPE_F16"
+DTYPE_Q4_K = "GGML_TYPE_Q4_K"
+DTYPE_Q6_K = "GGML_TYPE_Q6_K"
 _DTYPE_SIZE_BYTES = {DTYPE_F32: 4}
+# GGML ne[0] is the reduction/row dimension. Quantized strides use the size
+# of one 256-element block, not a rounded bytes-per-element estimate. These
+# formats describe M2 macro storage only; ordinary M0/M1 ops remain F32.
+_GGML_BLOCK_STORAGE = {
+    DTYPE_F32: (1, 4),
+    DTYPE_I32: (1, 4),
+    DTYPE_F16: (1, 2),
+    DTYPE_Q4_K: (256, 144),
+    DTYPE_Q6_K: (256, 210),
+}
 
 ROLE_INPUT = "input"
 ROLE_WEIGHT = "weight"
@@ -156,7 +187,38 @@ _ROLES = frozenset({ROLE_INPUT, ROLE_WEIGHT, ROLE_INTERMEDIATE, ROLE_OUTPUT})
 SEMANTIC_MUL_MAT = "MUL_MAT"
 SEMANTIC_RELU = "RELU"
 SEMANTIC_ADD = "ADD"
-_SEMANTIC_OPS = frozenset({SEMANTIC_MUL_MAT, SEMANTIC_RELU, SEMANTIC_ADD})
+
+# M2's schedulable macro-tasks (M2_LAYER_DESIGN.md §3). They are deliberately
+# NOT GGML ops: they name task groups a layer descriptor declares, and their
+# shapes are checked by the M2 layer validator rather than by the matrix-vector
+# rules below. ``dense_ffn`` is the acceptance's own third task name
+# (M2_LAYER_ACCEPTANCE.md §2) and sits beside the design's six.
+SEMANTIC_PROJECTION = "projection"
+SEMANTIC_ATTENTION = "attention"
+SEMANTIC_STATE_UPDATE = "state_update"
+SEMANTIC_ROUTER = "router"
+SEMANTIC_EXPERT_FFN = "expert_ffn"
+SEMANTIC_COMBINE = "combine"
+SEMANTIC_DENSE_FFN = "dense_ffn"
+# Materialized row execution is a synthetic graph/storage contract only. These
+# labels do not certify numerical GGML or measured physical kernel semantics.
+_SYNTHETIC_ROW_OPS = frozenset({"gather_rows", "scatter_rows", "combine_rows", "expert_gate",
+                                  "expert_up", "expert_swiglu", "expert_down", "attention_core", "attention_output",
+                                  "ffn_norm", "ffn_gate", "ffn_up", "ffn_swiglu", "ffn_down", "ffn_sum", "ffn_residual",
+                                  "attention_qk", "attention_softmax", "attention_pv", "attention_projection"})
+_M2_MACRO_OPS = frozenset(
+    {
+        SEMANTIC_PROJECTION,
+        SEMANTIC_ATTENTION,
+        SEMANTIC_STATE_UPDATE,
+        SEMANTIC_ROUTER,
+        SEMANTIC_EXPERT_FFN,
+        SEMANTIC_COMBINE,
+        SEMANTIC_DENSE_FFN,
+    }
+) | _SYNTHETIC_ROW_OPS
+
+_SEMANTIC_OPS = frozenset({SEMANTIC_MUL_MAT, SEMANTIC_RELU, SEMANTIC_ADD}) | _M2_MACRO_OPS
 
 LOC_DRAM = "dram"
 LOC_VRAM = "vram"
@@ -224,7 +286,18 @@ COPY_READY = "READY"
 # (DESIGN.md §9, ACCEPTANCE.md §7).
 ORIGIN_GGML = "ggml"
 ORIGIN_SYNTHETIC = "synthetic_fixture"
-_ORIGIN_KINDS = frozenset({ORIGIN_GGML, ORIGIN_SYNTHETIC})
+
+# M2's abstract layer graphs (M2_LAYER_DESIGN.md §3:36). An abstract macro-task
+# graph must be labelled so it is never read as a real GGML export, and the
+# label is load-bearing rather than decorative: the macro semantics above are
+# accepted *only* on a workload declaring one of these two kinds. Without that
+# gate, adding them to ``_SEMANTIC_OPS`` would quietly widen what a 0.1 or 0.2
+# document may say, not merely what it may hash to.
+ORIGIN_SYNTHETIC_LAYER = "synthetic_layer"
+ORIGIN_MEASURED_MACRO = "measured_macro"
+_M2_ORIGIN_KINDS = frozenset({ORIGIN_SYNTHETIC_LAYER, ORIGIN_MEASURED_MACRO})
+
+_ORIGIN_KINDS = frozenset({ORIGIN_GGML, ORIGIN_SYNTHETIC}) | _M2_ORIGIN_KINDS
 
 # Resource names used in states, events and error reports.
 #
@@ -336,7 +409,17 @@ class Tensor:
 
 @dataclass(frozen=True)
 class Operation:
-    """One node of the compute DAG."""
+    """One node of the compute DAG.
+
+    ``output`` is the tensor the operation is named after; ``extra_outputs``
+    holds any further tensors it materialises. For every M0/M1 graph the tuple
+    is empty and ``outputs`` is exactly ``(output,)``. M2 needs more than one:
+    its ``attention`` macro-task produces the new hidden state *and* one
+    immutable KV block per new token, in a single schedulable step. Splitting
+    that into two operations would put two rows in the trace where the
+    acceptance fixes one task on one CPU slot (M2_LAYER_ACCEPTANCE.md §2), and
+    an append task carrying 0 ns is refused by the cost parser anyway.
+    """
 
     id: str
     semantic_op: str
@@ -345,6 +428,12 @@ class Operation:
     op_params: tuple[int, ...]
     inputs: tuple[str, ...]
     output: str
+    extra_outputs: tuple[str, ...] = ()
+
+    @property
+    def outputs(self) -> tuple[str, ...]:
+        """Every tensor this operation produces, the named one first."""
+        return (self.output,) + self.extra_outputs
 
 
 @dataclass(frozen=True)
@@ -529,12 +618,21 @@ class ComputeCost:
     duration_ns: int
     workspace_bytes: int = 0
 
+    def __post_init__(self) -> None:
+        # Python callers must obey the same contract as parsed cost tables:
+        # invalid durations otherwise let ADVANCE move simulated time backwards.
+        _require_int(self.duration_ns, "ComputeCost.duration_ns", minimum=1)
+        _require_int(self.workspace_bytes, "ComputeCost.workspace_bytes")
+
 
 @dataclass(frozen=True)
 class H2DCost:
     """Duration of one host-to-device copy."""
 
     duration_ns: int
+
+    def __post_init__(self) -> None:
+        _require_int(self.duration_ns, "H2DCost.duration_ns", minimum=1)
 
 
 @dataclass(frozen=True)
@@ -556,6 +654,9 @@ class TransferCost:
     """
 
     duration_ns: int
+
+    def __post_init__(self) -> None:
+        _require_int(self.duration_ns, "TransferCost.duration_ns", minimum=1)
 
 
 @dataclass(frozen=True)
@@ -613,6 +714,30 @@ class M1Mapspace:
     allow_copy_compute_overlap: bool
     allow_cpu_gpu_overlap: bool
     allow_recomputation: bool = False
+    # Optional M2 causal-replay gate: selective expert transfers wait until
+    # the router that reveals the selection has completed. Resident copies
+    # remain usable; this gates transfer actions, never local computation.
+    transfer_dependencies: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        dependencies = _require_mapping(
+            self.transfer_dependencies, "M1Mapspace.transfer_dependencies"
+        )
+        for tensor_id, operation_ids in dependencies.items():
+            _require_str(tensor_id, "M1Mapspace.transfer_dependencies tensor id")
+            if not isinstance(operation_ids, tuple):
+                raise InvalidInput(
+                    f"M1Mapspace.transfer_dependencies[{tensor_id!r}] must be a tuple"
+                )
+            seen: set[str] = set()
+            for operation_id in operation_ids:
+                _require_str(operation_id, "transfer dependency operation id")
+                if operation_id in seen:
+                    raise InvalidInput(
+                        f"transfer_dependencies[{tensor_id!r}] lists "
+                        f"{operation_id!r} twice"
+                    )
+                seen.add(operation_id)
 
     def devices_for(self, operation_id: str) -> tuple[str, ...]:
         return self.allowed_devices.get(operation_id, ())
@@ -668,6 +793,25 @@ class Scenario:
     # 0.2 only. ``None`` for a 0.1 scenario, whose goal is "every requested
     # output resident in VRAM" (DESIGN.md §5).
     goal: M1Goal | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.mapspace, M1Mapspace) and self.mapspace.transfer_dependencies:
+            if not self.is_m1 or self.workload.origin.kind not in _M2_ORIGIN_KINDS:
+                raise Unsupported(
+                    "transfer_dependencies requires an M1 scenario with M2 "
+                    "synthetic_layer or measured_macro workload provenance"
+                )
+            for tensor_id, operation_ids in self.mapspace.transfer_dependencies.items():
+                if tensor_id not in self.workload.tensor_by_id:
+                    raise InvalidInput(
+                        f"transfer_dependencies: unknown tensor {tensor_id!r}"
+                    )
+                for operation_id in operation_ids:
+                    if operation_id not in self.workload.operation_by_id:
+                        raise InvalidInput(
+                            f"transfer_dependencies[{tensor_id!r}]: "
+                            f"unknown operation {operation_id!r}"
+                        )
 
     @property
     def is_m1(self) -> bool:
@@ -816,6 +960,44 @@ def _require_f32_nbytes(ne: tuple[int, ...], nb: tuple[int, ...]) -> int:
     return nb[3] * ne[3]
 
 
+def ggml_contiguous_layout(
+    dtype: str, ne: tuple[int, ...] | list[int]
+) -> tuple[tuple[int, int, int, int], int]:
+    """Return exact GGML contiguous strides and bytes for four positive extents.
+
+    F16 and K-quantized layouts are storage declarations for M2 macro operands,
+    not a claim that the ordinary tensor operations support these datatypes.
+    Quantized rows must contain whole blocks: no implicit row padding is used.
+    """
+    if not isinstance(dtype, str) or dtype not in _GGML_BLOCK_STORAGE:
+        raise Unsupported(f"unsupported contiguous GGML storage dtype {dtype!r}")
+    if not isinstance(ne, (tuple, list)) or len(ne) != 4:
+        raise InvalidInput("GGML ne must have exactly four positive integer extents")
+    for i, extent in enumerate(ne):
+        if isinstance(extent, bool) or not isinstance(extent, int) or extent < 1:
+            raise InvalidInput(f"ne[{i}] must be a positive integer, got {extent!r}")
+    block_elements, block_bytes = _GGML_BLOCK_STORAGE[dtype]
+    if ne[0] % block_elements:
+        raise Unsupported(
+            f"{dtype} contiguous rows require ne[0] divisible by {block_elements}; "
+            f"got {ne[0]} (row padding is not modeled)"
+        )
+    row_bytes = ne[0] // block_elements * block_bytes
+    nb = (block_bytes, row_bytes, row_bytes * ne[1], row_bytes * ne[1] * ne[2])
+    return nb, nb[3] * ne[3]
+
+
+def _require_ggml_nbytes(dtype: str, ne: tuple[int, ...], nb: tuple[int, ...]) -> int:
+    expected, nbytes = ggml_contiguous_layout(dtype, ne)
+    for i, stride in enumerate(nb):
+        if stride != expected[i]:
+            raise Unsupported(
+                f"non-contiguous {dtype} layout: nb[{i}]={stride} but contiguous "
+                f"GGML storage needs nb[{i}]={expected[i]}"
+            )
+    return nbytes
+
+
 # ---------------------------------------------------------------------------
 # Parsing
 # ---------------------------------------------------------------------------
@@ -838,7 +1020,9 @@ def _parse_origin(raw: Any, where: str) -> Origin:
     return Origin(kind=kind, ggml_version=ggml_version, sample=sample)
 
 
-def _parse_tensor(raw: Any, where: str, locations_allowed: frozenset[str]) -> Tensor:
+def _parse_tensor(
+    raw: Any, where: str, locations_allowed: frozenset[str], *, m2_origin: bool = False
+) -> Tensor:
     block = _require_mapping(raw, where)
     _reject_unknown_keys(
         block,
@@ -879,11 +1063,13 @@ def _parse_tensor(raw: Any, where: str, locations_allowed: frozenset[str]) -> Te
     )
 
     dtype = _require_str(block.get("dtype"), f"{where}.dtype")
-    if dtype != DTYPE_F32:
+    if dtype != DTYPE_F32 and not m2_origin:
         raise Unsupported(
-            f"{where}.dtype is {dtype!r}; M0 models only {DTYPE_F32} because its "
-            "costs are supplied per operation, not derived from the dtype"
+            f"{where}.dtype is {dtype!r}; M0/M1 non-M2 workloads model only "
+            f"{DTYPE_F32}; additional GGML storage types require M2 macro origin"
         )
+    if dtype not in _GGML_BLOCK_STORAGE:
+        raise Unsupported(f"{where}.dtype is {dtype!r}; unsupported M2 GGML storage dtype")
 
     ne_raw = _require_list(block.get("ne"), f"{where}.ne")
     nb_raw = _require_list(block.get("nb"), f"{where}.nb")
@@ -893,7 +1079,11 @@ def _parse_tensor(raw: Any, where: str, locations_allowed: frozenset[str]) -> Te
     nb = tuple(_require_int(v, f"{where}.nb[{i}]", minimum=1) for i, v in enumerate(nb_raw))
     assert len(ne) == 4 and len(nb) == 4  # narrowed for the type checker
 
-    computed_bytes = _require_f32_nbytes(ne, nb)
+    computed_bytes = (
+        _require_f32_nbytes(ne, nb)
+        if dtype == DTYPE_F32
+        else _require_ggml_nbytes(dtype, ne, nb)
+    )
     storage_bytes = _require_int(block.get("storage_bytes"), f"{where}.storage_bytes", minimum=1)
     _expect(
         storage_bytes == computed_bytes,
@@ -940,7 +1130,16 @@ def _parse_operation(raw: Any, where: str) -> Operation:
     block = _require_mapping(raw, where)
     _reject_unknown_keys(
         block,
-        {"id", "semantic_op", "ggml_op", "unary_op", "op_params", "inputs", "output"},
+        {
+            "id",
+            "semantic_op",
+            "ggml_op",
+            "unary_op",
+            "op_params",
+            "inputs",
+            "output",
+            "extra_outputs",
+        },
         where,
     )
 
@@ -978,6 +1177,13 @@ def _parse_operation(raw: Any, where: str) -> Operation:
     output = _require_str(block.get("output"), f"{where}.output")
     _expect(bool(output), f"{where}.output must not be empty")
 
+    extras_raw = _require_list(block.get("extra_outputs", []), f"{where}.extra_outputs")
+    extra_outputs: list[str] = []
+    for i, value in enumerate(extras_raw):
+        value = _require_str(value, f"{where}.extra_outputs[{i}]")
+        _expect(bool(value), f"{where}.extra_outputs[{i}] must not be empty")
+        extra_outputs.append(value)
+
     return Operation(
         id=op_id,
         semantic_op=semantic_op,
@@ -986,6 +1192,7 @@ def _parse_operation(raw: Any, where: str) -> Operation:
         op_params=op_params,
         inputs=tuple(inputs),
         output=output,
+        extra_outputs=tuple(extra_outputs),
     )
 
 
@@ -1027,7 +1234,10 @@ def _parse_workload(raw: Any, where: str) -> Workload:
     allowed_locations = _LOCATIONS_M1 if version == SCHEMA_VERSION_M1 else _LOCATIONS
     tensors_raw = _require_list(block.get("tensors"), f"{where}.tensors")
     tensors = tuple(
-        _parse_tensor(entry, f"{where}.tensors[{i}]", allowed_locations)
+        _parse_tensor(
+            entry, f"{where}.tensors[{i}]", allowed_locations,
+            m2_origin=origin.kind in _M2_ORIGIN_KINDS,
+        )
         for i, entry in enumerate(tensors_raw)
     )
 
@@ -1078,6 +1288,36 @@ def _validate_workload(workload: Workload) -> None:
             raise InvalidInput(f"duplicate operation id {operation.id!r}")
         operation_by_id[operation.id] = operation
 
+    # --- M2 macro-task gate ------------------------------------------------
+    # The macro semantics live in ``_SEMANTIC_OPS``, but a 0.1 or 0.2 document
+    # must not be able to reach them. Accepting one there would widen what those
+    # versions *mean*, which is a different and worse thing than changing what
+    # they hash to. Both the semantics and the second-output field are therefore
+    # gated on the origin the workload declares.
+    m2_origin = workload.origin.kind in _M2_ORIGIN_KINDS
+    if not m2_origin:
+        for tensor in workload.tensors:
+            if tensor.dtype != DTYPE_F32:
+                raise Unsupported(
+                    f"tensor {tensor.id!r}: non-M2 workloads require F32; "
+                    f"got {tensor.dtype!r}"
+                )
+    for operation in workload.operations:
+        if operation.semantic_op in _SYNTHETIC_ROW_OPS and workload.origin.kind != ORIGIN_SYNTHETIC_LAYER:
+            raise Unsupported(f"operation {operation.id!r}: row execution requires synthetic_layer origin")
+        if operation.semantic_op in _M2_MACRO_OPS and not m2_origin:
+            raise Unsupported(
+                f"operation {operation.id!r}: semantic_op "
+                f"{operation.semantic_op!r} is an M2 macro-task; it requires a "
+                f"workload whose origin.kind is one of {sorted(_M2_ORIGIN_KINDS)}, "
+                f"not {workload.origin.kind!r}"
+            )
+        if operation.extra_outputs and operation.semantic_op not in _M2_MACRO_OPS:
+            raise Unsupported(
+                f"operation {operation.id!r}: extra_outputs is only meaningful on "
+                f"an M2 macro-task, not on {operation.semantic_op!r}"
+            )
+
     # --- per-operation shape and reference checks -------------------------
     producer_of: dict[str, str] = {}
     for operation in workload.operations:
@@ -1094,20 +1334,29 @@ def _validate_workload(workload: Workload) -> None:
             # is one allocation and one read lock, never two.
             seen_inputs.add(tensor_id)
 
-        if operation.output not in tensor_by_id:
-            raise InvalidInput(f"{label}: unknown output tensor {operation.output!r}")
-        if operation.output in operation.inputs:
-            raise Unsupported(
-                f"{label}: reads and writes {operation.output!r} in place; M0 has "
-                "no in-place reuse and no way to model the aliasing"
-            )
-        if operation.output in producer_of:
+        # Checked before the producer map so a repeat is reported as what it is,
+        # rather than as the operation being its own second producer.
+        if len(set(operation.outputs)) != len(operation.outputs):
             raise InvalidInput(
-                f"tensor {operation.output!r} has several producers "
-                f"({producer_of[operation.output]!r} and {operation.id!r}); M0 needs "
-                "a single producer per tensor so that liveness is a DAG property"
+                f"{label}: lists the same output tensor twice "
+                f"({list(operation.outputs)})"
             )
-        producer_of[operation.output] = operation.id
+
+        for produced in operation.outputs:
+            if produced not in tensor_by_id:
+                raise InvalidInput(f"{label}: unknown output tensor {produced!r}")
+            if produced in operation.inputs:
+                raise Unsupported(
+                    f"{label}: reads and writes {produced!r} in place; M0 has "
+                    "no in-place reuse and no way to model the aliasing"
+                )
+            if produced in producer_of:
+                raise InvalidInput(
+                    f"tensor {produced!r} has several producers "
+                    f"({producer_of[produced]!r} and {operation.id!r}); M0 needs "
+                    "a single producer per tensor so that liveness is a DAG property"
+                )
+            producer_of[produced] = operation.id
 
         _validate_operation_shape(operation, tensor_by_id, label)
 
@@ -1205,7 +1454,11 @@ def _has_cycle(workload: Workload) -> bool:
     """Depth-first cycle detection over the tensor -> producing-operation edges."""
     producer_of: dict[str, str] = {}
     for operation in workload.operations:
-        producer_of[operation.output] = operation.id
+        # Every produced tensor, not just the named one: a cycle closed through
+        # an extra output would otherwise go undetected, and the engine would
+        # then call a non-DAG infeasible instead of rejecting it here.
+        for produced in operation.outputs:
+            producer_of[produced] = operation.id
     op_by_id = {op.id: op for op in workload.operations}
 
     WHITE, GREY, BLACK = 0, 1, 2
@@ -1246,6 +1499,16 @@ def _validate_operation_shape(
     """
     output = tensor_by_id[operation.output]
     inputs = [tensor_by_id[tid] for tid in operation.inputs]
+
+    if operation.semantic_op not in _M2_MACRO_OPS:
+        operands = inputs + [tensor_by_id[tid] for tid in operation.outputs]
+        non_f32 = [tensor for tensor in operands if tensor.dtype != DTYPE_F32]
+        if non_f32:
+            raise Unsupported(
+                f"{label}: ordinary {operation.semantic_op} operations require F32; "
+                f"tensor {non_f32[0].id!r} has dtype {non_f32[0].dtype!r}. "
+                "F16 and quantized storage are supported only as M2 macro operands"
+            )
 
     def vector_like(tensor: Tensor) -> bool:
         return tensor.ne[1] == 1 and tensor.ne[2] == 1 and tensor.ne[3] == 1
@@ -1301,10 +1564,45 @@ def _validate_operation_shape(
                 f"{list(inputs[0].ne)}, {list(inputs[1].ne)} -> {list(output.ne)}"
             )
 
+    elif operation.semantic_op in _M2_MACRO_OPS:
+        # An M2 macro-task's operands are the layer descriptor's business. A
+        # projection, an attention over an arbitrary visible history and a
+        # router over top-k experts share no shape rule, and inventing one here
+        # would be the kernel guessing at a contract it does not own --
+        # ``m2.spec.validate_invocation`` is where those shapes are checked.
+        return
+
+    else:
+        # Reachable only when a semantic op was added to ``_SEMANTIC_OPS`` and
+        # no branch was added for it here. Without this the function would fall
+        # off the end and *accept* the operation, which is the failure mode this
+        # project keeps meeting: a missing rule looks exactly like a passing one.
+        raise Unsupported(
+            f"{label}: no shape rule for semantic_op {operation.semantic_op!r}; "
+            "every entry in _SEMANTIC_OPS needs a branch here"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Scenario
 # ---------------------------------------------------------------------------
+
+
+# The keys a scenario document may carry. ``workload_file`` is a property of the
+# file-shaped document only -- an in-memory pair names no file (build_scenario).
+_SCENARIO_KEYS = frozenset(
+    {
+        "schema_version",
+        "id",
+        "workload_file",
+        "architecture",
+        "costs",
+        "mapspace",
+        "mapper",
+        "goal",
+        "comment",
+    }
+)
 
 
 def load_and_validate(scenario_path: str | Path) -> Scenario:
@@ -1316,51 +1614,95 @@ def load_and_validate(scenario_path: str | Path) -> Scenario:
     """
     path = Path(scenario_path)
     raw = _require_mapping(_read_json(path), path.name)
-
-    allowed = {
-        "schema_version",
-        "id",
-        "workload_file",
-        "architecture",
-        "costs",
-        "mapspace",
-        "mapper",
-        "goal",
-        "comment",
-    }
-    _reject_unknown_keys(raw, allowed, path.name)
+    _reject_unknown_keys(raw, set(_SCENARIO_KEYS), path.name)
 
     schema_version = _check_schema_version(raw.get("schema_version"), path.name)
-
     scenario_id = _require_str(raw.get("id"), f"{path.name}.id")
 
     workload_file = _require_str(raw.get("workload_file"), f"{path.name}.workload_file")
-    workload_path = path.parent / workload_file
-    workload = load_workload(workload_path)
+    workload = load_workload(path.parent / workload_file)
 
-    architecture = _parse_architecture(raw.get("architecture"), path.name, schema_version)
-    if schema_version == SCHEMA_VERSION_M1:
+    return _scenario_from(
+        workload, raw, path.name, version=schema_version, scenario_id=scenario_id
+    )
+
+
+def build_scenario(
+    workload_document: Mapping[str, Any],
+    scenario_document: Mapping[str, Any],
+    *,
+    where: str = "<memory>",
+) -> Scenario:
+    """Validate an in-memory workload/scenario pair exactly as a file pair would be.
+
+    :func:`load_and_validate` is the file-shaped entry point; this is the same
+    validation with no path anywhere. It exists because the M2 layer compiler
+    builds its scenario in memory, and it must still go through
+    ``_parse_costs_m1`` and ``_parse_mapspace_m1``: those enforce the
+    bidirectional allowed-set/cost-table agreement and the reachability check,
+    and constructing the dataclasses directly would skip both **silently** --
+    the under-counting failure the cost bridge is built to refuse.
+
+    The two documents are what the corresponding files would contain, except
+    that the scenario names no ``workload_file``; the workload is passed here
+    instead. Everything else, including ``comment``, is as on disk.
+    """
+    raw = _require_mapping(scenario_document, where)
+    if "workload_file" in raw:
+        raise InvalidInput(
+            f"{where}.workload_file: an in-memory scenario names no file; pass the "
+            "workload document to build_scenario() instead"
+        )
+    _reject_unknown_keys(raw, set(_SCENARIO_KEYS) - {"workload_file"}, where)
+
+    schema_version = _check_schema_version(raw.get("schema_version"), where)
+    scenario_id = _require_str(raw.get("id"), f"{where}.id")
+
+    workload = _parse_workload(workload_document, f"{where}:workload")
+
+    return _scenario_from(
+        workload, raw, where, version=schema_version, scenario_id=scenario_id
+    )
+
+
+def _scenario_from(
+    workload: Workload,
+    raw: dict[str, Any],
+    where: str,
+    *,
+    version: str,
+    scenario_id: str,
+) -> Scenario:
+    """The tail shared by both entry points: parse the rest and assemble.
+
+    Kept in one place so the file and in-memory routes cannot drift in which
+    parsers run or in what order -- the order is load-bearing for 0.2, where the
+    mapspace must exist before the costs are checked against it.
+    """
+    architecture = _parse_architecture(raw.get("architecture"), where, version)
+    mapspace: Mapspace | M1Mapspace
+    costs: Costs | M1Costs
+    goal: M1Goal | None
+    if version == SCHEMA_VERSION_M1:
         # The mapspace is parsed first: the cost tables are checked against the
         # allowed sets, so the sets have to exist before the costs are read.
-        mapspace_m1 = _parse_mapspace_m1(raw.get("mapspace"), path.name, workload)
-        mapspace: Mapspace | M1Mapspace = mapspace_m1
-        costs: Costs | M1Costs = _parse_costs_m1(
-            raw.get("costs"), path.name, workload, mapspace_m1
-        )
-        goal = _parse_goal(raw.get("goal"), path.name, workload)
+        mapspace_m1 = _parse_mapspace_m1(raw.get("mapspace"), where, workload)
+        mapspace = mapspace_m1
+        costs = _parse_costs_m1(raw.get("costs"), where, workload, mapspace_m1)
+        goal = _parse_goal(raw.get("goal"), where, workload)
     else:
         if raw.get("goal") is not None:
             raise Unsupported(
-                f"{path.name}.goal is a 0.2 field; a 0.1 scenario's outputs are "
+                f"{where}.goal is a 0.2 field; a 0.1 scenario's outputs are "
                 "always requested in VRAM and there is nothing to choose"
             )
-        costs = _parse_costs(raw.get("costs"), path.name, workload)
-        mapspace = _parse_mapspace(raw.get("mapspace"), path.name, workload)
+        costs = _parse_costs(raw.get("costs"), where, workload)
+        mapspace = _parse_mapspace(raw.get("mapspace"), where, workload)
         goal = None
-    mapper_config = _parse_mapper(raw.get("mapper"), path.name)
+    mapper_config = _parse_mapper(raw.get("mapper"), where)
 
     return Scenario(
-        schema_version=schema_version,
+        schema_version=version,
         id=scenario_id,
         workload=workload,
         architecture=architecture,
@@ -1728,6 +2070,7 @@ def _parse_mapspace_m1(raw: Any, where: str, workload: Workload) -> M1Mapspace:
         {
             "allowed_devices",
             "allowed_transfers",
+            "transfer_dependencies",
             "allow_copy_compute_overlap",
             "allow_cpu_gpu_overlap",
             "allow_eviction",
@@ -1832,9 +2175,23 @@ def _parse_mapspace_m1(raw: Any, where: str, workload: Workload) -> M1Mapspace:
             "and must not silently ignore the request"
         )
 
+    dependencies_raw = _require_mapping(
+        block.get("transfer_dependencies", {}),
+        f"{where}.mapspace.transfer_dependencies",
+    )
+    transfer_dependencies: dict[str, tuple[str, ...]] = {}
+    for tensor_id, entry in dependencies_raw.items():
+        item_label = f"{where}.mapspace.transfer_dependencies[{tensor_id!r}]"
+        operation_ids = _require_list(entry, item_label)
+        transfer_dependencies[tensor_id] = tuple(
+            _require_str(operation_id, f"{item_label}[{i}]")
+            for i, operation_id in enumerate(operation_ids)
+        )
+
     return M1Mapspace(
         allowed_devices=allowed_devices,
         allowed_transfers=allowed_transfers,
+        transfer_dependencies=transfer_dependencies,
         allow_eviction=_require_bool(
             block.get("allow_eviction"), f"{where}.mapspace.allow_eviction"
         ),
@@ -2041,6 +2398,26 @@ def _canonical_workload(workload: Workload) -> dict[str, Any]:
     Tensors and operations are sorted by id, so reordering the JSON file --
     which changes nothing semantically -- does not change the fingerprint.
     """
+    operations: list[dict[str, Any]] = []
+    for op in sorted(workload.operations, key=lambda op: op.id):
+        entry: dict[str, Any] = {
+            "id": op.id,
+            "semantic_op": op.semantic_op,
+            "ggml_op": op.ggml_op,
+            "unary_op": op.unary_op,
+            "op_params": list(op.op_params),
+            # Operand order is semantic for MUL_MAT (it is [weight, activation]),
+            # so inputs keep their declared order while everything else sorts.
+            "inputs": list(op.inputs),
+            "output": op.output,
+        }
+        # Present only when non-empty. This digest identifies *stored mappings*,
+        # so an unconditional key would re-hash every 0.1 and 0.2 workload --
+        # invalidating artefacts on disk -- over a field none of them uses.
+        if op.extra_outputs:
+            entry["extra_outputs"] = list(op.extra_outputs)
+        operations.append(entry)
+
     return {
         "id": workload.id,
         "origin": {"kind": workload.origin.kind},
@@ -2057,20 +2434,7 @@ def _canonical_workload(workload: Workload) -> dict[str, Any]:
             }
             for t in sorted(workload.tensors, key=lambda t: t.id)
         ],
-        "operations": [
-            {
-                "id": op.id,
-                "semantic_op": op.semantic_op,
-                "ggml_op": op.ggml_op,
-                "unary_op": op.unary_op,
-                "op_params": list(op.op_params),
-                # Operand order is semantic for MUL_MAT (it is [weight, activation]),
-                # so inputs keep their declared order while everything else sorts.
-                "inputs": list(op.inputs),
-                "output": op.output,
-            }
-            for op in sorted(workload.operations, key=lambda op: op.id)
-        ],
+        "operations": operations,
         "outputs": list(workload.outputs),
     }
 
@@ -2207,6 +2571,14 @@ def _canonical_scenario_m1(scenario: Scenario) -> dict[str, Any]:
             ],
             "allow_copy_compute_overlap": mapspace.allow_copy_compute_overlap,
             "allow_cpu_gpu_overlap": mapspace.allow_cpu_gpu_overlap,
+            **(
+                {"transfer_dependencies": [
+                    {"tensor_id": tensor_id, "operation_ids": sorted(operation_ids)}
+                    for tensor_id, operation_ids
+                    in sorted(mapspace.transfer_dependencies.items())
+                ]}
+                if mapspace.transfer_dependencies else {}
+            ),
             "allow_eviction": mapspace.allow_eviction,
             "allow_recomputation": mapspace.allow_recomputation,
         },

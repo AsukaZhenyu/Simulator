@@ -1,0 +1,110 @@
+{
+  "format_version": "unified-strategy-0.3",
+  "id": "reconfiguration-block",
+  "model": {
+    "kind": "block",
+    "file": "block.model.json",
+    "override_model_policy": true
+  },
+  "execution": [],
+  "policy": {
+    "placements": {
+      "dense_ffn": "gpu"
+    },
+    "request_placements": {},
+    "experts": {
+      "device_rule": "fixed",
+      "selection_unit": "expert_region"
+    },
+    "release": {
+      "rule": "last_use"
+    }
+  },
+  "cache": {
+    "rule": "lru",
+    "unit": "tensor",
+    "budget_bytes": 128,
+    "alpha": null,
+    "top_p": null
+  },
+  "prefetch": {
+    "enabled": true,
+    "scope": "next_layer",
+    "lookahead_layers": 1,
+    "max_count": 2,
+    "ranking": "history_frequency",
+    "include_dense_weights": true
+  },
+  "transport": {
+    "rules": [
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "ce"
+      },
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "ce"
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      }
+    ],
+    "slot_reuse": "release_unlocked_backed_copy",
+    "boundary_release": "declared_dead_intermediates"
+  },
+  "services_file": "../unified/global.services.json",
+  "environment_file": "block.environment.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "max_decisions": 1000,
+  "reconfiguration": {
+    "reclaim_response": "release_clean_weights",
+    "release_order": "lru",
+    "cpu_response": "fixed"
+  }
+}

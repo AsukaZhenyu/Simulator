@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.24)
+project(execution_transform_probe LANGUAGES CXX)
+set(GGML_SOURCE_DIR "" CACHE PATH "Existing GGML source root")
+set(GGML_BUILD_DIR "" CACHE PATH "Existing GGML build root")
+find_path(PROBE_INCLUDE ggml.h PATHS "${GGML_SOURCE_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+set(libpaths "${GGML_BUILD_DIR}/ggml/src" "${GGML_BUILD_DIR}/ggml/src/ggml-cuda"
+    "${GGML_BUILD_DIR}/ggml/src/ggml-cpu" "${GGML_BUILD_DIR}/src"
+    "${GGML_BUILD_DIR}/src/ggml-cuda" "${GGML_BUILD_DIR}/src/ggml-cpu")
+foreach(part base cpu cuda)
+  find_library(PROBE_${part} NAMES ggml-${part} PATHS ${libpaths} PATH_SUFFIXES Release REQUIRED NO_DEFAULT_PATH)
+endforeach()
+find_package(CUDAToolkit REQUIRED)
+find_package(Threads REQUIRED)
+add_executable(execution-transform-probe compute.cpp)
+target_compile_features(execution-transform-probe PRIVATE cxx_std_17)
+target_include_directories(execution-transform-probe PRIVATE "${PROBE_INCLUDE}")
+target_compile_definitions(execution-transform-probe PRIVATE GGML_SHARED GGML_BACKEND_SHARED MATCHED_HAVE_CUDA)
+target_link_libraries(execution-transform-probe PRIVATE "${PROBE_base}" "${PROBE_cpu}" "${PROBE_cuda}" CUDA::cudart Threads::Threads)

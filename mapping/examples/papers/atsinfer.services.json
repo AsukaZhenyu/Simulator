@@ -1,0 +1,21 @@
+{
+  "format_version": "tensor-services-0.1",
+  "pcie": {
+    "bandwidth_bytes_per_second": 1000000000,
+    "ce_bytes_per_second": 1000000000,
+    "sm_bytes_per_second": 1000000000,
+    "arbitration": "max_min_fair",
+    "timing_scope": "payload_only_no_launch_latency"
+  },
+  "slots": [
+    {
+      "id": "temporary-weight",
+      "domain": "vram",
+      "capacity_bytes": 32,
+      "members": [
+        "W1",
+        "W2"
+      ]
+    }
+  ]
+}

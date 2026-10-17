@@ -1,0 +1,129 @@
+{
+  "format_version": "dense-attention-execution-0.1",
+  "variant": "pure_attention",
+  "provenance": "synthetic_execution",
+  "invocation_files": [
+    "r_cpu.invocation.json",
+    "r_gpu0.invocation.json",
+    "r_gpu1.invocation.json"
+  ],
+  "frontend_config": {
+    "hidden": 16,
+    "intermediate": 32,
+    "heads": 4,
+    "kv_heads": 2,
+    "head_dim": 4,
+    "rope_dims": 4,
+    "attention_gate": "sigmoid",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 10000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+      "input_norm": "f32",
+      "q": "f32",
+      "k": "f32",
+      "v": "f32",
+      "output": "f32",
+      "post_attention_norm": "f32",
+      "gate": "f32",
+      "up": "f32",
+      "down": "f32",
+      "gate_proj": "f32",
+      "q_norm": "f32",
+      "k_norm": "f32"
+    }
+  },
+  "batch_contract": "independent_requests_not_fused_batch_kernel",
+  "subbatches": [
+    {
+      "id": "cpu-attention",
+      "request_ids": [
+        "r_cpu"
+      ],
+      "attention_device": "cpu"
+    },
+    {
+      "id": "gpu-attention",
+      "request_ids": [
+        "r_gpu0",
+        "r_gpu1"
+      ],
+      "attention_device": "gpu"
+    }
+  ],
+  "entries": [
+    {
+      "kind": "attention_core",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 1800,
+      "workspace_bytes": 64
+    },
+    {
+      "kind": "attention_core",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 600,
+      "workspace_bytes": 64
+    },
+    {
+      "kind": "attention_output",
+      "device": "cpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 1000,
+      "workspace_bytes": 64
+    },
+    {
+      "kind": "attention_output",
+      "device": "gpu",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "duration_ns": 500,
+      "workspace_bytes": 64
+    }
+  ],
+  "transfer_entries": [
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 32,
+      "duration_ns": 64
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 64,
+      "duration_ns": 128
+    },
+    {
+      "route": "dram_to_vram",
+      "storage_bytes": 128,
+      "duration_ns": 256
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 32,
+      "duration_ns": 64
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 64,
+      "duration_ns": 128
+    },
+    {
+      "route": "vram_to_dram",
+      "storage_bytes": 128,
+      "duration_ns": 256
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "format_version": "unified-strategy-0.3",
+  "id": "reconfiguration-single-m2",
+  "model": {
+    "kind": "m2",
+    "file": "../../../modeling/tests/fixtures/global_execution/denseL0.prefill.json"
+  },
+  "execution": [
+    {
+      "scope_id": "single",
+      "spec": {
+        "format_version": "dense-attention-execution-0.1",
+        "variant": "pure_attention",
+        "provenance": "synthetic_execution",
+        "invocation_files": [
+          "../../../modeling/tests/fixtures/global_execution/denseL0.prefill.json"
+        ],
+        "frontend_config": {
+          "hidden": 16,
+          "intermediate": 32,
+          "heads": 4,
+          "kv_heads": 2,
+          "head_dim": 4,
+          "rope_dims": 4,
+          "attention_gate": "sigmoid",
+          "qk_norm": "rms",
+          "rope_mode": "normal",
+          "rope_base": 10000.0,
+          "norm_epsilon": 9.999999974752427e-07,
+          "weight_dtypes": {
+            "input_norm": "f32",
+            "q": "f32",
+            "k": "f32",
+            "v": "f32",
+            "output": "f32",
+            "post_attention_norm": "f32",
+            "gate": "f32",
+            "up": "f32",
+            "down": "f32",
+            "gate_proj": "f32",
+            "q_norm": "f32",
+            "k_norm": "f32"
+          }
+        },
+        "batch_contract": "independent_requests_not_fused_batch_kernel",
+        "subbatches": [
+          {
+            "id": "explicit-attention-device",
+            "request_ids": [
+              "r0"
+            ],
+            "attention_device": "gpu"
+          }
+        ],
+        "entries": [
+          {
+            "kind": "attention_core",
+            "device": "cpu",
+            "phase": "prefill",
+            "batch": 1,
+            "tokens": 3,
+            "visible_history": 0,
+            "duration_ns": 456,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_core",
+            "device": "gpu",
+            "phase": "prefill",
+            "batch": 1,
+            "tokens": 3,
+            "visible_history": 0,
+            "duration_ns": 123,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_output",
+            "device": "cpu",
+            "phase": "prefill",
+            "batch": 1,
+            "tokens": 3,
+            "visible_history": 0,
+            "duration_ns": 456,
+            "workspace_bytes": 64
+          },
+          {
+            "kind": "attention_output",
+            "device": "gpu",
+            "phase": "prefill",
+            "batch": 1,
+            "tokens": 3,
+            "visible_history": 0,
+            "duration_ns": 123,
+            "workspace_bytes": 64
+          }
+        ],
+        "transfer_entries": []
+      }
+    }
+  ],
+  "policy": {
+    "placements": {
+      "projection": "gpu",
+      "attention_core": "execution_binding",
+      "attention_output": "gpu",
+      "dense_ffn": "gpu"
+    },
+    "request_placements": {},
+    "experts": {
+      "device_rule": "fixed",
+      "selection_unit": "expert_region"
+    },
+    "release": {
+      "rule": "last_use"
+    }
+  },
+  "cache": {
+    "rule": "lru",
+    "unit": "tensor",
+    "budget_bytes": 200000,
+    "alpha": null,
+    "top_p": null
+  },
+  "prefetch": {
+    "enabled": true,
+    "scope": "next_layer",
+    "lookahead_layers": 1,
+    "max_count": 16,
+    "ranking": "history_frequency",
+    "include_dense_weights": true
+  },
+  "transport": {
+    "rules": [
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "ce"
+      },
+      {
+        "role": "weight",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "ce"
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "input",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "intermediate",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      },
+      {
+        "role": "output",
+        "stage": null,
+        "src": "vram",
+        "dst": "dram",
+        "engine": "sm"
+      },
+      {
+        "role": "weight",
+        "stage": "down",
+        "src": "dram",
+        "dst": "vram",
+        "engine": "sm"
+      }
+    ],
+    "slot_reuse": "release_unlocked_backed_copy",
+    "boundary_release": "declared_dead_intermediates"
+  },
+  "services_file": "../unified/global.services.json",
+  "environment_file": "m2.environment.json",
+  "history_file": null,
+  "routing_scores_file": null,
+  "max_decisions": 3000,
+  "reconfiguration": {
+    "reclaim_response": "release_clean_weights",
+    "release_order": "lru",
+    "cpu_response": "fixed"
+  }
+}

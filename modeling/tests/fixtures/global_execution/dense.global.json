@@ -1,0 +1,44 @@
+{
+  "format_version": "global-execution-0.1",
+  "id": "dense-two-layer-PD",
+  "rounds": [
+    {
+      "id": "prefill",
+      "input_mode": "initial_supplied_hidden",
+      "gate_cost": null,
+      "invocations": [
+        {
+          "id": "denseL0-prefill",
+          "invocation_file": "denseL0.prefill.json",
+          "execution_file": null
+        },
+        {
+          "id": "denseL1-prefill",
+          "invocation_file": "denseL1.prefill.json",
+          "execution_file": null
+        }
+      ]
+    },
+    {
+      "id": "decode",
+      "input_mode": "trace_supplied_next_token",
+      "gate_cost": {
+        "device": "cpu",
+        "duration_ns": 7,
+        "workspace_bytes": 0
+      },
+      "invocations": [
+        {
+          "id": "denseL0-decode",
+          "invocation_file": "denseL0.decode.json",
+          "execution_file": null
+        },
+        {
+          "id": "denseL1-decode",
+          "invocation_file": "denseL1.decode.json",
+          "execution_file": null
+        }
+      ]
+    }
+  ]
+}

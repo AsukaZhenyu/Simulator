@@ -1,0 +1,10 @@
+{
+  "format_version": "causal-strategy-0.1",
+  "id": "fluctuating",
+  "invocation_file": "cached.invocation.json",
+  "environment_file": "fluctuating.environment.json",
+  "execution_file": "rows.execution.json",
+  "policy_file": "resident.policy.json",
+  "history_file": null,
+  "max_decisions": 250
+}

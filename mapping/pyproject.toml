@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tensor-mapping"
 version = "0.1.0"
-description = "Exact mapping search for small GGML compute graphs under limited VRAM"
+description = "LLM strategy expression, compilation and bounded heterogeneous mapping search"
 readme = "README.md"
 requires-python = ">=3.10"
 # 唯一的依赖是本仓库的 modeling 包，因为它持有张量模拟内核

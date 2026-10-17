@@ -1,0 +1,27 @@
+{
+  "format_version": "tensor-services-0.1",
+  "pcie": {
+    "bandwidth_bytes_per_second": 1000000000,
+    "ce_bytes_per_second": 1000000000,
+    "sm_bytes_per_second": 1000000000,
+    "arbitration": "max_min_fair",
+    "timing_scope": "payload_only_no_launch_latency"
+  },
+  "slots": [
+    {
+      "id": "expert_up_slot",
+      "domain": "vram",
+      "capacity_bytes": 128,
+      "members": [
+        "w:fragmentL0:E0:v1:up",
+        "w:fragmentL0:E1:v1:up",
+        "w:fragmentL0:E2:v1:up",
+        "w:fragmentL0:E3:v1:up",
+        "w:fragmentL1:E0:v1:up",
+        "w:fragmentL1:E1:v1:up",
+        "w:fragmentL1:E2:v1:up",
+        "w:fragmentL1:E3:v1:up"
+      ]
+    }
+  ]
+}

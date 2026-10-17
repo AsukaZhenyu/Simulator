@@ -1,0 +1,132 @@
+{
+  "schema_version": "moe_measurement_suite_v1",
+  "source": "public observed routing replay; declared resident F32 random-weight FFN variant, not original NVFP4 model kernel",
+  "cases": [
+    {
+      "id": "public-layer3-prefill-3",
+      "config": {
+        "hidden": 2560,
+        "intermediate": 640,
+        "experts": 512,
+        "top_k": 10,
+        "tokens": 3
+      },
+      "routes": [
+        [
+          188,
+          379,
+          217,
+          298,
+          87,
+          424,
+          436,
+          463,
+          346,
+          399
+        ],
+        [
+          405,
+          310,
+          470,
+          205,
+          399,
+          24,
+          14,
+          64,
+          217,
+          469
+        ],
+        [
+          379,
+          217,
+          310,
+          205,
+          455,
+          188,
+          405,
+          399,
+          367,
+          113
+        ]
+      ],
+      "backend": "CPU",
+      "threads": 1,
+      "phase": "prefill",
+      "work_items": [
+        {
+          "request_id": "freetoken-uid0",
+          "absolute_position": 0
+        },
+        {
+          "request_id": "freetoken-uid0",
+          "absolute_position": 1
+        },
+        {
+          "request_id": "freetoken-uid0",
+          "absolute_position": 2
+        }
+      ],
+      "source": {
+        "route_fragment": "profiling/cases/moe-routes-public-prefill180.fragment.json",
+        "route_fragment_sha256": "cdc837f8b9029fd7d3b16f4eb32aafe8971d83bc0593f6d9e5f8435e62128a40",
+        "route_source": "observed_inference:bundle_sha256=dc25673b96f78d78457d7de11c232c41cbfb28ce457823f87853fd39f67e2e14:source_layer=3:span=0+180",
+        "selected_span": {
+          "start": 0,
+          "count": 3
+        },
+        "complete_source_request": false,
+        "original_quantization": "nvfp4",
+        "measured_dtype": "f32",
+        "original_model_weights": false
+      },
+      "sampling_mode": "interleaved_joint_context"
+    },
+    {
+      "id": "public-layer3-decode-1",
+      "config": {
+        "hidden": 2560,
+        "intermediate": 640,
+        "experts": 512,
+        "top_k": 10,
+        "tokens": 1
+      },
+      "routes": [
+        [
+          205,
+          249,
+          269,
+          496,
+          394,
+          342,
+          408,
+          310,
+          403,
+          235
+        ]
+      ],
+      "backend": "CPU",
+      "threads": 1,
+      "phase": "decode",
+      "work_items": [
+        {
+          "request_id": "freetoken-uid0",
+          "absolute_position": 180
+        }
+      ],
+      "source": {
+        "route_fragment": "profiling/cases/moe-routes-public-decode180.fragment.json",
+        "route_fragment_sha256": "646de1ef1ba32402998b710542a155a89505e9bd5339c6d08007ad8cd7fe4e75",
+        "route_source": "observed_inference:bundle_sha256=dc25673b96f78d78457d7de11c232c41cbfb28ce457823f87853fd39f67e2e14:source_layer=3:span=180+1",
+        "selected_span": {
+          "start": 180,
+          "count": 1
+        },
+        "complete_source_request": false,
+        "original_quantization": "nvfp4",
+        "measured_dtype": "f32",
+        "original_model_weights": false
+      },
+      "sampling_mode": "interleaved_joint_context"
+    }
+  ]
+}
