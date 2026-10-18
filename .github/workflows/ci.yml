@@ -79,6 +79,10 @@ jobs:
         env:
           PYTHONPATH: profiling
         run: python -m unittest discover -s profiling/single_layer_context_pair/tests -v
+      - name: CUDA API and GPU interval attribution without hardware
+        env:
+          PYTHONPATH: profiling
+        run: python -m unittest discover -s profiling/single_layer_wait_diagnosis/tests -v
       - name: Single-layer native source and provenance guards without CUDA
         run: python -m unittest discover -s profiling/native/single_layer_calibration -p 'test_build.py' -v
       - name: Paired native source and provenance guards without CUDA

@@ -395,10 +395,21 @@ def collect(args, *, heldout=False):
     return dict(split=split, successful=status["successful"], failed=status["failed"])
 
 
-def records_for(out, case, poll, split):
+def records_for(out, case, poll, split, manifest):
+    prefix = f"{case['id']}--poll-{poll}--{split}-"
+    phase = read(out / (split + "-phase.json"))
+    expected = {row["run_id"]: row for row in phase["records"] if row["run_id"].startswith(prefix)}
+    paths = {path.parent.name: path for path in (out / "jobs").glob(prefix + "*/record.json")}
+    if not expected or set(paths) != set(expected):
+        raise ValueError("consumed record set differs from the declared case/poll/split phase subset")
+    # The caller verified the whole phase once; recheck only the consumed subset.
     rows = []
-    for path in sorted((out / "jobs").glob(f"{case['id']}--poll-{poll}--{split}-*/record.json")):
-        rows.append(read(path))
+    for run_id in sorted(expected):
+        row, record = expected[run_id], read(paths[run_id])
+        if (record["run_id"], record["process_id"], record["seed"], record["software_sha256"]) != (
+                run_id, row["pid"], row["seed"], manifest["software_sha256"]):
+            raise ValueError("verified run differs from the launched process inventory or software fingerprint")
+        rows.append(record)
     return rows
 
 
@@ -413,7 +424,7 @@ def freeze(args):
     for case in manifest["cases"]:
         program = read(manifest["programs"][case["program_keys"]["profile-0"]]["path"])
         for poll in manifest["protocol"]["polls"]:
-            frozen = freeze_profile(program, records_for(out, case, poll, "profile"), frozen_at_utc=utc(),
+            frozen = freeze_profile(program, records_for(out, case, poll, "profile", manifest), frozen_at_utc=utc(),
                 instrumentation_relative_error_max=manifest["protocol"]["instrumentation_relative_error_max"])
             distribution = freeze_distributions(frozen,
                 trials=manifest["protocol"]["distribution_trials"], seed=manifest["protocol"]["distribution_seed"])
@@ -457,7 +468,7 @@ def evaluate(args):
                 signature != content_sha(unsigned) or combined.get("heldout_used_for_estimation") is not False or
                 combined.get("primary_model") != "context_actions_and_gaps"):
             raise ValueError("combined frozen model differs")
-        report = evaluate_heldout(program, combined["base"], records_for(out, case, item["poll"], "heldout"))
+        report = evaluate_heldout(program, combined["base"], records_for(out, case, item["poll"], "heldout", manifest))
         report["distribution_candidate"] = evaluate_distribution(combined["distribution"], report)
         results.append(dict(case_id=item["case_id"], poll=item["poll"], report=report))
     path = out / "evaluation.json"

@@ -457,4 +457,3 @@ def evaluate_heldout(program, frozen, runs, *, verify_sources=True):
             "primary_model": "context_actions_and_gaps", "accepted": models["context_actions_and_gaps"]["accepted"],
             "gap_cv_scope": "reported_separately_not_original_source_criterion",
             "native_memory_capacity_accuracy_claimed": False}
-

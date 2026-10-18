@@ -1,0 +1,128 @@
+{
+  "schema": "single-layer-calibration-verification-summary-1",
+  "measurement_source_commit": "e447e4e1171523bfa46a10cd9e49c12acafcdc04",
+  "profile_processes": 126,
+  "heldout_processes": 42,
+  "native_failures": 0,
+  "independent_numerical_action_and_source_checks_passed": true,
+  "global_freeze_time_utc": "2026-10-18T13:18:36.838930+00:00",
+  "first_heldout_start_utc": "2026-10-18T13:19:49.613255+00:00",
+  "all_heldout_after_global_freeze": true,
+  "heldout_used_for_parameter_estimation": false,
+  "all_samples_retained": true,
+  "outliers_removed": 0,
+  "exact_record_sets": [
+    {
+      "split": "profile",
+      "expected_count": 126,
+      "actual_count": 126,
+      "extra_records": [],
+      "missing_records": [],
+      "passed": true
+    },
+    {
+      "split": "heldout",
+      "expected_count": 42,
+      "actual_count": 42,
+      "extra_records": [],
+      "missing_records": [],
+      "passed": true
+    }
+  ],
+  "test_groups": [
+    {
+      "name": "CI regression groups",
+      "unique_tests": 2694,
+      "passed": 2686,
+      "skipped": 8,
+      "local_receipt": "build/single-layer-regression/receipt.json",
+      "evidence_file_sha256": "fac6f9abe4d0d39da249fe268c9ab5a5b8870c368d473ea370e101ac7f7ed4f4",
+      "failures": 0
+    },
+    {
+      "name": "Portable summary integrity",
+      "unique_tests": 13,
+      "passed": 13,
+      "skipped": 0,
+      "test_source": "tools/tests/test_single_layer_summary.py",
+      "evidence_file_sha256": "4158b615a75effcc6beb1bacd3e027e3b0a2763bce808b5959937449b6468452",
+      "failures": 0
+    },
+    {
+      "name": "Independent source/wheel installation",
+      "unique_tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "local_receipt": "build/single-layer-regression/distribution-receipt.json",
+      "evidence_file_sha256": "b3bfb1d3fae3494eea93f62a901414af9cc893b08c0d5089b9ef713b53f5e4b6",
+      "failures": 0
+    },
+    {
+      "name": "NVTX native generation and provenance",
+      "unique_tests": 9,
+      "passed": 9,
+      "skipped": 0,
+      "test_source": "profiling/native/single_layer_wait_diagnosis/test_build.py",
+      "evidence_file_sha256": "278b772c77a6d9ee6eee6f512f9699c926e1f69dc815736b271a5702b03637f2",
+      "failures": 0
+    },
+    {
+      "name": "Exact consumed record sets",
+      "unique_tests": 4,
+      "passed": 4,
+      "skipped": 0,
+      "local_receipt": "build/single-layer-exact-record-guard-tests/receipt.json",
+      "note": "19 executed; 15 existing driver tests overlap the CI regression group and are not counted twice",
+      "evidence_file_sha256": "a6f89b2c2e95fa9a73f84ae847f5c14f0d3ea82f077460ed7dc85a99d983401d",
+      "failures": 0
+    },
+    {
+      "name": "CUDA interval and correlation attribution",
+      "unique_tests": 13,
+      "passed": 13,
+      "skipped": 0,
+      "test_source": "profiling/single_layer_wait_diagnosis/tests/test_analyze.py",
+      "evidence_file_sha256": "4afaa21bbc58fc660415f107e46dbeb5c8e3b9cd42a7914566dae57854c603c8",
+      "failures": 0
+    }
+  ],
+  "unique_tests": 2734,
+  "passed": 2726,
+  "skipped": 8,
+  "failures": 0,
+  "source_files": [
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/manifest.json",
+      "sha256": "13d46f7a0d8d0e877884443afc1cb2ad5b4a6815198f284220cf0a313bfaecb2"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/profile-phase.json",
+      "sha256": "05363fff2f765b7fb2e0ed564aff5b2dbd4cd908eca823e7281d91dd87827e0e"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/heldout-phase.json",
+      "sha256": "2f7ab9896b2d685ca422f9dd9c4cef817617811a8c6b5d01ad20f39079fec871"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/all-models-frozen.json",
+      "sha256": "b6b0f8507d150320b2e6f369caf36d4df3f44d8814d3a22702a91470268da428"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/evaluation.json",
+      "sha256": "5ded4b802d8d155018739e15b82242460432a3a9b0a3f963c6ed6c1ed7868b64"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/recorded-sources/archive.json",
+      "sha256": "80e4eafcded8aaa294f1ccdf3a32ec80f94f61ec55b4f31e90901536c1fa6f65"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/profile-record-inventory-guard.json",
+      "sha256": "1bbbeacf65f970342e85aab0d475614eb70e63cf11acb7c1883c194d2e64c249"
+    },
+    {
+      "local_path": "profiling/single_layer_calibration/results/formal-v1/heldout-record-inventory-guard.json",
+      "sha256": "cc4a78da16bd0eccb61abe8b958e446985dd152250e081dac8a0402e22e166cc"
+    }
+  ],
+  "evidence_scope": "Derived portable count/provenance receipt; not a replacement for native raw observations, original verification or full test logs"
+}

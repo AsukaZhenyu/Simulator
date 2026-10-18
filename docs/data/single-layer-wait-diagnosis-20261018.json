@@ -1,0 +1,2649 @@
+{
+  "schema": "single-layer-cuda-wait-diagnosis-compact-v1",
+  "source_files": [
+    {
+      "path": "manifest.json",
+      "sha256": "06d7ad50fa9c41538a2e7296945342f2c521012ce27914974fc7ace1fe7c079e"
+    },
+    {
+      "path": "phase.json",
+      "sha256": "a56d35b68954389ccf106858bf92959c2476440a9aaf58dbb665c414b99cf4cb"
+    },
+    {
+      "path": "ABBA/record.json",
+      "sha256": "22c0551b817919e3270d10269a104a76fda702e1e1341d1848b46e3b0c07681f"
+    },
+    {
+      "path": "ABBA/native.json",
+      "sha256": "f5e30b6cd70bc79e18fbe9c8d33df8cb92cc2e0f33cca2d77ec325022aa6404e"
+    },
+    {
+      "path": "ABBA/trace.nsys-rep",
+      "sha256": "7232e361f5a4ed3aa8e3f35d1f21e3cae6cbf1e7fa682853303a266d7b4f4115"
+    },
+    {
+      "path": "ABBA/trace.sqlite",
+      "sha256": "468b71928892dc663fa3204c8cfc3fe99231ad00ddf5364087af9ba0e5ba8218"
+    },
+    {
+      "path": "BAAB/record.json",
+      "sha256": "1eda96061dfd57bc90bddd1bd034fc493ff1480ebc79d776d921259375d40ccf"
+    },
+    {
+      "path": "BAAB/native.json",
+      "sha256": "4038a3961bafdb7266826864bde2de99ebb68caf5188bc340d4362d126bbafcd"
+    },
+    {
+      "path": "BAAB/trace.nsys-rep",
+      "sha256": "53e01237743d591f37007e35a3326a90607ddd3dda21558fd960551a7f22d9b8"
+    },
+    {
+      "path": "BAAB/trace.sqlite",
+      "sha256": "6c7e2057f9e5b0f25aeb1300c56819b96988a2213c34f50a2f57271849211698"
+    }
+  ],
+  "program_sha256": "4e7fbf014cccfcd59b64f65b1cea69f7c9c4d312ff5fde92ca1d9e7222448332",
+  "nsys_version": "NVIDIA Nsight Systems version 2024.4.2.133-244234382004v0",
+  "analyzer_sha256": "e58d7f2e911398f82eb1ef0f06c947ba71c78e30e5a0693a6864f846f1a0da97",
+  "quantile_method": "inverted_empirical_CDF_no_interpolation; all_invocations_retained",
+  "timeline_scope": "Nsight_aligned_CPU_and_GPU_ns_only; native_QPC_not_mapped",
+  "diagnostic_only": true,
+  "usable_for_parameter_fit": false,
+  "usable_for_accuracy_acceptance": false,
+  "limits": [
+    "NVTX_CUPTI_profiler_changes_timing",
+    "APIs_and_GPU_activity_overlap_do_not_add",
+    "non_sync_API_time_can_include_internal_wait_or_host_descheduling_not_pure_CPU_work",
+    "correlated_GPU_span_gaps_are_not_devicewide_idleness",
+    "post_API_return_delay_not_pure_queue_delay",
+    "retained_numerical_checks_bound_not_recomputed_by_stdlib_analyzer",
+    "CUDA_runtime_trace_may_select_a_subset_of_APIs_as_recorded_in_capture_options",
+    "SQLite_derived_export_bound_by_hash_not_independently_reexported_here",
+    "trace_kernel_names_not_proof_of_uninstrumented_execution"
+  ],
+  "full_decomposition_evidence": {
+    "path": "profiling/single_layer_context_pair/results/nsight-v2/wait-decomposition.json",
+    "sha256": "bcd797b690c1afe6518d5f91d0f02954cd413a5bb08af5675732a17a89cd74f1",
+    "scope": "local_full_per_invocation_details; not_embedded_in_portable_summary"
+  },
+  "reports": [
+    {
+      "native_process_id": 42732,
+      "nsight_global_pid": 282191900704768,
+      "nsight_main_global_tid": 282191900749860,
+      "block_order": "ABBA",
+      "target_action_index": 14,
+      "target_operation_id": "g:dense:op:highlevel-dense:r0:attn.pv",
+      "diagnostic_events": [
+        {
+          "severity": 1,
+          "text": "Profiling has started."
+        },
+        {
+          "severity": 1,
+          "text": "Process 42732 was launched by the profiler"
+        },
+        {
+          "severity": 1,
+          "text": "Number of NVTX events collected: \t31100."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUDA events collected: \t137413."
+        },
+        {
+          "severity": 1,
+          "text": "Common injection library initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "Buffers holding CUDA trace data will be flushed on CudaProfilerStop() call. See --flush-on-cudaprofilerstop to control this behavior."
+        },
+        {
+          "severity": 1,
+          "text": "Loaded CUPTI library: C:\\Program Files\\NVIDIA Corporation\\Nsight Systems 2024.4.2\\target-windows-x64\\cupti64_126.dll"
+        },
+        {
+          "severity": 2,
+          "text": "Installed CUDA driver version (13.0) is not supported by this build of Nsight Systems. CUDA trace will be collected using libraries for driver version 12.6"
+        },
+        {
+          "severity": 1,
+          "text": "Enabling trace for device graph launch"
+        },
+        {
+          "severity": 1,
+          "text": "CUDA injection initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "NVTX injection initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUPTI events produced: \t158587, CUPTI buffers: 20."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUPTI events produced: \t158592, CUPTI buffers: 20."
+        },
+        {
+          "severity": 1,
+          "text": "Profiling has stopped."
+        }
+      ],
+      "export_metadata": {
+        "EXPORT_PRODUCT_NAME": "NVIDIA Nsight Systems",
+        "EXPORT_PRODUCT_VERSION": "2024.4.2.133",
+        "EXPORT_PRODUCT_DATE": "2024.4",
+        "EXPORT_SCHEMA_VERSION": "3.11.3",
+        "EXPORT_SCHEMA_VERSION_MAJOR": "3",
+        "EXPORT_SCHEMA_VERSION_MINOR": "11",
+        "EXPORT_SCHEMA_VERSION_MICRO": "3",
+        "EXPORT_SCHEMA_VERSION_CKSUM": "2546268570 148088",
+        "EXPORT_PLATFORM": "windows-desktop",
+        "EXPORT_ARCH": "x64",
+        "EXPORT_TIME_UTC": "2026-10-18T13:39:51",
+        "EXPORT_TIME_LOCAL": "2026-10-18T21:39:51 +0800 \u4e2d\u56fd\u6807\u51c6\u65f6\u95f4",
+        "EXPORT_HOST": "liuzhenyu",
+        "EXPORT_USER": "89664",
+        "EXPORT_PARAM_INPUT_FILE": "trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_FILE": "trace.sqlite",
+        "EXPORT_PARAM_INPUT_PATH": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/ABBA/trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_PATH": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/ABBA/trace.sqlite",
+        "EXPORT_PARAM_INPUT_PATH_ABS": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/ABBA/trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_PATH_ABS": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/ABBA/trace.sqlite",
+        "EXPORT_PARAM_OVERWRITE": "false",
+        "EXPORT_PARAM_APPEND": "false",
+        "EXPORT_PARAM_LAZY": "true",
+        "EXPORT_PARAM_TIME_NORMALIZE": "false",
+        "EXPORT_PARAM_TIME_SHIFT": "0",
+        "EXPORT_PARAM_TABLES_TO_EXPORT": "",
+        "EXPORT_PARAM_TIMES_TO_EXPORT": "",
+        "EXPORT_CONFIG_TIME_SHIFT": "0",
+        "EXPORT_TIME": "0.82 sec"
+      },
+      "selected_capture_options": {
+        "PROCESS_0:COLLECT_NVTX_TRACE": "true",
+        "PROCESS_0:COLLECT_CUDA_TRACE": "true",
+        "PROCESS_0:CUDA_SKIP_SOME_API_CALLS": "true"
+      },
+      "complete_target_inventory_verified": true,
+      "all_selected_launch_copy_correlations_verified": true,
+      "kernel_count_distribution": {
+        "52": 404
+      },
+      "memcpy_count_distribution": {
+        "33": 404
+      },
+      "blocks": [
+        {
+          "block_index": 0,
+          "label": "A",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 11103754563,
+          "nsight_parent_end_ns": 11700033553,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1742736,
+              "mean": 2113337.9801980196,
+              "p10": 1818078,
+              "p50": 2117645,
+              "p90": 2403936,
+              "p99": 2723120,
+              "max": 2738589
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1582304,
+              "mean": 1944971.7722772278,
+              "p10": 1672251,
+              "p50": 1963395,
+              "p90": 2185158,
+              "p99": 2500870,
+              "max": 2503638
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 137901,
+              "mean": 168366.20792079208,
+              "p10": 140811,
+              "p50": 157947,
+              "p90": 219285,
+              "p99": 241369,
+              "max": 392990
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1571894,
+              "mean": 1920737.3663366337,
+              "p10": 1656585,
+              "p50": 1952675,
+              "p90": 2154665,
+              "p99": 2480893,
+              "max": 2484852
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 8786,
+              "mean": 22896.90099009901,
+              "p10": 9638,
+              "p50": 12303,
+              "p90": 26600,
+              "p99": 166645,
+              "max": 347798
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1042,
+              "mean": 1337.5049504950496,
+              "p10": 1122,
+              "p50": 1253,
+              "p90": 1683,
+              "p99": 1934,
+              "max": 2004
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9909,
+              "mean": 24234.40594059406,
+              "p10": 10820,
+              "p50": 13505,
+              "p90": 28043,
+              "p99": 168579,
+              "max": 349141
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1730953,
+              "mean": 2086966.5940594058,
+              "p10": 1796467,
+              "p50": 2103939,
+              "p90": 2371765,
+              "p99": 2702050,
+              "max": 2715776
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148192,
+              "mean": 148558.9504950495,
+              "p10": 148384,
+              "p50": 148544,
+              "p90": 148768,
+              "p99": 148960,
+              "max": 149249
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102433,
+              "mean": 102761.25742574257,
+              "p10": 102620,
+              "p50": 102754,
+              "p90": 102945,
+              "p99": 103169,
+              "max": 103328
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45571,
+              "mean": 45797.69306930693,
+              "p10": 45696,
+              "p50": 45793,
+              "p90": 45892,
+              "p99": 46015,
+              "max": 46019
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1705715,
+              "mean": 2058879.9603960395,
+              "p10": 1776276,
+              "p50": 2064631,
+              "p90": 2339834,
+              "p99": 2667646,
+              "max": 2668030
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1557520,
+              "mean": 1910321.0099009902,
+              "p10": 1627960,
+              "p50": 1916080,
+              "p90": 2191483,
+              "p99": 2519129,
+              "max": 2519224
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1594541,
+              "mean": 1964779.0297029703,
+              "p10": 1669762,
+              "p50": 1969114,
+              "p90": 2255585,
+              "p99": 2574603,
+              "max": 2589783
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.054336740562384495,
+              "mean": 0.07107040659331859,
+              "p10": 0.06171170946314711,
+              "p50": 0.07017483384292106,
+              "p90": 0.08157845812995922,
+              "p99": 0.08344538017986255,
+              "max": 0.08503582871989791
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.004699391320879264,
+              "mean": 0.011271001161433602,
+              "p10": 0.0054021091454336785,
+              "p50": 0.0067777599409578095,
+              "p90": 0.013020192598094237,
+              "p99": 0.06979787953118424,
+              "max": 0.14102769691371014
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.7942004878637924,
+              "mean": 0.9092407143836778,
+              "p10": 0.8906533579690742,
+              "p50": 0.9149233921741112,
+              "p90": 0.9267893612248994,
+              "p99": 0.9320203091298819,
+              "max": 0.9330305839891866
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -96700,
+              "mean": 6249.845311589983,
+              "p10": -903,
+              "p50": 28,
+              "p90": 725,
+              "p99": 155903,
+              "max": 470631
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 12469,
+              "mean": 28846.755503785673,
+              "p10": 13281,
+              "p50": 15396,
+              "p90": 55393,
+              "p99": 175508,
+              "max": 499399
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 941800,
+                "mean": 1172791.4455445544,
+                "p10": 1003589,
+                "p50": 1167116,
+                "p90": 1363471,
+                "p99": 1491834,
+                "max": 1623431
+              },
+              "worst_single_api_wall_ns": 274319,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 497755,
+                "mean": 747945.9207920792,
+                "p10": 590877,
+                "p50": 735606,
+                "p90": 905561,
+                "p99": 1040399,
+                "max": 1149575
+              },
+              "worst_single_api_wall_ns": 229725,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9909,
+                "mean": 24234.40594059406,
+                "p10": 10820,
+                "p50": 13505,
+                "p90": 28043,
+                "p99": 168579,
+                "max": 349141
+              },
+              "worst_single_api_wall_ns": 347798,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaMemcpyAsync_v3020": 35,
+            "cudaStreamSynchronize_v3020": 6,
+            "cudaLaunchKernel_v7000": 60
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 1,
+          "label": "B",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 11700048331,
+          "nsight_parent_end_ns": 12390017260,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1728649,
+              "mean": 2199120.089108911,
+              "p10": 1866570,
+              "p50": 2229567,
+              "p90": 2518122,
+              "p99": 2733705,
+              "max": 3157502
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1579751,
+              "mean": 2017952.3663366337,
+              "p10": 1717843,
+              "p50": 2035259,
+              "p90": 2282454,
+              "p99": 2448552,
+              "max": 2857459
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 143819,
+              "mean": 181167.72277227722,
+              "p10": 149910,
+              "p50": 171134,
+              "p90": 222318,
+              "p99": 285393,
+              "max": 300043
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1566616,
+              "mean": 1993382.3267326732,
+              "p10": 1681549,
+              "p50": 2005922,
+              "p90": 2249822,
+              "p99": 2427683,
+              "max": 2824025
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 9458,
+              "mean": 23180.861386138615,
+              "p10": 10811,
+              "p50": 14928,
+              "p90": 29436,
+              "p99": 185641,
+              "max": 192574
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1042,
+              "mean": 1389.1782178217823,
+              "p10": 1102,
+              "p50": 1243,
+              "p90": 1763,
+              "p99": 3246,
+              "max": 4458
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 10560,
+              "mean": 24570.039603960395,
+              "p10": 11983,
+              "p50": 16100,
+              "p90": 30959,
+              "p99": 186873,
+              "max": 194268
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1713821,
+              "mean": 2172188.792079208,
+              "p10": 1831143,
+              "p50": 2207158,
+              "p90": 2491261,
+              "p99": 2709328,
+              "max": 3118438
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148225,
+              "mean": 148616.42574257427,
+              "p10": 148386,
+              "p50": 148639,
+              "p90": 148799,
+              "p99": 149092,
+              "max": 149253
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102495,
+              "mean": 102808.39603960396,
+              "p10": 102689,
+              "p50": 102788,
+              "p90": 102944,
+              "p99": 103233,
+              "max": 103366
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45596,
+              "mean": 45808.0297029703,
+              "p10": 45694,
+              "p50": 45821,
+              "p90": 45922,
+              "p99": 46019,
+              "max": 46082
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1672371,
+              "mean": 2133518.376237624,
+              "p10": 1821428,
+              "p50": 2153593,
+              "p90": 2433244,
+              "p99": 2612253,
+              "max": 3047426
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1523891,
+              "mean": 1984901.9504950496,
+              "p10": 1672821,
+              "p50": 2004790,
+              "p90": 2284534,
+              "p99": 2463445,
+              "max": 2898685
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1580169,
+              "mean": 2050503.6633663366,
+              "p10": 1717963,
+              "p50": 2080990,
+              "p90": 2369513,
+              "p99": 2584897,
+              "max": 3008761
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.04710717522902598,
+              "mean": 0.06852793162380248,
+              "p10": 0.05901580622384459,
+              "p50": 0.066725563751619,
+              "p90": 0.07958413921317553,
+              "p99": 0.08452109058590714,
+              "max": 0.08589366609415792
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.005155694842067854,
+              "mean": 0.0111521209908574,
+              "p10": 0.005681275559903819,
+              "p50": 0.007344694896357554,
+              "p90": 0.01184608053281699,
+              "p99": 0.08220864970680573,
+              "max": 0.09161307908052085
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.8243667170472501,
+              "mean": 0.9065658998813863,
+              "p10": 0.8904049004482514,
+              "p50": 0.909850906101215,
+              "p90": 0.9220460408971438,
+              "p99": 0.9275108286909416,
+              "max": 0.9276762603241622
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -65334,
+              "mean": 6476.190914385556,
+              "p10": -1285,
+              "p50": 3,
+              "p90": 1104,
+              "p99": 154799,
+              "max": 472800
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 11906,
+              "mean": 29927.74769947583,
+              "p10": 13267,
+              "p50": 15958,
+              "p90": 61336,
+              "p99": 177792,
+              "max": 530970
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 889110,
+                "mean": 1232327.8514851485,
+                "p10": 1050994,
+                "p50": 1234740,
+                "p90": 1408626,
+                "p99": 1580241,
+                "max": 1637056
+              },
+              "worst_single_api_wall_ns": 253840,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 505817,
+                "mean": 761054.4752475248,
+                "p10": 581124,
+                "p50": 744918,
+                "p90": 953501,
+                "p99": 1089671,
+                "max": 1243784
+              },
+              "worst_single_api_wall_ns": 226468,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 10560,
+                "mean": 24570.039603960395,
+                "p10": 11983,
+                "p50": 16100,
+                "p90": 30959,
+                "p99": 186873,
+                "max": 194268
+              },
+              "worst_single_api_wall_ns": 192574,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaLaunchKernel_v7000": 64,
+            "cudaStreamSynchronize_v3020": 4,
+            "cudaMemcpyAsync_v3020": 33
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 2,
+          "label": "B",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 12390039081,
+          "nsight_parent_end_ns": 13047771152,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1699694,
+              "mean": 1956915.5247524753,
+              "p10": 1752634,
+              "p50": 1873964,
+              "p90": 2261166,
+              "p99": 2472004,
+              "max": 2949809
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1540521,
+              "mean": 1799670.1386138613,
+              "p10": 1607824,
+              "p50": 1717934,
+              "p90": 2083124,
+              "p99": 2295352,
+              "max": 2714932
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 141136,
+              "mean": 157245.38613861386,
+              "p10": 143514,
+              "p50": 150270,
+              "p90": 187539,
+              "p99": 211682,
+              "max": 234877
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1528759,
+              "mean": 1778005.4257425743,
+              "p10": 1575774,
+              "p50": 1704815,
+              "p90": 2049613,
+              "p99": 2280250,
+              "max": 2680437
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 8887,
+              "mean": 20406.029702970296,
+              "p10": 9979,
+              "p50": 11121,
+              "p90": 32441,
+              "p99": 140045,
+              "max": 140686
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1072,
+              "mean": 1258.6831683168316,
+              "p10": 1113,
+              "p50": 1202,
+              "p90": 1473,
+              "p99": 1783,
+              "max": 2054
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9989,
+              "mean": 21664.712871287127,
+              "p10": 11151,
+              "p50": 12303,
+              "p90": 34495,
+              "p99": 141428,
+              "max": 142158
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1686840,
+              "mean": 1933534.0792079207,
+              "p10": 1725574,
+              "p50": 1856832,
+              "p90": 2248291,
+              "p99": 2449562,
+              "max": 2908992
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148316,
+              "mean": 148629.22772277228,
+              "p10": 148420,
+              "p50": 148608,
+              "p90": 148830,
+              "p99": 148930,
+              "max": 149023
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102494,
+              "mean": 102827.08910891089,
+              "p10": 102691,
+              "p50": 102819,
+              "p90": 102973,
+              "p99": 103072,
+              "max": 103133
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45598,
+              "mean": 45802.13861386139,
+              "p10": 45696,
+              "p50": 45793,
+              "p90": 45920,
+              "p99": 46048,
+              "max": 46052
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1655186,
+              "mean": 1904674.9801980199,
+              "p10": 1704883,
+              "p50": 1817589,
+              "p90": 2215577,
+              "p99": 2398587,
+              "max": 2849088
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1506576,
+              "mean": 1756045.7524752475,
+              "p10": 1556526,
+              "p50": 1668690,
+              "p90": 2066933,
+              "p99": 2250010,
+              "max": 2700640
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1551084,
+              "mean": 1808286.297029703,
+              "p10": 1603864,
+              "p50": 1725065,
+              "p90": 2112587,
+              "p99": 2323267,
+              "max": 2801361
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.05032461423773539,
+              "mean": 0.07680848784830357,
+              "p10": 0.0657090191520658,
+              "p50": 0.0794567024766751,
+              "p90": 0.08488366652706726,
+              "p99": 0.08667471449062751,
+              "max": 0.08743338506813579
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.005054451755229357,
+              "mean": 0.010895474543362411,
+              "p10": 0.0056400958394412955,
+              "p50": 0.006672081081049589,
+              "p90": 0.013619713931596372,
+              "p99": 0.06548062476705505,
+              "max": 0.06586353047574746
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.8535664843687742,
+              "mean": 0.9084187875606109,
+              "p10": 0.8942325223430525,
+              "p50": 0.9107901129850887,
+              "p90": 0.9238498670081765,
+              "p99": 0.932546897963974,
+              "max": 0.9329297081804874
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -74274,
+              "mean": 8252.432615026208,
+              "p10": -154,
+              "p50": 419,
+              "p90": 5828,
+              "p99": 115015,
+              "max": 494012
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 11617,
+              "mean": 29170.143506115317,
+              "p10": 13312,
+              "p50": 15016,
+              "p90": 64733,
+              "p99": 134657,
+              "max": 567356
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 828827,
+                "mean": 1089471.0891089109,
+                "p10": 947660,
+                "p50": 1055046,
+                "p90": 1279032,
+                "p99": 1542638,
+                "max": 1573893
+              },
+              "worst_single_api_wall_ns": 317560,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 516625,
+                "mean": 688534.3366336634,
+                "p10": 581099,
+                "p50": 665799,
+                "p90": 842602,
+                "p99": 1137799,
+                "max": 1167407
+              },
+              "worst_single_api_wall_ns": 566641,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9989,
+                "mean": 21664.712871287127,
+                "p10": 11151,
+                "p50": 12303,
+                "p90": 34495,
+                "p99": 141428,
+                "max": 142158
+              },
+              "worst_single_api_wall_ns": 140686,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaMemcpyAsync_v3020": 29,
+            "cudaLaunchKernel_v7000": 65,
+            "cudaStreamSynchronize_v3020": 7
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 3,
+          "label": "A",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 13047794466,
+          "nsight_parent_end_ns": 13320593103,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1651233,
+              "mean": 1899987.0495049504,
+              "p10": 1705084,
+              "p50": 1877671,
+              "p90": 2137812,
+              "p99": 2498419,
+              "max": 2520973
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1512367,
+              "mean": 1751245.8514851485,
+              "p10": 1565750,
+              "p50": 1719020,
+              "p90": 1975655,
+              "p99": 2321190,
+              "max": 2348585
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 135714,
+              "mean": 148741.198019802,
+              "p10": 136902,
+              "p50": 148028,
+              "p90": 160988,
+              "p99": 189217,
+              "max": 199783
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1502518,
+              "mean": 1719154.4653465347,
+              "p10": 1551843,
+              "p50": 1692405,
+              "p90": 1912252,
+              "p99": 2237031,
+              "max": 2302063
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 8516,
+              "mean": 30813.51485148515,
+              "p10": 9148,
+              "p50": 11081,
+              "p90": 63781,
+              "p99": 448328,
+              "max": 729209
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1072,
+              "mean": 1277.8712871287128,
+              "p10": 1112,
+              "p50": 1182,
+              "p90": 1423,
+              "p99": 3978,
+              "max": 4058
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9588,
+              "mean": 32091.38613861386,
+              "p10": 10270,
+              "p50": 12374,
+              "p90": 65324,
+              "p99": 449540,
+              "max": 731112
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1640372,
+              "mean": 1866392.4851485149,
+              "p10": 1688844,
+              "p50": 1831173,
+              "p90": 2061458,
+              "p99": 2424104,
+              "max": 2499302
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148222,
+              "mean": 148570.94059405942,
+              "p10": 148350,
+              "p50": 148574,
+              "p90": 148774,
+              "p99": 149056,
+              "max": 149284
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102499,
+              "mean": 102769.9900990099,
+              "p10": 102624,
+              "p50": 102751,
+              "p90": 102944,
+              "p99": 103263,
+              "max": 103398
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45598,
+              "mean": 45800.9504950495,
+              "p10": 45694,
+              "p50": 45792,
+              "p90": 45921,
+              "p99": 46015,
+              "max": 46049
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1599762,
+              "mean": 1853157.2178217822,
+              "p10": 1658547,
+              "p50": 1824917,
+              "p90": 2095671,
+              "p99": 2452732,
+              "max": 2455388
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1451121,
+              "mean": 1704586.2772277228,
+              "p10": 1509968,
+              "p50": 1676245,
+              "p90": 1947225,
+              "p99": 2304055,
+              "max": 2306332
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1502592,
+              "mean": 1751416.108910891,
+              "p10": 1556599,
+              "p50": 1729029,
+              "p90": 1989366,
+              "p99": 2349742,
+              "max": 2371917
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.05912637699808764,
+              "mean": 0.07886661620768248,
+              "p10": 0.06943828549937973,
+              "p50": 0.07921494833448879,
+              "p90": 0.08708368619962419,
+              "p99": 0.08931587723728036,
+              "max": 0.09001818640979195
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.005558786723212721,
+              "mean": 0.015482348340969754,
+              "p10": 0.005822762162473241,
+              "p50": 0.006399098226245745,
+              "p90": 0.033583549386952675,
+              "p99": 0.19832740389366538,
+              "max": 0.29262985912290934
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.6473986148840527,
+              "mean": 0.9059421247299247,
+              "p10": 0.8894391551365238,
+              "p50": 0.9134093370496179,
+              "p90": 0.9195457170784672,
+              "p99": 0.9221433806128525,
+              "max": 0.9222010409886435
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -58994,
+              "mean": 15900.284915550379,
+              "p10": -12,
+              "p50": 495,
+              "p90": 51852,
+              "p99": 418491,
+              "max": 767836
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 11667,
+              "mean": 36125.63156668608,
+              "p10": 13242,
+              "p50": 14922,
+              "p90": 72642,
+              "p99": 446774,
+              "max": 780680
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 808757,
+                "mean": 1037649.9504950495,
+                "p10": 892799,
+                "p50": 1019446,
+                "p90": 1222026,
+                "p99": 1380964,
+                "max": 1446395
+              },
+              "worst_single_api_wall_ns": 277525,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 534904,
+                "mean": 681504.5148514851,
+                "p10": 584353,
+                "p50": 667239,
+                "p90": 813070,
+                "p99": 895073,
+                "max": 938603
+              },
+              "worst_single_api_wall_ns": 210308,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9588,
+                "mean": 32091.38613861386,
+                "p10": 10270,
+                "p50": 12374,
+                "p90": 65324,
+                "p99": 449540,
+                "max": 731112
+              },
+              "worst_single_api_wall_ns": 729209,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaLaunchKernel_v7000": 62,
+            "cudaMemcpyAsync_v3020": 34,
+            "cudaStreamSynchronize_v3020": 5
+          },
+          "full_invocation_count": 101
+        }
+      ]
+    },
+    {
+      "native_process_id": 40508,
+      "nsight_global_pid": 282154588176384,
+      "nsight_main_global_tid": 282154588220960,
+      "block_order": "BAAB",
+      "target_action_index": 14,
+      "target_operation_id": "g:dense:op:highlevel-dense:r0:attn.pv",
+      "diagnostic_events": [
+        {
+          "severity": 1,
+          "text": "Profiling has started."
+        },
+        {
+          "severity": 1,
+          "text": "Process 40508 was launched by the profiler"
+        },
+        {
+          "severity": 1,
+          "text": "Number of NVTX events collected: \t31100."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUDA events collected: \t137413."
+        },
+        {
+          "severity": 1,
+          "text": "Common injection library initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "Buffers holding CUDA trace data will be flushed on CudaProfilerStop() call. See --flush-on-cudaprofilerstop to control this behavior."
+        },
+        {
+          "severity": 1,
+          "text": "Loaded CUPTI library: C:\\Program Files\\NVIDIA Corporation\\Nsight Systems 2024.4.2\\target-windows-x64\\cupti64_126.dll"
+        },
+        {
+          "severity": 2,
+          "text": "Installed CUDA driver version (13.0) is not supported by this build of Nsight Systems. CUDA trace will be collected using libraries for driver version 12.6"
+        },
+        {
+          "severity": 1,
+          "text": "Enabling trace for device graph launch"
+        },
+        {
+          "severity": 1,
+          "text": "CUDA injection initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "NVTX injection initialized successfully."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUPTI events produced: \t158587, CUPTI buffers: 20."
+        },
+        {
+          "severity": 1,
+          "text": "Number of CUPTI events produced: \t158592, CUPTI buffers: 20."
+        },
+        {
+          "severity": 1,
+          "text": "Profiling has stopped."
+        }
+      ],
+      "export_metadata": {
+        "EXPORT_PRODUCT_NAME": "NVIDIA Nsight Systems",
+        "EXPORT_PRODUCT_VERSION": "2024.4.2.133",
+        "EXPORT_PRODUCT_DATE": "2024.4",
+        "EXPORT_SCHEMA_VERSION": "3.11.3",
+        "EXPORT_SCHEMA_VERSION_MAJOR": "3",
+        "EXPORT_SCHEMA_VERSION_MINOR": "11",
+        "EXPORT_SCHEMA_VERSION_MICRO": "3",
+        "EXPORT_SCHEMA_VERSION_CKSUM": "2546268570 148088",
+        "EXPORT_PLATFORM": "windows-desktop",
+        "EXPORT_ARCH": "x64",
+        "EXPORT_TIME_UTC": "2026-10-18T13:39:51",
+        "EXPORT_TIME_LOCAL": "2026-10-18T21:39:51 +0800 \u4e2d\u56fd\u6807\u51c6\u65f6\u95f4",
+        "EXPORT_HOST": "liuzhenyu",
+        "EXPORT_USER": "89664",
+        "EXPORT_PARAM_INPUT_FILE": "trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_FILE": "trace.sqlite",
+        "EXPORT_PARAM_INPUT_PATH": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/BAAB/trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_PATH": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/BAAB/trace.sqlite",
+        "EXPORT_PARAM_INPUT_PATH_ABS": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/BAAB/trace.nsys-rep",
+        "EXPORT_PARAM_OUTUPT_PATH_ABS": "C:/Users/89664/Desktop/master degree/LLM-Infer/Simulator/profiling/single_layer_context_pair/results/nsight-v2/BAAB/trace.sqlite",
+        "EXPORT_PARAM_OVERWRITE": "false",
+        "EXPORT_PARAM_APPEND": "false",
+        "EXPORT_PARAM_LAZY": "true",
+        "EXPORT_PARAM_TIME_NORMALIZE": "false",
+        "EXPORT_PARAM_TIME_SHIFT": "0",
+        "EXPORT_PARAM_TABLES_TO_EXPORT": "",
+        "EXPORT_PARAM_TIMES_TO_EXPORT": "",
+        "EXPORT_CONFIG_TIME_SHIFT": "0",
+        "EXPORT_TIME": "0.79 sec"
+      },
+      "selected_capture_options": {
+        "PROCESS_0:COLLECT_NVTX_TRACE": "true",
+        "PROCESS_0:COLLECT_CUDA_TRACE": "true",
+        "PROCESS_0:CUDA_SKIP_SOME_API_CALLS": "true"
+      },
+      "complete_target_inventory_verified": true,
+      "all_selected_launch_copy_correlations_verified": true,
+      "kernel_count_distribution": {
+        "52": 404
+      },
+      "memcpy_count_distribution": {
+        "33": 404
+      },
+      "blocks": [
+        {
+          "block_index": 0,
+          "label": "B",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 1235249168,
+          "nsight_parent_end_ns": 2073970994,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1648057,
+              "mean": 2661400.663366337,
+              "p10": 1717708,
+              "p50": 1844007,
+              "p90": 5229289,
+              "p99": 5648733,
+              "max": 5650656
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1498054,
+              "mean": 2436247.623762376,
+              "p10": 1563570,
+              "p50": 1691399,
+              "p90": 4795082,
+              "p99": 5241299,
+              "max": 5245450
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 149041,
+              "mean": 225153.0396039604,
+              "p10": 150378,
+              "p50": 162206,
+              "p90": 405206,
+              "p99": 549354,
+              "max": 550548
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1487463,
+              "mean": 2398922.910891089,
+              "p10": 1552870,
+              "p50": 1675924,
+              "p90": 4723280,
+              "p99": 5106775,
+              "max": 5183239
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 8246,
+              "mean": 36008.90099009901,
+              "p10": 9498,
+              "p50": 11001,
+              "p90": 56607,
+              "p99": 423371,
+              "max": 468115
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1002,
+              "mean": 1315.8118811881188,
+              "p10": 1082,
+              "p50": 1202,
+              "p90": 1563,
+              "p99": 2805,
+              "max": 4569
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9318,
+              "mean": 37324.71287128713,
+              "p10": 10700,
+              "p50": 12114,
+              "p90": 57960,
+              "p99": 424714,
+              "max": 469878
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1636084,
+              "mean": 2622176.9306930695,
+              "p10": 1703892,
+              "p50": 1829900,
+              "p90": 5174756,
+              "p99": 5551198,
+              "max": 5588278
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148161,
+              "mean": 148641.63366336634,
+              "p10": 148456,
+              "p50": 148612,
+              "p90": 148893,
+              "p99": 149252,
+              "max": 149378
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102591,
+              "mean": 102855.51485148515,
+              "p10": 102686,
+              "p50": 102843,
+              "p90": 103072,
+              "p99": 103459,
+              "max": 103489
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45536,
+              "mean": 45786.11881188119,
+              "p10": 45695,
+              "p50": 45791,
+              "p90": 45889,
+              "p99": 45955,
+              "max": 45985
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1608722,
+              "mean": 2594824.6336633665,
+              "p10": 1672915,
+              "p50": 1800724,
+              "p90": 5134522,
+              "p99": 5540702,
+              "max": 5546366
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1460048,
+              "mean": 2446183,
+              "p10": 1523986,
+              "p50": 1652114,
+              "p90": 4985816,
+              "p99": 5392056,
+              "max": 5397214
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1499383,
+              "mean": 2512759.0297029703,
+              "p10": 1569128,
+              "p50": 1695434,
+              "p90": 5080805,
+              "p99": 5499581,
+              "max": 5502010
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.02630597226233556,
+              "mean": 0.06707030140278715,
+              "p10": 0.02839468233635586,
+              "p50": 0.08057073536054907,
+              "p90": 0.08649898585789902,
+              "p99": 0.08964215594967048,
+              "max": 0.09021168563951368
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.004543849472528244,
+              "mean": 0.011570615348896213,
+              "p10": 0.005715588395313334,
+              "p50": 0.006482992992892744,
+              "p90": 0.010968375148687672,
+              "p99": 0.08315459302424355,
+              "max": 0.18978900019751346
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.7383335225053645,
+              "mean": 0.90210264241708,
+              "p10": 0.8898919622480724,
+              "p50": 0.9059707686521677,
+              "p90": 0.9135945168317572,
+              "p99": 0.9213055118033442,
+              "max": 0.9296510481635266
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -242657,
+              "mean": 3857.10460104834,
+              "p10": -1666,
+              "p50": -8,
+              "p90": 369,
+              "p99": 157849,
+              "max": 464297
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 12419,
+              "mean": 32079.727082119978,
+              "p10": 12968,
+              "p50": 16883,
+              "p90": 58849,
+              "p99": 181919,
+              "max": 536294
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 847186,
+                "mean": 1455695.9900990098,
+                "p10": 945487,
+                "p50": 1063728,
+                "p90": 2827426,
+                "p99": 3145377,
+                "max": 3166760
+              },
+              "worst_single_api_wall_ns": 335945,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 472535,
+                "mean": 943226.9207920792,
+                "p10": 561443,
+                "p50": 674456,
+                "p90": 1878573,
+                "p99": 2037862,
+                "max": 2099742
+              },
+              "worst_single_api_wall_ns": 287594,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9318,
+                "mean": 37324.71287128713,
+                "p10": 10700,
+                "p50": 12114,
+                "p90": 57960,
+                "p99": 424714,
+                "max": 469878
+              },
+              "worst_single_api_wall_ns": 468115,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaMemcpyAsync_v3020": 36,
+            "cudaLaunchKernel_v7000": 59,
+            "cudaStreamSynchronize_v3020": 6
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 1,
+          "label": "A",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 2073989990,
+          "nsight_parent_end_ns": 2466193095,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1582773,
+              "mean": 2758281.4356435644,
+              "p10": 1659398,
+              "p50": 1778183,
+              "p90": 5162593,
+              "p99": 5350939,
+              "max": 5470154
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1435891,
+              "mean": 2524876.5247524753,
+              "p10": 1516375,
+              "p50": 1632385,
+              "p90": 4747103,
+              "p99": 4939589,
+              "max": 4981500
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 141341,
+              "mean": 233404.91089108912,
+              "p10": 142841,
+              "p50": 149438,
+              "p90": 436540,
+              "p99": 629887,
+              "max": 669919
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1425412,
+              "mean": 2495559.287128713,
+              "p10": 1484918,
+              "p50": 1621514,
+              "p90": 4696427,
+              "p99": 4885967,
+              "max": 4927098
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 7955,
+              "mean": 28082.29702970297,
+              "p10": 8626,
+              "p50": 9739,
+              "p90": 52589,
+              "p99": 112653,
+              "max": 183066
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1012,
+              "mean": 1234.9405940594058,
+              "p10": 1093,
+              "p50": 1192,
+              "p90": 1423,
+              "p99": 1973,
+              "max": 2315
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9097,
+              "mean": 29317.237623762376,
+              "p10": 9718,
+              "p50": 10911,
+              "p90": 53862,
+              "p99": 113745,
+              "max": 184489
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1570951,
+              "mean": 2726430.792079208,
+              "p10": 1631666,
+              "p50": 1763575,
+              "p90": 5092550,
+              "p99": 5295123,
+              "max": 5414149
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148128,
+              "mean": 148555.51485148515,
+              "p10": 148414,
+              "p50": 148540,
+              "p90": 148740,
+              "p99": 148866,
+              "max": 148965
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102465,
+              "mean": 102755.64356435643,
+              "p10": 102599,
+              "p50": 102781,
+              "p90": 102883,
+              "p99": 103006,
+              "max": 103012
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45629,
+              "mean": 45799.87128712871,
+              "p10": 45695,
+              "p50": 45792,
+              "p90": 45921,
+              "p99": 45985,
+              "max": 45985
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1531953,
+              "mean": 2702099.0693069305,
+              "p10": 1617587,
+              "p50": 1738740,
+              "p90": 5052344,
+              "p99": 5262779,
+              "max": 5383004
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1383188,
+              "mean": 2553543.5544554456,
+              "p10": 1468980,
+              "p50": 1590001,
+              "p90": 4903478,
+              "p99": 5114232,
+              "max": 5234614
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1434008,
+              "mean": 2609725.920792079,
+              "p10": 1510793,
+              "p50": 1629444,
+              "p90": 5013956,
+              "p99": 5202392,
+              "max": 5321764
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.02712720702195953,
+              "mean": 0.06818075059316005,
+              "p10": 0.028791152043169004,
+              "p50": 0.08364662129825783,
+              "p90": 0.08955356099019042,
+              "p99": 0.09345518515371519,
+              "max": 0.09399010470863478
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.0051250502110695905,
+              "mean": 0.010555855007073678,
+              "p10": 0.00564653323699838,
+              "p50": 0.006368698283354243,
+              "p90": 0.011045162077978666,
+              "p99": 0.06644189335300683,
+              "max": 0.09688474649080381
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.8196360592392334,
+              "mean": 0.9036501612254733,
+              "p10": 0.8834204623187363,
+              "p50": 0.9081120454167415,
+              "p90": 0.9186959241847263,
+              "p99": 0.9300423375929775,
+              "max": 0.9394689722371752
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -152633,
+              "mean": 4944.584973791497,
+              "p10": -335,
+              "p50": 163,
+              "p90": 615,
+              "p99": 108386,
+              "max": 612737
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 12436,
+              "mean": 34304.10599883518,
+              "p10": 13079,
+              "p50": 15156,
+              "p90": 57166,
+              "p99": 139260,
+              "max": 654426
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 804384,
+                "mean": 1509740.3762376239,
+                "p10": 888799,
+                "p50": 1015924,
+                "p90": 2789010,
+                "p99": 2984409,
+                "max": 3123179
+              },
+              "worst_single_api_wall_ns": 426257,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 470814,
+                "mean": 985818.9108910891,
+                "p10": 532002,
+                "p50": 637162,
+                "p90": 1946901,
+                "p99": 2014315,
+                "max": 2021983
+              },
+              "worst_single_api_wall_ns": 234043,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9097,
+                "mean": 29317.237623762376,
+                "p10": 9718,
+                "p50": 10911,
+                "p90": 53862,
+                "p99": 113745,
+                "max": 184489
+              },
+              "worst_single_api_wall_ns": 183066,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaLaunchKernel_v7000": 69,
+            "cudaMemcpyAsync_v3020": 29,
+            "cudaStreamSynchronize_v3020": 3
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 2,
+          "label": "A",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 2466194958,
+          "nsight_parent_end_ns": 2813394528,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1607691,
+              "mean": 2308828.9306930695,
+              "p10": 1685017,
+              "p50": 1767984,
+              "p90": 5442582,
+              "p99": 5822501,
+              "max": 6018302
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1462427,
+              "mean": 2114764.574257426,
+              "p10": 1540680,
+              "p50": 1617547,
+              "p90": 4963478,
+              "p99": 5384561,
+              "max": 5550354
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 141359,
+              "mean": 194064.35643564357,
+              "p10": 142682,
+              "p50": 147188,
+              "p90": 378934,
+              "p99": 528147,
+              "max": 687245
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1421811,
+              "mean": 2089480.8613861387,
+              "p10": 1517756,
+              "p50": 1606921,
+              "p90": 4905900,
+              "p99": 5327423,
+              "max": 5488488
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 8506,
+              "mean": 24014.26732673267,
+              "p10": 8756,
+              "p50": 9668,
+              "p90": 56827,
+              "p99": 130647,
+              "max": 280090
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 1042,
+              "mean": 1269.4455445544554,
+              "p10": 1102,
+              "p50": 1182,
+              "p90": 1443,
+              "p99": 2144,
+              "max": 5941
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 9658,
+              "mean": 25283.712871287127,
+              "p10": 9919,
+              "p50": 10861,
+              "p90": 58851,
+              "p99": 131840,
+              "max": 281152
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1563246,
+              "mean": 2282109.9405940594,
+              "p10": 1666521,
+              "p50": 1755921,
+              "p90": 5383190,
+              "p99": 5763419,
+              "max": 5954301
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148128,
+              "mean": 148589.89108910892,
+              "p10": 148413,
+              "p50": 148577,
+              "p90": 148774,
+              "p99": 149082,
+              "max": 149092
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102399,
+              "mean": 102791.28712871287,
+              "p10": 102652,
+              "p50": 102786,
+              "p90": 102944,
+              "p99": 103267,
+              "max": 103356
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45600,
+              "mean": 45798.60396039604,
+              "p10": 45668,
+              "p50": 45795,
+              "p90": 45890,
+              "p99": 46047,
+              "max": 46047
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1574641,
+              "mean": 2259668.831683168,
+              "p10": 1651058,
+              "p50": 1726868,
+              "p90": 5350620,
+              "p99": 5729696,
+              "max": 5919714
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1425840,
+              "mean": 2111078.9405940594,
+              "p10": 1502606,
+              "p50": 1578447,
+              "p90": 5202142,
+              "p99": 5581213,
+              "max": 5771234
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1458890,
+              "mean": 2160239.0396039602,
+              "p10": 1536565,
+              "p50": 1619563,
+              "p90": 5294104,
+              "p99": 5674018,
+              "max": 5869822
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.02467141064040987,
+              "mean": 0.0755809885212127,
+              "p10": 0.02728080164892325,
+              "p50": 0.08403267777328127,
+              "p90": 0.08810118829661659,
+              "p99": 0.09124667491190357,
+              "max": 0.09255572121757229
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.00437675263792124,
+              "mean": 0.010877630273352305,
+              "p10": 0.005662221956994494,
+              "p50": 0.006156695926309633,
+              "p90": 0.011308375937165861,
+              "p99": 0.07562898430342918,
+              "max": 0.1323262521367843
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.8005194174391722,
+              "mean": 0.9044048536361308,
+              "p10": 0.8858771045205764,
+              "p50": 0.9087308911423445,
+              "p90": 0.9164293942370572,
+              "p99": 0.9223166660087626,
+              "max": 0.9224776960113702
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -179215,
+              "mean": 5426.7032032615025,
+              "p10": -14,
+              "p50": 353,
+              "p90": 798,
+              "p99": 140344,
+              "max": 381257
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 12668,
+              "mean": 30008.830984274897,
+              "p10": 13123,
+              "p50": 14686,
+              "p90": 61383,
+              "p99": 159214,
+              "max": 410082
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 810546,
+                "mean": 1278899.396039604,
+                "p10": 887431,
+                "p50": 1014537,
+                "p90": 2944299,
+                "p99": 3219744,
+                "max": 3261257
+              },
+              "worst_single_api_wall_ns": 405897,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 466505,
+                "mean": 810581.4653465346,
+                "p10": 530740,
+                "p50": 625252,
+                "p90": 1950171,
+                "p99": 2099049,
+                "max": 2360826
+              },
+              "worst_single_api_wall_ns": 333631,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 9658,
+                "mean": 25283.712871287127,
+                "p10": 9919,
+                "p50": 10861,
+                "p90": 58851,
+                "p99": 131840,
+                "max": 281152
+              },
+              "worst_single_api_wall_ns": 280090,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaLaunchKernel_v7000": 69,
+            "cudaMemcpyAsync_v3020": 29,
+            "cudaStreamSynchronize_v3020": 3
+          },
+          "full_invocation_count": 101
+        },
+        {
+          "block_index": 3,
+          "label": "B",
+          "target_ranges_total": 132,
+          "validation_ranges_excluded": 1,
+          "warmup_ranges_excluded": 30,
+          "timed_ranges": 101,
+          "nsight_parent_start_ns": 2813396301,
+          "nsight_parent_end_ns": 3605317205,
+          "statistics": {
+            "host_nvtx_span_ns": {
+              "n": 101,
+              "min": 1627818,
+              "mean": 2681910.2772277226,
+              "p10": 1744820,
+              "p50": 1894583,
+              "p90": 5367260,
+              "p99": 5691232,
+              "max": 5704758
+            },
+            "runtime_api_union_ns": {
+              "n": 101,
+              "min": 1461043,
+              "mean": 2447464.326732673,
+              "p10": 1588496,
+              "p50": 1727411,
+              "p90": 4900261,
+              "p99": 5163735,
+              "max": 5168822
+            },
+            "host_outside_recorded_runtime_api_ns": {
+              "n": 101,
+              "min": 149382,
+              "mean": 234445.9504950495,
+              "p10": 152033,
+              "p50": 163962,
+              "p90": 441839,
+              "p99": 697200,
+              "max": 835520
+            },
+            "non_sync_runtime_api_union_ns": {
+              "n": 101,
+              "min": 1449341,
+              "mean": 2410729.9702970297,
+              "p10": 1571581,
+              "p50": 1713376,
+              "p90": 4846309,
+              "p99": 5110805,
+              "max": 5115292
+            },
+            "first_sync_api_ns": {
+              "n": 101,
+              "min": 9108,
+              "mean": 35462.18811881188,
+              "p10": 9879,
+              "p50": 11892,
+              "p90": 57479,
+              "p99": 394356,
+              "max": 453177
+            },
+            "second_sync_api_ns": {
+              "n": 101,
+              "min": 992,
+              "mean": 1272.1683168316831,
+              "p10": 1102,
+              "p50": 1222,
+              "p90": 1483,
+              "p99": 1963,
+              "max": 2365
+            },
+            "sync_api_union_ns": {
+              "n": 101,
+              "min": 10400,
+              "mean": 36734.35643564357,
+              "p10": 11061,
+              "p50": 13044,
+              "p90": 58921,
+              "p99": 395939,
+              "max": 455542
+            },
+            "pre_first_sync_host_span_ns": {
+              "n": 101,
+              "min": 1615004,
+              "mean": 2643304.6534653464,
+              "p10": 1722488,
+              "p50": 1876779,
+              "p90": 5310783,
+              "p99": 5635287,
+              "max": 5649333
+            },
+            "correlated_gpu_activity_union_ns": {
+              "n": 101,
+              "min": 148193,
+              "mean": 148622.61386138614,
+              "p10": 148385,
+              "p50": 148614,
+              "p90": 148834,
+              "p99": 149115,
+              "max": 149223
+            },
+            "correlated_kernel_union_ns": {
+              "n": 101,
+              "min": 102592,
+              "mean": 102827.50495049504,
+              "p10": 102655,
+              "p50": 102817,
+              "p90": 103008,
+              "p99": 103291,
+              "max": 103364
+            },
+            "correlated_memcpy_union_ns": {
+              "n": 101,
+              "min": 45504,
+              "mean": 45795.10891089109,
+              "p10": 45667,
+              "p50": 45791,
+              "p90": 45919,
+              "p99": 46015,
+              "max": 46048
+            },
+            "correlated_gpu_activity_span_ns": {
+              "n": 101,
+              "min": 1579090,
+              "mean": 2613653.0396039602,
+              "p10": 1700882,
+              "p50": 1830580,
+              "p90": 5258715,
+              "p99": 5579902,
+              "max": 5596895
+            },
+            "correlated_span_without_target_activity_ns": {
+              "n": 101,
+              "min": 1430672,
+              "mean": 2465030.425742574,
+              "p10": 1552631,
+              "p50": 1682035,
+              "p90": 5110145,
+              "p99": 5431549,
+              "max": 5448341
+            },
+            "host_without_correlated_target_gpu_activity_ns": {
+              "n": 101,
+              "min": 1479400,
+              "mean": 2533287.663366337,
+              "p10": 1596084,
+              "p50": 1745845,
+              "p90": 5218457,
+              "p99": 5542879,
+              "max": 5556204
+            },
+            "gpu_activity_to_host_ratio": {
+              "n": 101,
+              "min": 0.02604036840826552,
+              "mean": 0.067544903338631,
+              "p10": 0.027713640513212526,
+              "p50": 0.07849071204574315,
+              "p90": 0.0852032313305553,
+              "p99": 0.0878069392651778,
+              "max": 0.09117604056473144
+            },
+            "sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.0032765757536806733,
+              "mean": 0.012419080453202171,
+              "p10": 0.006049095172207722,
+              "p50": 0.007023101669517124,
+              "p90": 0.010947351364091687,
+              "p99": 0.08490352208764465,
+              "max": 0.08917840104459292
+            },
+            "non_sync_api_to_host_ratio": {
+              "n": 101,
+              "min": 0.8135340807904389,
+              "mean": 0.9001272167618839,
+              "p10": 0.8775651433519465,
+              "p50": 0.9055732202981167,
+              "p90": 0.9130403678987608,
+              "p99": 0.9219763648585818,
+              "max": 0.93767799622068
+            },
+            "kernel_count": {
+              "n": 101,
+              "min": 52,
+              "mean": 52,
+              "p10": 52,
+              "p50": 52,
+              "p90": 52,
+              "p99": 52,
+              "max": 52
+            },
+            "memcpy_count": {
+              "n": 101,
+              "min": 33,
+              "mean": 33,
+              "p10": 33,
+              "p50": 33,
+              "p90": 33,
+              "p99": 33,
+              "max": 33
+            },
+            "runtime_api_count": {
+              "n": 101,
+              "min": 87,
+              "mean": 87,
+              "p10": 87,
+              "p50": 87,
+              "p90": 87,
+              "p99": 87,
+              "max": 87
+            },
+            "post_api_return_to_gpu_start_ns": {
+              "n": 8585,
+              "min": -178384,
+              "mean": 7312.185090273733,
+              "p10": -635,
+              "p50": 12,
+              "p90": 491,
+              "p99": 281049,
+              "max": 475124
+            },
+            "host_api_start_to_gpu_start_ns": {
+              "n": 8585,
+              "min": 12454,
+              "mean": 35673.71415259173,
+              "p10": 13031,
+              "p50": 15647,
+              "p90": 60735,
+              "p99": 301537,
+              "max": 549493
+            }
+          },
+          "recorded_runtime_api_aggregates": {
+            "cudaLaunchKernel_v7000": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 5252,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 855884,
+                "mean": 1453899.4752475247,
+                "p10": 945169,
+                "p50": 1049494,
+                "p90": 2863458,
+                "p99": 3036828,
+                "max": 3061813
+              },
+              "worst_single_api_wall_ns": 325646,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaMemcpyAsync_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 3333,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 494817,
+                "mean": 956830.4950495049,
+                "p10": 560877,
+                "p50": 687172,
+                "p90": 1958134,
+                "p99": 2108350,
+                "max": 2165888
+              },
+              "worst_single_api_wall_ns": 259551,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            },
+            "cudaStreamSynchronize_v3020": {
+              "invocations_with_api": 101,
+              "recorded_api_calls": 202,
+              "per_invocation_inclusive_wall_sum_ns": {
+                "n": 101,
+                "min": 10400,
+                "mean": 36734.35643564357,
+                "p10": 11061,
+                "p50": 13044,
+                "p90": 58921,
+                "p99": 395939,
+                "max": 455542
+              },
+              "worst_single_api_wall_ns": 453177,
+              "semantics": "host_API_wall_intervals; may_include_internal_blocking_and_descheduling; overlap_GPU_work"
+            }
+          },
+          "kernel_multiset_counts": {
+            "{\"concat_f32_dim0\": 16, \"cpy_scalar\": 33, \"cpy_scalar_transpose\": 1, \"gemmSN_TN_kernel\": 1, \"k_compute_batched_ptrs\": 1}": 101
+          },
+          "memcpy_multiset_counts": {
+            "{\"kind_8_bytes_512\": 32, \"kind_8_bytes_8192\": 1}": 101
+          },
+          "longest_api_name_counts": {
+            "cudaLaunchKernel_v7000": 60,
+            "cudaMemcpyAsync_v3020": 34,
+            "cudaStreamSynchronize_v3020": 7
+          },
+          "full_invocation_count": 101
+        }
+      ]
+    }
+  ],
+  "all_block_quantiles_retained": true,
+  "raw_details_omitted_only_from_portable_summary": true
+}

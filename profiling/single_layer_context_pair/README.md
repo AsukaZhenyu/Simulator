@@ -10,15 +10,22 @@ B: the same target in the complete action sequence) and `instrumentation`
 ABBA/BAAB order is fixed before measurements. Two cases, three repetitions, two
 poll settings and two controls declare 24 independent processes.
 
+Prepare a fresh base campaign with `--suite diagnostic` and an explicit new
+`--seed-offset` using the [single-layer workflow](../single_layer_calibration/README.md).
+Keep its sources unchanged. Every selected case must expose one GPU Attention PV
+stage; this specific control does not accept the unsplit macro cases in the
+14-case representative suite. Historical source-bound campaigns require their
+recorded source version, rather than rewriting their manifests for new code.
+
 ```powershell
 python profiling/single_layer_context_pair/runner.py prepare `
-  --campaign profiling/single_layer_calibration/results/diagnostic-v2 `
+  --campaign profiling/single_layer_calibration/results/new-base-campaign `
   --executable profiling/native/single_layer_context_pair/build-release-v2/Release/context-pair-probe.exe `
-  --out profiling/single_layer_context_pair/results/diagnostic-v1
+  --out profiling/single_layer_context_pair/results/new-paired-campaign
 python profiling/single_layer_context_pair/runner.py run `
-  --out profiling/single_layer_context_pair/results/diagnostic-v1
+  --out profiling/single_layer_context_pair/results/new-paired-campaign
 python profiling/single_layer_context_pair/runner.py summary `
-  --out profiling/single_layer_context_pair/results/diagnostic-v1
+  --out profiling/single_layer_context_pair/results/new-paired-campaign
 ```
 
 Prepare never starts hardware. Run acquires the common measurement lock, retains

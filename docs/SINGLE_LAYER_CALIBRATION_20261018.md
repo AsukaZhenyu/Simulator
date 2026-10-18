@@ -175,11 +175,37 @@ The expected-mean row compares against observed mean latency, while the other ro
 | H256 q32/history0 / Attention + FFN cut 256 | 6.1612 | 6.18% | 6.7483 | 9.53% | 13.20% |
 | H256 q32/history0 / Attention + FFN cut 260 | 6.3278 | 6.19% | 6.5151 | 2.96% | 16.91% |
 
-The largest isolated-baseline error is H128/q16/FFN cut128: observed 3.2950 ms; isolated prediction 6.0171 ms; context compute/copy prediction 3.6447 ms; primary prediction 3.7002 ms. Its GPU PV price changes from 4.7333 ms in isolated profiling to 2.0870 ms in context profiling. This identifies **parameter applicability/context** as the dominant correction for that case. Adding control/gap intervals increases the prediction by only 0.0555 ms; it is not the main explanation. Context PV process medians still range from 1.5364 to 3.2309 ms, so the new price is not established as a stable universal constant.
+The largest isolated-baseline error is H128/q16/FFN cut128: observed 3.2950 ms; isolated prediction 6.0171 ms; context compute/copy prediction 3.6447 ms; primary prediction 3.7002 ms. Its GPU PV price changes from 4.7333 ms in isolated profiling to 2.0870 ms in context profiling. Replacing isolated prices with context-scoped observations supplies the dominant numerical correction for that case. Mode, time and process state still differ between profile cohorts; this is not a causal estimate of an intrinsic context penalty. Adding control/gap intervals increases the prediction by only 0.0555 ms; it is not the main explanation. Context PV process medians still range from 1.5364 to 3.2309 ms, so the new price is not established as a stable universal constant.
 
 The primary model is not better in every case. For H128/q16/cut132 the isolated baseline error is 0.64%, compared with the primary model’s 9.20%. We retain that result, use the predeclared primary for all cases, and do not select the best alternative after looking at each heldout result.
 
 The supported conclusion is narrower than “single-layer inference is fully calibrated”: **prices collected in the real execution order eliminate the four >20% pooled-median failures of the isolated baseline in this fresh 14-case cohort**. Remaining within-run tails, source-regime changes and cohort incompatibilities prevent a full accepted accuracy claim.
+
+## Where the remaining time is observed
+
+The separate [operation-scoped CUDA diagnosis](SINGLE_LAYER_CUDA_WAIT_DIAGNOSIS_20261018.md)
+validates all 808 selected PV ranges across two instrumented H128/q16 processes.
+Each range has 52 correlated kernels, 33 device-to-device copies and two stream
+synchronizations. Host PV p50/p90 is 1.898/4.916 ms, while the correlated GPU
+activity union stays between 148.128 and 149.378 microseconds. Non-synchronization
+CUDA runtime API **host wall intervals** occupy a median 90.90% of the host PV
+range; the two explicit synchronization APIs occupy a median 0.666%.
+
+For this representation and disabled-CUDA-graph configuration, the dominant
+observable interval is therefore inside many backend runtime API calls rather
+than the final synchronization or arithmetic on the GPU. API wall time can
+include internal blocking and thread descheduling; it is not measured CPU
+arithmetic. API and GPU intervals overlap and must not be summed. This supports
+modeling backend materialization/call granularity and host/device overlap when
+finer physical prices are required, instead of deriving a pure GPU rate from
+completed PV latency or adding one fixed synchronization penalty.
+
+The capture is diagnostic only: NVTX/CUPTI perturbs execution, some APIs are
+explicitly skipped, and Nsight warns about its CUDA-driver compatibility. Exact
+target/correlation counts pass, but those facts do not make traced timings valid
+uninstrumented prices. None of these samples updates the formal frozen models.
+The distinction between internal driver blocking and host descheduling remains
+unresolved.
 
 ## What remains unresolved
 
@@ -189,6 +215,34 @@ Current prices apply to their exact serial graph, shape, execution boundary and 
 
 The reusable workflow, source guards, independent numerical oracle and recorded failures are deliverables alongside the improved point predictions. They do not turn an unresolved residual into a known calibrated physical parameter.
 
+Before using these results to validate design-space exploration, separately test
+policies and layouts not included in profiling. Measuring every action within a
+known complete policy validates replay at that policy; it does not establish
+composable predictions for arbitrary new splits, KV layouts or overlaps.
+
+## Source version and validation
+
+The checked-in source for the formal measurements is commit
+`e447e4e1171523bfa46a10cd9e49c12acafcdc04`. The 145 recorded source
+files also have a byte-verified local archive. Later evidence-only record-set
+guards and whitespace cleanup do not alter performance equations or frozen
+results; they must not be presented as a new hardware campaign. Use the recorded
+commit and declared native/runtime build inputs to reproduce this campaign.
+
+The original offline verification checks every numerical port and source byte;
+the portable summarizer checks signatures, cached predictions and inventories
+without repeating NumPy or native execution. The two verification scopes are
+explicitly different. Actual profile/heldout file trees also match the declared
+126/42 record sets exactly.
+
+Local validation totals **2,734 distinct tests: 2,726 passed, eight existing
+optional-dependency/artifact skips, zero failures**. This includes independent
+wheel/sdist installation without profiles, the original full modeling/mapping
+regressions, calibration evidence guards, native source generation and interval
+attribution. Repeated driver checks are not counted twice. The
+[verification receipt](data/single-layer-calibration-verification-20261018.json)
+binds component counts, local logs and experiment chronology.
+
 ## Reuse and evidence
 
 - [Source-checkout calibration workflow](../profiling/single_layer_calibration/README.md)
@@ -197,6 +251,8 @@ The reusable workflow, source guards, independent numerical oracle and recorded 
 - [Portable formal results](data/single-layer-calibration-20261018.json)
 - [Reset and COPY audit](SINGLE_LAYER_RESET_BOUNDARY_AUDIT.md)
 - [Independent model integration review](SINGLE_LAYER_MODELING_AUDIT_20261018.md)
+- [CUDA runtime/API decomposition](SINGLE_LAYER_CUDA_WAIT_DIAGNOSIS_20261018.md)
+- [Verification counts and chronology](data/single-layer-calibration-verification-20261018.json)
 - Read-only portable summarizer: `tools/summarize_single_layer_calibration.py`
 - Local development campaign: `profiling/single_layer_calibration/results/diagnostic-v2/`
 - Local paired campaign: `profiling/single_layer_context_pair/results/diagnostic-v1/`
