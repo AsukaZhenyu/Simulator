@@ -49,6 +49,8 @@ jobs:
         run: python -m unittest discover -s profiling/execution_calibration/tests -v
       - name: Batch sample units and profile-only freezing
         run: python -m unittest discover -s profiling/batched_calibration/tests -v
+      - name: Profile-only composition model and exact IR accounting
+        run: python -m unittest discover -s profiling/composition_calibration/tests -v
       - name: Native batch source generation without CUDA
         run: python -m unittest discover -s profiling/native/execution_transforms_batch -p 'test_*.py' -v
       - name: Modeling tests

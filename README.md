@@ -110,6 +110,8 @@ Distribution checks build wheel/sdist and run Dense/MoE in a fresh virtual envir
 
 The [research evidence report](docs/RESEARCH_EVIDENCE_20261017.md) separates independent strategy checks, measured-component replay, analytical design exploration and hardware acceptance. Reusable source-checkout experiments include [strategy fidelity](docs/STRATEGY_FIDELITY.md), [hardware sensitivity](docs/HARDWARE_SENSITIVITY.md) and [repeated completed-work calibration](profiling/batched_calibration/README.md). Analytical curves illustrate declared assumptions; successful compilation or replay does not establish hardware accuracy. A policy that cannot advance is reported as a policy dead end, without claiming that every mapping on the hardware is infeasible.
 
+The [composition calibration study](docs/COMPOSITION_CALIBRATION_20261018.md) adds profile-only shared corrections and exact IR accounting for retained FFN/Attention chains. Confirmation median error decreases from 13.65% to 6.14%; held-out-geometry worst error is still 34.85% and quality acceptance remains 0/10. This retrospective, opt-in workflow preserves the original runtime timeline and does not replace the library's uncalibrated analytical defaults.
+
 ## License and research use
 
 Original code uses the [MIT License](LICENSE). Attributed third-party data retains its own license; see [public routing data](profiling/data/public-routes/README.md). This is an **alpha research library**, with no associated accepted paper or accuracy claim. Citation metadata: [CITATION.cff](CITATION.cff).

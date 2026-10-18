@@ -1,0 +1,4819 @@
+{
+  "schema": "composition-calibration-public-summary-0.1",
+  "evaluation_design": "retrospective; historically inspected heldout data",
+  "fresh_blind_validation": false,
+  "independent_geometries": 4,
+  "processes_per_campaign": 24,
+  "batch_repetitions": 16,
+  "primary_paths_per_campaign": 10,
+  "shared_coefficients": 3,
+  "profile_joint_totals_used_for_calibration": true,
+  "heldout_totals_used_for_calibration": false,
+  "physical_capacity_validated": false,
+  "gpu_private_workspace_bytes": null,
+  "source_report_sha256": "d0beac4cc57709a3ee4b515fcfd8b5982ac2f3ef0fb47a23c0ae5eb84db10eed",
+  "source_frozen_model_sha256": {
+    "initial": "5daa1cc78bf784ca11a53f25cd4d1350843ba528bd5ea427bddd0ade2df5b4a2",
+    "confirmation": "512e54de0da3606b7f2a2e275b0905b8f191c784c0ef63a5ad8e16dab857017f"
+  },
+  "campaigns": {
+    "initial": {
+      "coefficients": {
+        "composition_boundaries": 16.05258092730657,
+        "hybrid_ffn_critical_branch_us": 0.1986937280937259,
+        "preload_event": 36.39088247979499
+      },
+      "coefficient_units": {
+        "composition_boundaries": "us/boundary",
+        "hybrid_ffn_critical_branch_us": "dimensionless",
+        "preload_event": "us/preload_event"
+      },
+      "quality": {
+        "max_within_process_cv": 0.15,
+        "max_between_process_cv": 0.2,
+        "max_heldout_relative_error": 0.2
+      },
+      "full": {
+        "baseline_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.11891176370155754,
+            "mean_signed_bias_us": -151.788,
+            "mean_signed_relative_bias": -0.13029137622210663
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.09328026671510095,
+              "mean_signed_bias_us": -115.75,
+              "mean_signed_relative_bias": -0.08383865962306786
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.156404624201403,
+              "mean_signed_bias_us": -175.81333333333333,
+              "mean_signed_relative_bias": -0.1612598539547991
+            }
+          }
+        },
+        "corrected_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.04773715598265064,
+            "mean_signed_bias_us": -1.2312595531513557,
+            "mean_signed_relative_bias": 0.0078077894569625475
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.03794285877575893,
+              "mean_signed_bias_us": -43.51338582712051,
+              "mean_signed_relative_bias": -0.028813249859439203
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.047957794485189865,
+              "mean_signed_bias_us": 26.956824629494747,
+              "mean_signed_relative_bias": 0.032221815667897044
+            }
+          }
+        },
+        "baseline_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 580800,
+            "predicted_ns": 565787,
+            "absolute_relative_error": 0.025848829201101927,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 309669,
+            "predicted_ns": 230000,
+            "absolute_relative_error": 0.2572714737348588,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 827219,
+            "predicted_ns": 581556,
+            "absolute_relative_error": 0.29697456175450515,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 770531,
+            "predicted_ns": 713007,
+            "absolute_relative_error": 0.07465501063552278,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1759756,
+            "predicted_ns": 1436938,
+            "absolute_relative_error": 0.18344475029492724,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2583344,
+            "predicted_ns": 2249151,
+            "absolute_relative_error": 0.12936449810787878,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1656731,
+            "predicted_ns": 1463688,
+            "absolute_relative_error": 0.11652042486076497,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1265994,
+            "predicted_ns": 1112425,
+            "absolute_relative_error": 0.12130310254235012,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1412062,
+            "predicted_ns": 1373243,
+            "absolute_relative_error": 0.02749100251971939,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1107494,
+            "predicted_ns": 1029925,
+            "absolute_relative_error": 0.07004010856943695,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          }
+        ],
+        "corrected_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 580800,
+            "predicted_ns": 629997.3237092263,
+            "absolute_relative_error": 0.084706135862993,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 565.787,
+              "correction_us": 64.21032370922627,
+              "total_us": 629.9973237092263,
+              "baseline_ns": 565787.0,
+              "correction_ns": 64210.32370922627,
+              "predicted_ns": 629997.3237092263,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 64.21032370922627,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 309669,
+            "predicted_ns": 342850.06690000056,
+            "absolute_relative_error": 0.107150108341489,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 230.0,
+              "correction_us": 112.85006690000054,
+              "total_us": 342.85006690000057,
+              "baseline_ns": 230000.0,
+              "correction_ns": 112850.06690000054,
+              "predicted_ns": 342850.06690000056,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 164.007,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 80.26290463653284,
+                "hybrid_ffn_critical_branch_us": 32.587162263467704,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 827219,
+            "predicted_ns": 778954.6921617152,
+            "absolute_relative_error": 0.058345260249443934,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 581.556,
+              "correction_us": 197.39869216171525,
+              "total_us": 778.9546921617152,
+              "baseline_ns": 581556.0,
+              "correction_ns": 197398.69216171524,
+              "predicted_ns": 778954.6921617152,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 164.007,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 128.42064741845255,
+                "hybrid_ffn_critical_branch_us": 32.587162263467704,
+                "preload_event": 36.39088247979499
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 770531,
+            "predicted_ns": 777217.3237092262,
+            "absolute_relative_error": 0.008677553153898043,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 713.007,
+              "correction_us": 64.21032370922627,
+              "total_us": 777.2173237092262,
+              "baseline_ns": 713007.0,
+              "correction_ns": 64210.32370922627,
+              "predicted_ns": 777217.3237092262,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 64.21032370922627,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1759756,
+            "predicted_ns": 1783639.458017543,
+            "absolute_relative_error": 0.013572028177510381,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1436.938,
+              "correction_us": 346.7014580175427,
+              "total_us": 1783.639458017543,
+              "baseline_ns": 1436938.0,
+              "correction_ns": 346701.45801754267,
+              "predicted_ns": 1783639.458017543,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 1340.951,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 80.26290463653284,
+                "hybrid_ffn_critical_branch_us": 266.43855338100985,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2583344,
+            "predicted_ns": 2680401.083279257,
+            "absolute_relative_error": 0.0375703287209358,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 2249.151,
+              "correction_us": 431.2500832792574,
+              "total_us": 2680.4010832792574,
+              "baseline_ns": 2249151.0,
+              "correction_ns": 431250.0832792574,
+              "predicted_ns": 2680401.083279257,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 1340.951,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 128.42064741845255,
+                "hybrid_ffn_critical_branch_us": 266.43855338100985,
+                "preload_event": 36.39088247979499
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1656731,
+            "predicted_ns": 1527898.3237092262,
+            "absolute_relative_error": 0.07776318321488146,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1463.6879999999999,
+              "correction_us": 64.21032370922627,
+              "total_us": 1527.8983237092261,
+              "baseline_ns": 1463687.9999999998,
+              "correction_ns": 64210.32370922627,
+              "predicted_ns": 1527898.3237092262,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 64.21032370922627,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1265994,
+            "predicted_ns": 1192687.9046365328,
+            "absolute_relative_error": 0.05790398324436548,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1112.425,
+              "correction_us": 80.26290463653284,
+              "total_us": 1192.6879046365327,
+              "baseline_ns": 1112425.0,
+              "correction_ns": 80262.90463653284,
+              "predicted_ns": 1192687.9046365328,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 80.26290463653284,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1412062,
+            "predicted_ns": 1437453.3237092262,
+            "absolute_relative_error": 0.017981734307152386,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1373.243,
+              "correction_us": 64.21032370922627,
+              "total_us": 1437.4533237092262,
+              "baseline_ns": 1373243.0,
+              "correction_ns": 64210.32370922627,
+              "predicted_ns": 1437453.3237092262,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 64.21032370922627,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1107494,
+            "predicted_ns": 1110187.9046365328,
+            "absolute_relative_error": 0.002432432714337745,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1029.925,
+              "correction_us": 80.26290463653284,
+              "total_us": 1110.1879046365327,
+              "baseline_ns": 1029925.0,
+              "correction_ns": 80262.90463653284,
+              "predicted_ns": 1110187.9046365328,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 80.26290463653284,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          }
+        ],
+        "baseline_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ],
+        "corrected_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ]
+      },
+      "grouped_leave_one_case_out": {
+        "baseline_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.11891176370155754,
+            "mean_signed_bias_us": -151.788,
+            "mean_signed_relative_bias": -0.13029137622210663
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.09328026671510095,
+              "mean_signed_bias_us": -115.75,
+              "mean_signed_relative_bias": -0.08383865962306786
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.156404624201403,
+              "mean_signed_bias_us": -175.81333333333333,
+              "mean_signed_relative_bias": -0.1612598539547991
+            }
+          }
+        },
+        "corrected_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.04262661944212953,
+            "mean_signed_bias_us": 9.677481071095423,
+            "mean_signed_relative_bias": 0.04504644542317056
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.04241467746031369,
+              "mean_signed_bias_us": -49.208446524221046,
+              "mean_signed_relative_bias": -0.03287837881324941
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.0561249833555945,
+              "mean_signed_bias_us": 48.93476613463974,
+              "mean_signed_relative_bias": 0.09699632824745054
+            }
+          }
+        },
+        "baseline_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 580800,
+            "predicted_ns": 565787,
+            "absolute_relative_error": 0.025848829201101927,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 309669,
+            "predicted_ns": 230000,
+            "absolute_relative_error": 0.2572714737348588,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 827219,
+            "predicted_ns": 581556,
+            "absolute_relative_error": 0.29697456175450515,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 770531,
+            "predicted_ns": 713007,
+            "absolute_relative_error": 0.07465501063552278,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1759756,
+            "predicted_ns": 1436938,
+            "absolute_relative_error": 0.18344475029492724,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2583344,
+            "predicted_ns": 2249151,
+            "absolute_relative_error": 0.12936449810787878,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1656731,
+            "predicted_ns": 1463688,
+            "absolute_relative_error": 0.11652042486076497,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1265994,
+            "predicted_ns": 1112425,
+            "absolute_relative_error": 0.12130310254235012,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1412062,
+            "predicted_ns": 1373243,
+            "absolute_relative_error": 0.02749100251971939,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1107494,
+            "predicted_ns": 1029925,
+            "absolute_relative_error": 0.07004010856943695,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          }
+        ],
+        "corrected_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 580800,
+            "predicted_ns": 684830.0491792846,
+            "absolute_relative_error": 0.17911509844918147,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 565.787,
+              "correction_us": 119.04304917928457,
+              "total_us": 684.8300491792846,
+              "baseline_ns": 565787.0,
+              "correction_ns": 119043.04917928457,
+              "predicted_ns": 684830.0491792846,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 119.04304917928457,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 309669,
+            "predicted_ns": 403105.2045900745,
+            "absolute_relative_error": 0.3017292805869315,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 230.0,
+              "correction_us": 173.1052045900745,
+              "total_us": 403.1052045900745,
+              "baseline_ns": 230000.0,
+              "correction_ns": 173105.20459007449,
+              "predicted_ns": 403105.2045900745,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 164.007,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 148.80381147410571,
+                "hybrid_ffn_critical_branch_us": 24.301393115968786,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 827219,
+            "predicted_ns": 905212.6482527115,
+            "absolute_relative_error": 0.09428415963935972,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 581.556,
+              "correction_us": 323.65664825271136,
+              "total_us": 905.2126482527115,
+              "baseline_ns": 581556.0,
+              "correction_ns": 323656.64825271134,
+              "predicted_ns": 905212.6482527115,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 164.007,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 238.08609835856913,
+                "hybrid_ffn_critical_branch_us": 24.301393115968786,
+                "preload_event": 61.269156778173446
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 770531,
+            "predicted_ns": 776627.0960730795,
+            "absolute_relative_error": 0.007911551998660022,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 713.007,
+              "correction_us": 63.62009607307957,
+              "total_us": 776.6270960730795,
+              "baseline_ns": 713007.0,
+              "correction_ns": 63620.09607307957,
+              "predicted_ns": 776627.0960730795,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 63.62009607307957,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1759756,
+            "predicted_ns": 1728140.563210506,
+            "absolute_relative_error": 0.017965807071829282,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1436.938,
+              "correction_us": 291.20256321050573,
+              "total_us": 1728.140563210506,
+              "baseline_ns": 1436938.0,
+              "correction_ns": 291202.5632105057,
+              "predicted_ns": 1728140.563210506,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 1340.951,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 79.52512009134946,
+                "hybrid_ffn_critical_branch_us": 211.67744311915627,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2583344,
+            "predicted_ns": 2627012.0355021823,
+            "absolute_relative_error": 0.016903685882399835,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 2249.151,
+              "correction_us": 377.8610355021823,
+              "total_us": 2627.0120355021822,
+              "baseline_ns": 2249151.0,
+              "correction_ns": 377861.03550218226,
+              "predicted_ns": 2627012.0355021823,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 1340.951,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 127.24019214615915,
+                "hybrid_ffn_critical_branch_us": 211.67744311915627,
+                "preload_event": 38.94340023686691
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1656731,
+            "predicted_ns": 1518394.8120400438,
+            "absolute_relative_error": 0.08349948661548329,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1463.6879999999999,
+              "correction_us": 54.706812040043765,
+              "total_us": 1518.3948120400437,
+              "baseline_ns": 1463687.9999999998,
+              "correction_ns": 54706.81204004376,
+              "predicted_ns": 1518394.8120400438,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 54.706812040043765,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1265994,
+            "predicted_ns": 1180808.5150500548,
+            "absolute_relative_error": 0.06728743181242978,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1112.425,
+              "correction_us": 68.38351505005471,
+              "total_us": 1180.8085150500547,
+              "baseline_ns": 1112425.0,
+              "correction_ns": 68383.51505005472,
+              "predicted_ns": 1180808.5150500548,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 68.38351505005471,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1412062,
+            "predicted_ns": 1436832.2830280077,
+            "absolute_relative_error": 0.017541923108197598,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1373.243,
+              "correction_us": 63.58928302800777,
+              "total_us": 1436.8322830280076,
+              "baseline_ns": 1373243.0,
+              "correction_ns": 63589.28302800777,
+              "predicted_ns": 1436832.2830280077,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 63.58928302800777,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1107494,
+            "predicted_ns": 1109411.6037850096,
+            "absolute_relative_error": 0.0017314800667178234,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1029.925,
+              "correction_us": 79.48660378500972,
+              "total_us": 1109.4116037850097,
+              "baseline_ns": 1029925.0,
+              "correction_ns": 79486.60378500972,
+              "predicted_ns": 1109411.6037850096,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 79.48660378500972,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          }
+        ],
+        "baseline_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ],
+        "corrected_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ]
+      }
+    },
+    "confirmation": {
+      "coefficients": {
+        "composition_boundaries": 12.361054752430439,
+        "hybrid_ffn_critical_branch_us": 0.19888853470517312,
+        "preload_event": 91.63766796217061
+      },
+      "coefficient_units": {
+        "composition_boundaries": "us/boundary",
+        "hybrid_ffn_critical_branch_us": "dimensionless",
+        "preload_event": "us/preload_event"
+      },
+      "quality": {
+        "max_within_process_cv": 0.15,
+        "max_between_process_cv": 0.2,
+        "max_heldout_relative_error": 0.2
+      },
+      "full": {
+        "baseline_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.136524650360138,
+            "mean_signed_bias_us": -179.5693,
+            "mean_signed_relative_bias": -0.15467937628858272
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.11314933343839587,
+              "mean_signed_bias_us": -147.7955,
+              "mean_signed_relative_bias": -0.1119177237821056
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.17886559622816806,
+              "mean_signed_bias_us": -200.75183333333334,
+              "mean_signed_relative_bias": -0.18318714462623414
+            }
+          }
+        },
+        "corrected_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.0613524961881692,
+            "mean_signed_bias_us": -38.890062669932206,
+            "mean_signed_relative_bias": -0.026688900981925855
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.06979029222753927,
+              "mean_signed_bias_us": -92.17075361406297,
+              "mean_signed_relative_bias": -0.06884805868631896
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.0107857217463093,
+              "mean_signed_bias_us": -3.369602040511701,
+              "mean_signed_relative_bias": 0.0014172041543362142
+            }
+          }
+        },
+        "baseline_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 585444,
+            "predicted_ns": 536007,
+            "absolute_relative_error": 0.08444360177916248,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 299838,
+            "predicted_ns": 228706,
+            "absolute_relative_error": 0.2372347734443266,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 783681,
+            "predicted_ns": 567132,
+            "absolute_relative_error": 0.2763228915847137,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 777688,
+            "predicted_ns": 666175,
+            "absolute_relative_error": 0.14339040849286602,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1718831,
+            "predicted_ns": 1381807,
+            "absolute_relative_error": 0.19607745031361432,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2591069,
+            "predicted_ns": 2172213,
+            "absolute_relative_error": 0.1616537421427218,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1589188,
+            "predicted_ns": 1415262,
+            "absolute_relative_error": 0.10944331318887382,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1197044,
+            "predicted_ns": 1057163,
+            "absolute_relative_error": 0.1168553536879179,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1444381,
+            "predicted_ns": 1311912,
+            "absolute_relative_error": 0.09171333602422076,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1117594,
+            "predicted_ns": 972688,
+            "absolute_relative_error": 0.12965889222740995,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          }
+        ],
+        "corrected_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 585444,
+            "predicted_ns": 585451.2190097218,
+            "absolute_relative_error": 1.233082877571226e-05,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 536.007,
+              "correction_us": 49.444219009721756,
+              "total_us": 585.4512190097217,
+              "baseline_ns": 536007.0,
+              "correction_ns": 49444.21900972175,
+              "predicted_ns": 585451.2190097218,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 49.444219009721756,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 299838,
+            "predicted_ns": 323407.4374023878,
+            "absolute_relative_error": 0.07860723925048789,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 228.70600000000002,
+              "correction_us": 94.70143740238782,
+              "total_us": 323.4074374023878,
+              "baseline_ns": 228706.00000000003,
+              "correction_ns": 94701.43740238782,
+              "predicted_ns": 323407.4374023878,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 165.4,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 61.8052737621522,
+                "hybrid_ffn_critical_branch_us": 32.896163640235635,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 783681,
+            "predicted_ns": 790554.2696218498,
+            "absolute_relative_error": 0.008770494144747364,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 567.1320000000001,
+              "correction_us": 223.42226962184975,
+              "total_us": 790.5542696218498,
+              "baseline_ns": 567132.0000000001,
+              "correction_ns": 223422.26962184976,
+              "predicted_ns": 790554.2696218498,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 165.4,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 98.88843801944351,
+                "hybrid_ffn_critical_branch_us": 32.896163640235635,
+                "preload_event": 91.63766796217061
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 777688,
+            "predicted_ns": 715619.2190097219,
+            "absolute_relative_error": 0.07981193099324937,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 666.1750000000001,
+              "correction_us": 49.444219009721756,
+              "total_us": 715.6192190097219,
+              "baseline_ns": 666175.0000000001,
+              "correction_ns": 49444.21900972175,
+              "predicted_ns": 715619.2190097219,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 49.444219009721756,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1718831,
+            "predicted_ns": 1701087.2052468935,
+            "absolute_relative_error": 0.010323175898681454,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1381.807,
+              "correction_us": 319.28020524689344,
+              "total_us": 1701.0872052468935,
+              "baseline_ns": 1381807.0,
+              "correction_ns": 319280.20524689346,
+              "predicted_ns": 1701087.2052468935,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 1294.569,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 61.8052737621522,
+                "hybrid_ffn_critical_branch_us": 257.47493148474126,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2591069,
+            "predicted_ns": 2620214.037466355,
+            "absolute_relative_error": 0.011248267593937149,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 2172.2129999999997,
+              "correction_us": 448.0010374663554,
+              "total_us": 2620.214037466355,
+              "baseline_ns": 2172212.9999999995,
+              "correction_ns": 448001.0374663554,
+              "predicted_ns": 2620214.037466355,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 1294.569,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 98.88843801944351,
+                "hybrid_ffn_critical_branch_us": 257.47493148474126,
+                "preload_event": 91.63766796217061
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1589188,
+            "predicted_ns": 1464706.2190097217,
+            "absolute_relative_error": 0.07833043100645005,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1415.262,
+              "correction_us": 49.444219009721756,
+              "total_us": 1464.7062190097217,
+              "baseline_ns": 1415262.0,
+              "correction_ns": 49444.21900972175,
+              "predicted_ns": 1464706.2190097217,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 49.444219009721756,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1197044,
+            "predicted_ns": 1118968.2737621523,
+            "absolute_relative_error": 0.06522377309259117,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1057.163,
+              "correction_us": 61.8052737621522,
+              "total_us": 1118.9682737621522,
+              "baseline_ns": 1057163.0,
+              "correction_ns": 61805.273762152196,
+              "predicted_ns": 1118968.2737621523,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 61.8052737621522,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1444381,
+            "predicted_ns": 1361356.219009722,
+            "absolute_relative_error": 0.057481219283747234,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1311.912,
+              "correction_us": 49.444219009721756,
+              "total_us": 1361.3562190097218,
+              "baseline_ns": 1311912.0,
+              "correction_ns": 49444.21900972175,
+              "predicted_ns": 1361356.219009722,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 49.444219009721756,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1117594,
+            "predicted_ns": 1034493.2737621523,
+            "absolute_relative_error": 0.07435681136248737,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 972.6880000000001,
+              "correction_us": 61.8052737621522,
+              "total_us": 1034.4932737621523,
+              "baseline_ns": 972688.0000000001,
+              "correction_ns": 61805.273762152196,
+              "predicted_ns": 1034493.2737621523,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 61.8052737621522,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          }
+        ],
+        "baseline_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ],
+        "corrected_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ]
+      },
+      "grouped_leave_one_case_out": {
+        "baseline_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.136524650360138,
+            "mean_signed_bias_us": -179.5693,
+            "mean_signed_relative_bias": -0.15467937628858272
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.11314933343839587,
+              "mean_signed_bias_us": -147.7955,
+              "mean_signed_relative_bias": -0.1119177237821056
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.17886559622816806,
+              "mean_signed_bias_us": -200.75183333333334,
+              "mean_signed_relative_bias": -0.18318714462623414
+            }
+          }
+        },
+        "corrected_summary": {
+          "overall": {
+            "declared": 10,
+            "evaluated": 10,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.08181932637511408,
+            "mean_signed_bias_us": -49.82565385300918,
+            "mean_signed_relative_bias": 0.013249649732201912
+          },
+          "by_family": {
+            "attention": {
+              "declared": 4,
+              "evaluated": 4,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.07646198271586716,
+              "mean_signed_bias_us": -99.09656361089202,
+              "mean_signed_relative_bias": -0.07422410967741833
+            },
+            "ffn": {
+              "declared": 6,
+              "evaluated": 6,
+              "unknown": 0,
+              "accepted": 0,
+              "median_absolute_relative_error": 0.12058686901136753,
+              "mean_signed_bias_us": -16.97838068108729,
+              "mean_signed_relative_bias": 0.07156548933861541
+            }
+          }
+        },
+        "baseline_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 585444,
+            "predicted_ns": 536007,
+            "absolute_relative_error": 0.08444360177916248,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 299838,
+            "predicted_ns": 228706,
+            "absolute_relative_error": 0.2372347734443266,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 783681,
+            "predicted_ns": 567132,
+            "absolute_relative_error": 0.2763228915847137,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 777688,
+            "predicted_ns": 666175,
+            "absolute_relative_error": 0.14339040849286602,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1718831,
+            "predicted_ns": 1381807,
+            "absolute_relative_error": 0.19607745031361432,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2591069,
+            "predicted_ns": 2172213,
+            "absolute_relative_error": 0.1616537421427218,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1589188,
+            "predicted_ns": 1415262,
+            "absolute_relative_error": 0.10944331318887382,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1197044,
+            "predicted_ns": 1057163,
+            "absolute_relative_error": 0.1168553536879179,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1444381,
+            "predicted_ns": 1311912,
+            "absolute_relative_error": 0.09171333602422076,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1117594,
+            "predicted_ns": 972688,
+            "absolute_relative_error": 0.12965889222740995,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false
+          }
+        ],
+        "corrected_results": [
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "gpu/resident",
+            "observed_ns": 585444,
+            "predicted_ns": 639663.2579342184,
+            "absolute_relative_error": 0.09261220190866827,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": true,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 536.007,
+              "correction_us": 103.65625793421835,
+              "total_us": 639.6632579342183,
+              "baseline_ns": 536007.0,
+              "correction_ns": 103656.25793421835,
+              "predicted_ns": 639663.2579342184,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 103.65625793421835,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 299838,
+            "predicted_ns": 383088.64405478473,
+            "absolute_relative_error": 0.2776520789719273,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": true,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 228.70600000000002,
+              "correction_us": 154.38264405478466,
+              "total_us": 383.0886440547847,
+              "baseline_ns": 228706.00000000003,
+              "correction_ns": 154382.64405478467,
+              "predicted_ns": 383088.64405478473,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 165.4,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 129.57032241777293,
+                "hybrid_ffn_critical_branch_us": 24.812321637011745,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "strategy": "hybrid/preload",
+            "observed_ns": 783681,
+            "predicted_ns": 1056760.5018925292,
+            "absolute_relative_error": 0.34845747426890433,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": false
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": true,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 567.1320000000001,
+              "correction_us": 489.62850189252924,
+              "total_us": 1056.7605018925292,
+              "baseline_ns": 567132.0000000001,
+              "correction_ns": 489628.50189252925,
+              "predicted_ns": 1056760.5018925292,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 165.4,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 207.3125158684367,
+                "hybrid_ffn_critical_branch_us": 24.812321637011745,
+                "preload_event": 257.5036643870808
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "gpu/resident",
+            "observed_ns": 777688,
+            "predicted_ns": 731512.4610556181,
+            "absolute_relative_error": 0.05937540368937398,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 666.1750000000001,
+              "correction_us": 65.33746105561802,
+              "total_us": 731.5124610556181,
+              "baseline_ns": 666175.0000000001,
+              "correction_ns": 65337.46105561802,
+              "predicted_ns": 731512.4610556181,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 65.33746105561802,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/full_gate",
+                  "gpu/full_up",
+                  "gpu/full_activation",
+                  "gpu/full_down",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1718831,
+            "predicted_ns": 1463478.8263195225,
+            "absolute_relative_error": 0.1485615361140668,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1381.807,
+              "correction_us": 81.67182631952252,
+              "total_us": 1463.4788263195226,
+              "baseline_ns": 1381807.0,
+              "correction_ns": 81671.82631952253,
+              "predicted_ns": 1463478.8263195225,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 1294.569,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 81.67182631952252,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "max": [
+                      {
+                        "sum": [
+                          "cpu/shard_gate",
+                          "cpu/shard_up",
+                          "cpu/shard_activation",
+                          "cpu/shard_down"
+                        ]
+                      },
+                      {
+                        "sum": [
+                          "gpu/shard_gate",
+                          "gpu/shard_up",
+                          "gpu/shard_activation",
+                          "gpu/shard_down"
+                        ]
+                      }
+                    ]
+                  },
+                  "hybrid/output_d2h",
+                  "cpu/sum"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "strategy": "hybrid/preload",
+            "observed_ns": 2591069,
+            "predicted_ns": 2380177.0246568033,
+            "absolute_relative_error": 0.08139187931436664,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 2172.2129999999997,
+              "correction_us": 207.96402465680382,
+              "total_us": 2380.1770246568035,
+              "baseline_ns": 2172212.9999999995,
+              "correction_ns": 207964.0246568038,
+              "predicted_ns": 2380177.0246568033,
+              "features": {
+                "composition_boundaries": 8,
+                "hybrid_ffn_critical_branch_us": 1294.569,
+                "preload_event": 1
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 130.67492211123604,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 77.28910254556777
+              },
+              "recipe": {
+                "sum": [
+                  {
+                    "sum": [
+                      "hybrid/preload_down_weight_h2d",
+                      "hybrid/preload_gate_weight_h2d",
+                      "hybrid/preload_up_weight_h2d"
+                    ]
+                  },
+                  {
+                    "sum": [
+                      {
+                        "max": [
+                          {
+                            "sum": [
+                              "cpu/shard_gate",
+                              "cpu/shard_up",
+                              "cpu/shard_activation",
+                              "cpu/shard_down"
+                            ]
+                          },
+                          {
+                            "sum": [
+                              "gpu/shard_gate",
+                              "gpu/shard_up",
+                              "gpu/shard_activation",
+                              "gpu/shard_down"
+                            ]
+                          }
+                        ]
+                      },
+                      "hybrid/output_d2h",
+                      "cpu/sum"
+                    ]
+                  }
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "gpu/resident",
+            "observed_ns": 1589188,
+            "predicted_ns": 1458942.251159418,
+            "absolute_relative_error": 0.08195742029299372,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1415.262,
+              "correction_us": 43.68025115941816,
+              "total_us": 1458.942251159418,
+              "baseline_ns": 1415262.0,
+              "correction_ns": 43680.25115941816,
+              "predicted_ns": 1458942.251159418,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 43.68025115941816,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1197044,
+            "predicted_ns": 1111763.3139492727,
+            "absolute_relative_error": 0.0712427329744999,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1057.163,
+              "correction_us": 54.6003139492727,
+              "total_us": 1111.7633139492727,
+              "baseline_ns": 1057163.0,
+              "correction_ns": 54600.313949272706,
+              "predicted_ns": 1111763.3139492727,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 54.6003139492727,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "gpu/resident",
+            "observed_ns": 1444381,
+            "predicted_ns": 1354807.6357545517,
+            "absolute_relative_error": 0.062015052984945286,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 1311.912,
+              "correction_us": 42.89563575455167,
+              "total_us": 1354.8076357545517,
+              "baseline_ns": 1311912.0,
+              "correction_ns": 42895.63575455167,
+              "predicted_ns": 1354807.6357545517,
+              "features": {
+                "composition_boundaries": 4,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 42.89563575455167,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "gpu/qk",
+                  "gpu/softmax",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          },
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "strategy": "hybrid/resident",
+            "observed_ns": 1117594,
+            "predicted_ns": 1026307.5446931896,
+            "absolute_relative_error": 0.08168123245723442,
+            "gates": {
+              "numeric_and_process_coverage": true,
+              "model_frozen_before_heldout": true,
+              "within_process_cv": false,
+              "between_process_cv": true,
+              "heldout_relative_error": true
+            },
+            "calibrated": false,
+            "calibration_target_stability_accepted": false,
+            "composition_calibration_quality_accepted": false,
+            "composition_prediction": {
+              "baseline_us": 972.6880000000001,
+              "correction_us": 53.61954469318959,
+              "total_us": 1026.3075446931896,
+              "baseline_ns": 972688.0000000001,
+              "correction_ns": 53619.544693189586,
+              "predicted_ns": 1026307.5446931896,
+              "features": {
+                "composition_boundaries": 5,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0
+              },
+              "feature_units": {
+                "composition_boundaries": "count",
+                "hybrid_ffn_critical_branch_us": "microseconds",
+                "preload_event": "count"
+              },
+              "correction_contributions_us": {
+                "composition_boundaries": 53.61954469318959,
+                "hybrid_ffn_critical_branch_us": 0.0,
+                "preload_event": 0.0
+              },
+              "recipe": {
+                "sum": [
+                  "cpu/qk",
+                  "cpu/softmax",
+                  "hybrid/probabilities_h2d",
+                  "gpu/pv",
+                  "gpu/output",
+                  "gpu/output_d2h"
+                ]
+              },
+              "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+            }
+          }
+        ],
+        "baseline_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ],
+        "corrected_rankings": [
+          {
+            "case_id": "attention-h256-q1-hist128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "attention-h256-q32-hist0",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h256-i512-q1-cut128",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "observed_order": [
+              "hybrid/resident",
+              "gpu/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          },
+          {
+            "case_id": "ffn-h512-i1024-q32-cut256",
+            "boundary_contract": "resident;ideal_model",
+            "predicted_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "observed_order": [
+              "gpu/resident",
+              "hybrid/resident"
+            ],
+            "median_order_correct": true,
+            "observed_95pct_intervals_disjoint": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "latency_quality_accepted": false
+          }
+        ]
+      }
+    }
+  },
+  "cross_campaign_transfer": {
+    "compatibility": {
+      "same_geometry": true,
+      "same_protocol": true,
+      "same_batch_repetitions": true,
+      "same_timing_unit": true,
+      "same_normalization": true,
+      "same_child_flags": true,
+      "transfer_seeds_disjoint": true,
+      "all_campaign_seeds_disjoint": true,
+      "same_physical_binary_source_runtime_signatures": true
+    },
+    "transfer_mode": "zero refit: both initial profile component prices and initial composition coefficients frozen",
+    "evaluation": {
+      "baseline_summary": {
+        "overall": {
+          "declared": 10,
+          "evaluated": 10,
+          "unknown": 0,
+          "accepted": 0,
+          "median_absolute_relative_error": 0.08107101677013626,
+          "mean_signed_bias_us": -134.9038,
+          "mean_signed_relative_bias": -0.11809036850947748
+        },
+        "by_family": {
+          "attention": {
+            "declared": 4,
+            "evaluated": 4,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.07456718726960194,
+            "mean_signed_bias_us": -92.2315,
+            "mean_signed_relative_bias": -0.06933926749088636
+          },
+          "ffn": {
+            "declared": 6,
+            "evaluated": 6,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.14798147505554984,
+            "mean_signed_bias_us": -163.352,
+            "mean_signed_relative_bias": -0.15059110252187155
+          }
+        }
+      },
+      "corrected_summary": {
+        "overall": {
+          "declared": 10,
+          "evaluated": 10,
+          "unknown": 0,
+          "accepted": 0,
+          "median_absolute_relative_error": 0.020551871386378734,
+          "mean_signed_bias_us": 15.652940446848644,
+          "mean_signed_relative_bias": 0.023146971872761594
+        },
+        "by_family": {
+          "attention": {
+            "declared": 4,
+            "evaluated": 4,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.00571155761568364,
+            "mean_signed_bias_us": -19.99488582712051,
+            "mean_signed_relative_bias": -0.013407205194490054
+          },
+          "ffn": {
+            "declared": 6,
+            "evaluated": 6,
+            "unknown": 0,
+            "accepted": 0,
+            "median_absolute_relative_error": 0.03609094203673916,
+            "mean_signed_bias_us": 39.418157962828076,
+            "mean_signed_relative_bias": 0.047516423250929356
+          }
+        }
+      },
+      "baseline_results": [
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "gpu/resident",
+          "observed_ns": 585444,
+          "predicted_ns": 565787,
+          "absolute_relative_error": 0.033576225907174725,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "hybrid/resident",
+          "observed_ns": 299838,
+          "predicted_ns": 230000,
+          "absolute_relative_error": 0.2329191096525457,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": false
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "hybrid/preload",
+          "observed_ns": 783681,
+          "predicted_ns": 581556,
+          "absolute_relative_error": 0.25791744344956685,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": false
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "gpu/resident",
+          "observed_ns": 777688,
+          "predicted_ns": 713007,
+          "absolute_relative_error": 0.0831708860108424,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1718831,
+          "predicted_ns": 1436938,
+          "absolute_relative_error": 0.16400274372524118,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "hybrid/preload",
+          "observed_ns": 2591069,
+          "predicted_ns": 2249151,
+          "absolute_relative_error": 0.1319602063858585,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "strategy": "gpu/resident",
+          "observed_ns": 1589188,
+          "predicted_ns": 1463688,
+          "absolute_relative_error": 0.07897114752943013,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1197044,
+          "predicted_ns": 1112425,
+          "absolute_relative_error": 0.07068996628361196,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "strategy": "gpu/resident",
+          "observed_ns": 1444381,
+          "predicted_ns": 1373243,
+          "absolute_relative_error": 0.04925154789491138,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        },
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1117594,
+          "predicted_ns": 1029925,
+          "absolute_relative_error": 0.07844440825559193,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false
+        }
+      ],
+      "corrected_results": [
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "gpu/resident",
+          "observed_ns": 585444,
+          "predicted_ns": 629997.3237092263,
+          "absolute_relative_error": 0.07610176841717796,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 565.787,
+            "correction_us": 64.21032370922627,
+            "total_us": 629.9973237092263,
+            "baseline_ns": 565787.0,
+            "correction_ns": 64210.32370922627,
+            "predicted_ns": 629997.3237092263,
+            "features": {
+              "composition_boundaries": 4,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 64.21032370922627,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "gpu/full_gate",
+                "gpu/full_up",
+                "gpu/full_activation",
+                "gpu/full_down",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "hybrid/resident",
+          "observed_ns": 299838,
+          "predicted_ns": 342850.06690000056,
+          "absolute_relative_error": 0.1434510198840726,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 230.0,
+            "correction_us": 112.85006690000054,
+            "total_us": 342.85006690000057,
+            "baseline_ns": 230000.0,
+            "correction_ns": 112850.06690000054,
+            "predicted_ns": 342850.06690000056,
+            "features": {
+              "composition_boundaries": 5,
+              "hybrid_ffn_critical_branch_us": 164.007,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 80.26290463653284,
+              "hybrid_ffn_critical_branch_us": 32.587162263467704,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                {
+                  "max": [
+                    {
+                      "sum": [
+                        "cpu/shard_gate",
+                        "cpu/shard_up",
+                        "cpu/shard_activation",
+                        "cpu/shard_down"
+                      ]
+                    },
+                    {
+                      "sum": [
+                        "gpu/shard_gate",
+                        "gpu/shard_up",
+                        "gpu/shard_activation",
+                        "gpu/shard_down"
+                      ]
+                    }
+                  ]
+                },
+                "hybrid/output_d2h",
+                "cpu/sum"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "strategy": "hybrid/preload",
+          "observed_ns": 783681,
+          "predicted_ns": 778954.6921617152,
+          "absolute_relative_error": 0.0060309077778901874,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 581.556,
+            "correction_us": 197.39869216171525,
+            "total_us": 778.9546921617152,
+            "baseline_ns": 581556.0,
+            "correction_ns": 197398.69216171524,
+            "predicted_ns": 778954.6921617152,
+            "features": {
+              "composition_boundaries": 8,
+              "hybrid_ffn_critical_branch_us": 164.007,
+              "preload_event": 1
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 128.42064741845255,
+              "hybrid_ffn_critical_branch_us": 32.587162263467704,
+              "preload_event": 36.39088247979499
+            },
+            "recipe": {
+              "sum": [
+                {
+                  "sum": [
+                    "hybrid/preload_down_weight_h2d",
+                    "hybrid/preload_gate_weight_h2d",
+                    "hybrid/preload_up_weight_h2d"
+                  ]
+                },
+                {
+                  "sum": [
+                    {
+                      "max": [
+                        {
+                          "sum": [
+                            "cpu/shard_gate",
+                            "cpu/shard_up",
+                            "cpu/shard_activation",
+                            "cpu/shard_down"
+                          ]
+                        },
+                        {
+                          "sum": [
+                            "gpu/shard_gate",
+                            "gpu/shard_up",
+                            "gpu/shard_activation",
+                            "gpu/shard_down"
+                          ]
+                        }
+                      ]
+                    },
+                    "hybrid/output_d2h",
+                    "cpu/sum"
+                  ]
+                }
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "gpu/resident",
+          "observed_ns": 777688,
+          "predicted_ns": 777217.3237092262,
+          "absolute_relative_error": 0.0006052250912625456,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 713.007,
+            "correction_us": 64.21032370922627,
+            "total_us": 777.2173237092262,
+            "baseline_ns": 713007.0,
+            "correction_ns": 64210.32370922627,
+            "predicted_ns": 777217.3237092262,
+            "features": {
+              "composition_boundaries": 4,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 64.21032370922627,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "gpu/full_gate",
+                "gpu/full_up",
+                "gpu/full_activation",
+                "gpu/full_down",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1718831,
+          "predicted_ns": 1783639.458017543,
+          "absolute_relative_error": 0.03770496227816636,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 1436.938,
+            "correction_us": 346.7014580175427,
+            "total_us": 1783.639458017543,
+            "baseline_ns": 1436938.0,
+            "correction_ns": 346701.45801754267,
+            "predicted_ns": 1783639.458017543,
+            "features": {
+              "composition_boundaries": 5,
+              "hybrid_ffn_critical_branch_us": 1340.951,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 80.26290463653284,
+              "hybrid_ffn_critical_branch_us": 266.43855338100985,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                {
+                  "max": [
+                    {
+                      "sum": [
+                        "cpu/shard_gate",
+                        "cpu/shard_up",
+                        "cpu/shard_activation",
+                        "cpu/shard_down"
+                      ]
+                    },
+                    {
+                      "sum": [
+                        "gpu/shard_gate",
+                        "gpu/shard_up",
+                        "gpu/shard_activation",
+                        "gpu/shard_down"
+                      ]
+                    }
+                  ]
+                },
+                "hybrid/output_d2h",
+                "cpu/sum"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "strategy": "hybrid/preload",
+          "observed_ns": 2591069,
+          "predicted_ns": 2680401.083279257,
+          "absolute_relative_error": 0.03447692179531196,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 2249.151,
+            "correction_us": 431.2500832792574,
+            "total_us": 2680.4010832792574,
+            "baseline_ns": 2249151.0,
+            "correction_ns": 431250.0832792574,
+            "predicted_ns": 2680401.083279257,
+            "features": {
+              "composition_boundaries": 8,
+              "hybrid_ffn_critical_branch_us": 1340.951,
+              "preload_event": 1
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 128.42064741845255,
+              "hybrid_ffn_critical_branch_us": 266.43855338100985,
+              "preload_event": 36.39088247979499
+            },
+            "recipe": {
+              "sum": [
+                {
+                  "sum": [
+                    "hybrid/preload_down_weight_h2d",
+                    "hybrid/preload_gate_weight_h2d",
+                    "hybrid/preload_up_weight_h2d"
+                  ]
+                },
+                {
+                  "sum": [
+                    {
+                      "max": [
+                        {
+                          "sum": [
+                            "cpu/shard_gate",
+                            "cpu/shard_up",
+                            "cpu/shard_activation",
+                            "cpu/shard_down"
+                          ]
+                        },
+                        {
+                          "sum": [
+                            "gpu/shard_gate",
+                            "gpu/shard_up",
+                            "gpu/shard_activation",
+                            "gpu/shard_down"
+                          ]
+                        }
+                      ]
+                    },
+                    "hybrid/output_d2h",
+                    "cpu/sum"
+                  ]
+                }
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "strategy": "gpu/resident",
+          "observed_ns": 1589188,
+          "predicted_ns": 1527898.3237092262,
+          "absolute_relative_error": 0.03856666189951962,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 1463.6879999999999,
+            "correction_us": 64.21032370922627,
+            "total_us": 1527.8983237092261,
+            "baseline_ns": 1463687.9999999998,
+            "correction_ns": 64210.32370922627,
+            "predicted_ns": 1527898.3237092262,
+            "features": {
+              "composition_boundaries": 4,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 64.21032370922627,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "gpu/qk",
+                "gpu/softmax",
+                "gpu/pv",
+                "gpu/output",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1197044,
+          "predicted_ns": 1192687.9046365328,
+          "absolute_relative_error": 0.0036390436470733183,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 1112.425,
+            "correction_us": 80.26290463653284,
+            "total_us": 1192.6879046365327,
+            "baseline_ns": 1112425.0,
+            "correction_ns": 80262.90463653284,
+            "predicted_ns": 1192687.9046365328,
+            "features": {
+              "composition_boundaries": 5,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 80.26290463653284,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "cpu/qk",
+                "cpu/softmax",
+                "hybrid/probabilities_h2d",
+                "gpu/pv",
+                "gpu/output",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "strategy": "gpu/resident",
+          "observed_ns": 1444381,
+          "predicted_ns": 1437453.3237092262,
+          "absolute_relative_error": 0.004796294253921775,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 1373.243,
+            "correction_us": 64.21032370922627,
+            "total_us": 1437.4533237092262,
+            "baseline_ns": 1373243.0,
+            "correction_ns": 64210.32370922627,
+            "predicted_ns": 1437453.3237092262,
+            "features": {
+              "composition_boundaries": 4,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 64.21032370922627,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "gpu/qk",
+                "gpu/softmax",
+                "gpu/pv",
+                "gpu/output",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        },
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "strategy": "hybrid/resident",
+          "observed_ns": 1117594,
+          "predicted_ns": 1110187.9046365328,
+          "absolute_relative_error": 0.006626820977445507,
+          "gates": {
+            "numeric_and_process_coverage": true,
+            "model_frozen_before_heldout": true,
+            "within_process_cv": false,
+            "between_process_cv": true,
+            "heldout_relative_error": true
+          },
+          "calibrated": false,
+          "calibration_target_stability_accepted": false,
+          "composition_calibration_quality_accepted": false,
+          "composition_prediction": {
+            "baseline_us": 1029.925,
+            "correction_us": 80.26290463653284,
+            "total_us": 1110.1879046365327,
+            "baseline_ns": 1029925.0,
+            "correction_ns": 80262.90463653284,
+            "predicted_ns": 1110187.9046365328,
+            "features": {
+              "composition_boundaries": 5,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0
+            },
+            "feature_units": {
+              "composition_boundaries": "count",
+              "hybrid_ffn_critical_branch_us": "microseconds",
+              "preload_event": "count"
+            },
+            "correction_contributions_us": {
+              "composition_boundaries": 80.26290463653284,
+              "hybrid_ffn_critical_branch_us": 0.0,
+              "preload_event": 0.0
+            },
+            "recipe": {
+              "sum": [
+                "cpu/qk",
+                "cpu/softmax",
+                "hybrid/probabilities_h2d",
+                "gpu/pv",
+                "gpu/output",
+                "gpu/output_d2h"
+              ]
+            },
+            "feature_recipe_version": "serial-boundary-critical-branch-preload-0.1"
+          }
+        }
+      ],
+      "baseline_rankings": [
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "gpu/resident",
+            "hybrid/resident"
+          ],
+          "observed_order": [
+            "gpu/resident",
+            "hybrid/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        }
+      ],
+      "corrected_rankings": [
+        {
+          "case_id": "attention-h256-q1-hist128",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "attention-h256-q32-hist0",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "ffn-h256-i512-q1-cut128",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "observed_order": [
+            "hybrid/resident",
+            "gpu/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        },
+        {
+          "case_id": "ffn-h512-i1024-q32-cut256",
+          "boundary_contract": "resident;ideal_model",
+          "predicted_order": [
+            "gpu/resident",
+            "hybrid/resident"
+          ],
+          "observed_order": [
+            "gpu/resident",
+            "hybrid/resident"
+          ],
+          "median_order_correct": true,
+          "observed_95pct_intervals_disjoint": true,
+          "selection_regret_ns": 0,
+          "selection_regret_relative": 0.0,
+          "latency_quality_accepted": false
+        }
+      ]
+    }
+  }
+}
