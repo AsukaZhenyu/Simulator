@@ -28,6 +28,7 @@ PACKAGES = {
     "llm_simulator": "src/llm_simulator",
     "tensor_mapping": "mapping/tensor_mapping",
     "llm_infer_model": "modeling/llm_infer_model",
+    "llm_infer_profile": "profiling/llm_infer_profile",
 }
 BUILD_AVAILABLE = all(importlib.util.find_spec(name) for name in ("setuptools", "wheel", "pip"))
 
@@ -50,6 +51,9 @@ class DistributionTests(unittest.TestCase):
             source_assets = [
                 "CITATION.cff", "docs/LIBRARY_GUIDE.md", "docs/DEVICE_STATE_RUNTIME.md",
                 "docs/OPEN_SOURCE_AND_PREPRINT.md", "docs/RELEASE_0_1.md",
+                "docs/PERFORMANCE_BOUNDARIES.md", "tests/test_performance_boundaries.py",
+                "docs/PERFORMANCE_BOUNDARY_REFACTOR_20261018.md",
+                "docs/data/performance-boundary-refactor-20261018.json",
                 "tests/test_distribution.py", "tests/test_library.py",
                 "tests/test_analytical_inputs.py",
             ]
@@ -169,10 +173,21 @@ class DistributionTests(unittest.TestCase):
                      "tensor_mapping.python_frontend", "tensor_mapping.unified_strategy",
                      "llm_infer_model.tensor.program", "llm_infer_model.m2.expand",
                      "llm_infer_model.m2.global_execution", "llm_infer_model.components",
+                     "llm_infer_model.performance", "llm_simulator.performance",
+                     "llm_infer_profile", "llm_infer_profile.legacy_calibration",
+                     "llm_infer_profile.legacy_nsys_analysis",
                  ])],
                 cwd=temporary,
             )
             self.assertIn("llm_simulator", json.loads(imports.stdout))
+            physical = self._run(
+                [str(interpreter), "-I", str(source_roots[0] / "examples/library/interpretable_performance.py")],
+                cwd=temporary,
+            )
+            physical_result = json.loads(physical.stdout)
+            self.assertEqual(physical_result["constant"]["duration_ns"], 16)
+            self.assertEqual(physical_result["dynamic"]["duration_ns"], 23)
+            self.assertEqual(physical_result["prediction_provider"], "llm_infer_model.performance.evaluate")
             executable = scripts_dir / ("llm-sim.exe" if os.name == "nt" else "llm-sim")
             help_result = self._run([str(executable), "--help"], cwd=temporary)
             self.assertIn("usage:", help_result.stdout)

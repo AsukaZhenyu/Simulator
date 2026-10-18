@@ -1,5 +1,11 @@
 # Unified resource-trajectory calibration
 
+**Historical diagnostic workflow.** The total-duration Ridge predictor in this
+directory is retained with its frozen experiment. New performance calculation
+belongs to modeling; use [physical parameter calibration](../parameter_calibration/README.md)
+and [the ownership guide](../../docs/PERFORMANCE_BOUNDARIES.md). The collector and
+raw timings remain useful evidence, without becoming pure device parameters.
+
 This optional source-checkout workflow fits **one execution-time functional**
 from numeric resource inputs. It does not select a model by a named background
 condition. See the [modeling contract](../../docs/UNIFIED_RESOURCE_FUNCTIONAL.md).

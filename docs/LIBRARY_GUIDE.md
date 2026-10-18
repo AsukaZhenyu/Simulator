@@ -8,10 +8,19 @@ The convenience API wraps the existing compiler and common runtime.
 1. `Model.dense(...)` / `Model.moe(...)`: geometry and layer count.
 2. `Hardware(...)`: explicit capacities, compute rates and bandwidth.
 3. `Workload(...)`: prompt length, finite Decode steps and routing input.
-4. `AnalyticalCosts(...)`: explicit uncalibrated analytical estimates.
+4. `AnalyticalCosts(...)`: explicit uncalibrated analytical estimates, with the numerical formulas owned by modeling.
 5. `Scheduling(...)` and `configure(plan)`: strategy declarations.
 6. `Simulator.compile(...)`: generated inputs and immutable strategy IR.
 7. `CompiledSimulation.run()`: the existing causal tensor runtime.
+
+For explicit physical work, dependencies and changing resources, use the installed
+`llm_simulator.performance` API. It re-exports `llm_infer_model.performance` rather
+than implementing a second predictor. The runnable
+[interpretable performance example](../examples/library/interpretable_performance.py)
+uses declared parameters and needs no profile, CUDA, NumPy or network access.
+See [performance ownership and calibration](PERFORMANCE_BOUNDARIES.md) for the
+separate responsibilities of modeling and profiling. Profiling produces
+evidence-backed parameter bundles; only modeling computes their predicted time.
 
 No saved profile, model weights, native executable, source-tree fixture or
 GPU is required. Simulated devices are described by the caller.

@@ -1,5 +1,9 @@
 # Unified resource functional: implementation and first hardware check
 
+**Historical total-duration response diagnostic.** The primary architecture now
+separates [model-owned physical calculation and profiling parameter calibration](PERFORMANCE_BOUNDARIES.md).
+The Ridge results below remain unchanged; they do not calibrate the new model.
+
 **One prediction interface is implemented and connected to the common runtime.
 The first hardware smoke experiment completed. Hardware accuracy has not passed.**
 

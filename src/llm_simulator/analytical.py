@@ -25,6 +25,9 @@ from llm_infer_model.m2.hybrid_physical import signature_for as hybrid_signature
 from llm_infer_model.m2.moe_spec import parse_route_trace
 from llm_infer_model.m2.spec import parse_invocation_document, parse_layer_document
 from llm_infer_model.tensor.spec import Unsupported
+from llm_infer_model.performance import (
+    analytical_compute_duration_ns, analytical_transfer_duration_ns,
+)
 
 from .config import Device, Hardware, Model, Workload, _integer
 
@@ -32,16 +35,6 @@ from .config import Device, Hardware, Model, Workload, _integer
 def _write(path, value):
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
                     encoding="utf-8", newline="\n")
-
-
-def _duration(work, rate, label):
-    try:
-        duration = 1e9 * work / rate
-    except (OverflowError, ZeroDivisionError) as error:
-        raise ValueError(f"{label} cannot be represented as finite nanoseconds") from error
-    if not math.isfinite(duration):
-        raise ValueError(f"{label} cannot be represented as finite nanoseconds")
-    return duration
 
 
 def _route_document(route):
@@ -72,9 +65,12 @@ class AnalyticalCosts:
             raise ValueError("analytical compute requires a declared Device")
         _integer(flops, "flops", 0)
         _integer(traffic_bytes, "traffic_bytes", 0)
-        elapsed = max(_duration(flops, device.compute_flops_per_second, "compute time"),
-                      _duration(traffic_bytes, device.memory_bandwidth_bytes_per_second, "memory time"))
-        return max(1, math.ceil(elapsed) + device.launch_overhead_ns)
+        return analytical_compute_duration_ns(
+            flops=flops, traffic_bytes=traffic_bytes,
+            flops_per_second=device.compute_flops_per_second,
+            memory_bytes_per_second=device.memory_bandwidth_bytes_per_second,
+            launch_overhead_ns=device.launch_overhead_ns,
+        )
 
     def transfer_duration_ns(self, hardware: Hardware, *, route: str, storage_bytes: int):
         if not isinstance(hardware, Hardware):
@@ -91,7 +87,10 @@ class AnalyticalCosts:
         rate = getattr(hardware, name)
         if rate is None:
             raise Unsupported(f"analytical route {route!r} needs explicit Hardware.{name}; unknown is not zero")
-        return max(1, math.ceil(_duration(storage_bytes, rate, "transfer time")) + hardware.transfer_latency_ns)
+        return analytical_transfer_duration_ns(
+            storage_bytes=storage_bytes, bytes_per_second=rate,
+            latency_ns=hardware.transfer_latency_ns,
+        )
 
     def build_inputs(self, directory, model: Model, hardware: Hardware, workload: Workload):
         """Create a self-contained finite model in a new or empty directory.

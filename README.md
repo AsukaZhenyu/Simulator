@@ -85,7 +85,7 @@ The convenience builder uses full-causal F32 geometry. Dense batch and decomposi
 
 | Directory | Responsibility |
 |---|---|
-| `src/llm_simulator/` | Public API, generated inputs, analytical provider and installed CLI |
+| `src/llm_simulator/` | Public API, generated inputs, modeling facade and installed CLI |
 | [mapping](mapping/README.md) | Strategy frontend, IR, execution transforms, compiler and causal policies |
 | [modeling](modeling/README.md) | LLM state/graph expansion, common tensor runtime, capacity/resource accounting |
 | [profiling](profiling/README.md) | Optional native measurement tools; not needed to install or use the simulator |
@@ -114,7 +114,9 @@ The [composition calibration study](docs/COMPOSITION_CALIBRATION_20261018.md) ad
 
 The [accuracy validation suite](profiling/accuracy_suite/README.md) adds complete compiled Dense strategy replay, execution-chain diagnostics, real multi-layer Dense/MoE traces, tracked allocator boundaries, and asynchronous copy/compute experiments. Optional source-checkout tooling uses `pip install ".[profiling]"`; the installed simulator still needs no profiles or CUDA. The [validation report](docs/ACCURACY_VALIDATION_20261018.md) separates numerical correctness, prediction error, measurement stability and physical capacity. The suite does not establish universal hardware accuracy or change the analytical defaults.
 
-The primary state-dependent modeling target is [one execution-time functional over resource traces](docs/UNIFIED_RESOURCE_FUNCTIONAL.md): workload and hardware constants plus time-varying CPU/GPU pressure and DRAM/VRAM allocations enter one prediction path. The [resource-trajectory workflow](profiling/resource_calibration/README.md) collects numeric controlled inputs while a foreground process continues running. It separates offered background work from target-inclusive utilization counters. The [first implementation and hardware check](docs/UNIFIED_RESOURCE_RESULTS_20261018.md) records the working integration and the response model's remaining accuracy failures.
+Performance predictions are computed in [modeling](docs/PERFORMANCE_BOUNDARIES.md), using physical work, dependencies, parameters and resource trajectories. The installed `llm_simulator.performance` API shares that same implementation; `AnalyticalCosts` also delegates its compute and transfer formulas to modeling. [Profiling parameter calibration](profiling/parameter_calibration/README.md) owns measurement sources, exact medians, quality gates and frozen parameter evidence, and calls modeling for predictions during independent validation. It reports parameter evidence and model residuals separately.
+
+The [earlier total-duration response experiment](docs/UNIFIED_RESOURCE_RESULTS_20261018.md) is a historical diagnostic. Its Ridge predictor is not the primary performance model. Its raw resource trajectories, failed gates and source version are preserved; whole-PV medians cannot silently become pure GPU throughput or bandwidth parameters.
 
 The earlier [state-aligned calibration workflow](profiling/state_calibration/README.md) and [device-state study](docs/DEVICE_STATE_CALIBRATION_20261018.md) remain diagnostic controls, including all failed gates; their two historical table families are not the target simulator interface. [Explicit CPU/GPU service rates](docs/DEVICE_STATE_RUNTIME.md) support mid-operation speed changes, pauses and recovery with exact remaining-work accounting; they do not infer an unmeasured slowdown from utilization or clocks.
 

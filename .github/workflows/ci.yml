@@ -69,6 +69,10 @@ jobs:
         run: python -m unittest discover -s profiling/native/state_calibration -p 'test_*.py' -v
       - name: Unified resource functional and phased collection without hardware
         run: python -m unittest discover -s profiling/resource_calibration/tests -v
+      - name: Profiling parameter evidence and modeling calibration boundaries
+        run: python -m unittest discover -s profiling/parameter_calibration/tests -v
+      - name: Installed performance ownership boundaries
+        run: python -m unittest discover -s tests -p test_performance_boundaries.py -v
       - name: Modeling tests
         run: python -m unittest discover -s modeling/tests -v
       - name: Mapping tests

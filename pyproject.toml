@@ -43,12 +43,15 @@ packages = [
   "llm_infer_model.tensor",
   "llm_infer_model.m2",
   "llm_infer_model.components",
+  "llm_infer_model.performance",
+  "llm_infer_profile",
 ]
 
 [tool.setuptools.package-dir]
 llm_simulator = "src/llm_simulator"
 tensor_mapping = "mapping/tensor_mapping"
 llm_infer_model = "modeling/llm_infer_model"
+llm_infer_profile = "profiling/llm_infer_profile"
 
 [tool.setuptools.package-data]
 llm_simulator = ["data/*", "data/**/*", "py.typed"]

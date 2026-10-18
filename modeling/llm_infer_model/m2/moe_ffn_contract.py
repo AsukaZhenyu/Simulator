@@ -9,7 +9,6 @@ import copy
 import hashlib
 import json
 import math
-import statistics
 
 CONTRACT = "ggml_cpu_resident_moe_ffn_f32_v1"
 NATIVE_SCHEMA = "resident_moe_ffn_native_v1"
@@ -188,13 +187,13 @@ def build_plan(suite):
 
 
 def statistics_ns(values):
-    if not isinstance(values,list) or len(values)<3:
-        raise ValueError("timing requires at least three samples")
-    for value in values:
-        _int(value,"sample_ns")
-    mean=statistics.mean(values)
-    return {"median_ns":statistics.median(values),"mean_ns":mean,"min_ns":min(values),"max_ns":max(values),
-            "cv":statistics.pstdev(values)/mean,"count":len(values)}
+    """Legacy compatibility; raw timing statistics are owned by profiling.
+
+    Only explicit native-measurement validation loads the optional profiling
+    namespace. Structural case/port contracts and normal simulation stay here.
+    """
+    from llm_infer_profile.statistics import statistics_ns as summarize
+    return summarize(values)
 
 
 def validate_native(native, case):

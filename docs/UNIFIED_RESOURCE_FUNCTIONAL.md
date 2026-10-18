@@ -1,4 +1,37 @@
-# One execution-time functional over resource traces
+# One model-owned execution-time functional over resource traces
+
+The active architecture is documented in [performance ownership and calibration](PERFORMANCE_BOUNDARIES.md).
+Performance calculation belongs to `llm_infer_model.performance`, exposed by
+`llm_simulator.performance`. Profiling produces measurement statistics and a
+frozen, model-validated physical parameter bundle; it does not supply another
+execution-time predictor.
+
+```text
+profiling: raw evidence -> medians/quality -> parameter estimates and provenance
+                                               |
+modeling: work + dependencies + parameter bundle + resource trajectory
+                                               |
+                         progress, waits, completion and capacity checks
+                                               |
+profiling: independent observation comparison, parameter/model diagnostics
+```
+
+Named parameters have explicit units: FLOP/s, byte/s, ns, and bytes. Host fixed
+overhead, device work, copy service and dependency waits are distinct. Unknown
+parameters remain unknown. Capacity allocation does not silently reduce service
+rates. The existing `AnalyticalCosts` facade also delegates its numerical compute
+and transfer formulas to modeling.
+
+Use the [physical parameter workflow](../profiling/parameter_calibration/README.md)
+for calibration. A total completed-action duration can be a comparison reference;
+it is not automatically a pure arithmetic, bandwidth or host-overhead parameter.
+
+## Historical total-duration response diagnostic
+
+The description below records the earlier Ridge experiment. Its source and
+results are preserved for audit; it is superseded as the primary prediction
+architecture. Its historical diagnostics must not be relabeled as identified
+physical parameters.
 
 The primary modeling target is one function of time-varying resource inputs:
 

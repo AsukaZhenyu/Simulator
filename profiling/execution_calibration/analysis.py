@@ -35,31 +35,21 @@ def stats(values):
 
 
 def terms(expression):
-    if isinstance(expression, str) and expression:
-        return {expression}
-    if not isinstance(expression, dict) or len(expression) != 1:
-        raise ValueError("expression requires a metric or a single sum/max node")
-    operation, children = next(iter(expression.items()))
-    if operation not in ("sum", "max") or not isinstance(children, list) or not children:
-        raise ValueError("sum/max requires explicit nonempty children")
-    return set().union(*(terms(child) for child in children))
+    """Compatibility; expression validation is model-owned."""
+    from llm_infer_model.performance.legacy_expressions import terms as validate
+    return validate(expression)
 
 
 def predict(expression, prices):
-    if isinstance(expression, str):
-        return prices[expression]
-    terms(expression)
-    operation, children = next(iter(expression.items()))
-    values = [predict(child, prices) for child in children]
-    return sum(values) if operation == "sum" else max(values)
+    """Compatibility; all declared execution arithmetic is model-owned."""
+    from llm_infer_model.performance.legacy_expressions import predict as calculate
+    return calculate(expression, prices)
 
 
 def expression_text(expression):
-    if isinstance(expression, str):
-        return expression
-    operation, children = next(iter(expression.items()))
-    formatted = [expression_text(child) for child in children]
-    return "(" + " + ".join(formatted) + ")" if operation == "sum" else "max(" + ", ".join(formatted) + ")"
+    """Compatibility formatting for the model-owned expression structure."""
+    from llm_infer_model.performance.legacy_expressions import expression_text as format_expression
+    return format_expression(expression)
 
 
 def _rows(rows, cid, split, metric):

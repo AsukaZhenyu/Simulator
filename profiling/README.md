@@ -1,5 +1,13 @@
 # 可复用的 GGML 与 CUDA 测量工具
 
+Performance calculation belongs to modeling. The primary integration contract is
+[physical parameter calibration](parameter_calibration/README.md): profiling owns
+raw measurements, medians, uncertainty and parameter evidence; its validation
+calls `llm_infer_model.performance.evaluate` for every prediction. See
+[ownership boundaries](../docs/PERFORMANCE_BOUNDARIES.md). Existing completed-action
+measurements remain useful references; their timing scope must not be silently
+changed into pure kernel throughput or bandwidth.
+
 本目录采集真实执行成本，并验证这些成本能否预测组合路径。模型、精度、线程、端口、初始驻留和计时边界必须明确；程序不会把孤立矩阵乘改称完整 Attention/FFN，也不会把未知 GPU workspace 填成 0。
 
 推荐从[执行变换校准工具](execution_calibration/README.md)开始。当前 FFN 分片、Attention 分段和显式权重重载已做数值与独立预测检查，但完整延迟质量门尚未通过；不是完整 Dense/MoE 或新 IR 全链的校准结果。测量结果由使用者在目标硬件上生成，不随库分发；核心库可使用显式提供的成本或标为 synthetic 的示例成本，不要求已有 profile。

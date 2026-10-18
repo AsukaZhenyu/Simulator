@@ -1,0 +1,241 @@
+{
+  "schema": "performance-boundary-refactor-verification-1",
+  "date": "2026-10-18",
+  "verification_scope": "Software semantics, offline distribution, recorded source bindings and historical reference imports; no new hardware experiment.",
+  "tests": {
+    "discovered": 2571,
+    "passed": 2563,
+    "skipped": 8,
+    "failures": 0,
+    "errors": 0,
+    "groups": [
+      {
+        "name": "profiling",
+        "tests": 491,
+        "skipped": 1,
+        "failed": 0,
+        "log_sha256": "2d98cf143e59b0b5201fe4a7da64d0377dc3e7721ab3f12322222a3951455eab"
+      },
+      {
+        "name": "parameters",
+        "tests": 58,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "8c170538c1140dfea7a83152dc9de86bb8b3bb527e40e63c67b8c34404f7aed7"
+      },
+      {
+        "name": "execution",
+        "tests": 54,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "2925c0aef55909bafbbbc5431126abb2d111a305f43a2ff5157ed5d2c6b8855e"
+      },
+      {
+        "name": "batched",
+        "tests": 15,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "591601f8d56bf1366260adb21b9544401b4bbc94667b75a3f56d56304b79bfb0"
+      },
+      {
+        "name": "composition",
+        "tests": 26,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "066a50e04c401afbee3dd4fd1769fdd6dc3199168917fdb2d0be47d6a67e529b"
+      },
+      {
+        "name": "common",
+        "tests": 54,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "c1184acc5686e1893fa7b630ceee2f8b0cd6c7f92856656fe1651206d81d9d1c"
+      },
+      {
+        "name": "chain",
+        "tests": 13,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "290667ab886e19a2387e5f812ffe3250c0e612b0fe868ac759d1ea7f8de2e6f2"
+      },
+      {
+        "name": "overlap",
+        "tests": 13,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "6bd21a1d6d8cd604e7288ffeffd65b324b0634bd59dd704c0808ea135bda488e"
+      },
+      {
+        "name": "workload",
+        "tests": 14,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "84e66e834096ca2eb6d5e496f899fd062381aef99ee440bd182e21c10762cccc"
+      },
+      {
+        "name": "native_batch",
+        "tests": 8,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "093b3faa33819f15c190f5fff88cd23566c211a184a8a5f93b969c584b7d7b1c"
+      },
+      {
+        "name": "state",
+        "tests": 130,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "450f0d0e132ff12e38e77c60ca14ee2c2d2235a99386ce74a08ab08d5a410fb7"
+      },
+      {
+        "name": "native_state",
+        "tests": 6,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "a9a49f497260056f9d942826525644e43278b5ee8730fc817acb4f2b8469540d"
+      },
+      {
+        "name": "resource",
+        "tests": 111,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "09908e4f4b0a48fd4769b516461793c99d122d1a213d3ef81b1131e432f16c44"
+      },
+      {
+        "name": "modeling",
+        "tests": 396,
+        "skipped": 7,
+        "failed": 0,
+        "log_sha256": "e97936e31b18affbbd5c17b26bce5c240da7247abe7f6515da08154f421c8e0f"
+      },
+      {
+        "name": "mapping",
+        "tests": 1119,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "60e921cb427a0b4cdcdc812aa67855f03a6b1a16787de73b0dd205ac99dfdd98"
+      },
+      {
+        "name": "public_library",
+        "tests": 63,
+        "skipped": 0,
+        "failed": 0,
+        "log_sha256": "2707542a07480960048a5c89daa381083a47ee50fbd131b1d41d88131c27e037"
+      }
+    ],
+    "reruns_counted_again": false
+  },
+  "distribution": {
+    "fresh_environment": true,
+    "without_saved_profiles": true,
+    "third_party_runtime_dependencies_required": false,
+    "source_archive_rebuild_passed": true,
+    "declared_example_ns": {
+      "constant": 16,
+      "dynamic": 23
+    },
+    "log_sha256": "4985644d3e48855e7c2f2f46bc135af3ca155b59b9f3b5add652a2d00775f036"
+  },
+  "modeling_source_files_sha256": {
+    "__init__.py": "00f8596a14614b005e576f1add747f805a50a297261f2eb84ad2e6e878572720",
+    "analytical.py": "6d0675cc7c4d4b33bb4143a366f484c708cc8eea32d4a1c34f20fa708f549d74",
+    "evaluator.py": "4886178755660de068f5ee22edd2c79796e82ad63e3f187ba91bb0458f4612c4",
+    "graph.py": "3c4b919ffa797057e6623c2be34a37fbab34003cc7cb00e034522c042a4c537d",
+    "legacy_composition.py": "286a025590ec37421586e52ed1fb739c0c64906e9b5787e6670254f0c008b410",
+    "legacy_expressions.py": "f7bc250d6ae97b78fa13ef612d0bda291a65dd49f21aac137d84d89c033ffe2a",
+    "legacy_forward.py": "f16dbbad87df8589de790be81ec9aa21c429241c739d71e41e2e5fe2f797e6a2",
+    "legacy_trace.py": "bb17dcacba2f30e7820efae742b2ca8340ff25f98b44dbf431304284b82b4750",
+    "parameters.py": "16fb1bef92135a646ebb15346be0973bf267583ec7cd3079b820ebf9e5f3190c"
+  },
+  "archived_source_verification": {
+    "schema": "recorded-source-version-verification-0.1",
+    "verified": true,
+    "recorded_git_commit": "2a9ee982b088084d78c5d2744e38a090cc990f1b",
+    "archive_sha256": "c6007f39e7c78ab3340f618791379de44fe952d49925858159fd507580757477",
+    "source_files": 426,
+    "source_bytes": 9301569,
+    "current_source_changes": [
+      "modeling/llm_infer_model/calibration.py",
+      "modeling/llm_infer_model/m2/moe_ffn_contract.py",
+      "modeling/llm_infer_model/m2/moe_measured.py",
+      "modeling/llm_infer_model/nsys_analysis.py",
+      "src/llm_simulator/analytical.py"
+    ],
+    "campaigns": [
+      {
+        "manifest": "profiling/state_calibration/results/formal-v1/manifest.json",
+        "manifest_sha256": "7a77056af75548d8f93a93d07e4116e5f392ec1b926e0fd4115317a6550f3eef",
+        "archived_bindings": 416
+      },
+      {
+        "manifest": "profiling/resource_calibration/results/smoke-v1/manifest.json",
+        "manifest_sha256": "5032523f356c74eceec2f5bc0e1f877ec8ac1354d6a718b3edaedc7fb46fb1d4",
+        "archived_bindings": 426
+      }
+    ],
+    "raw_measurements_rewritten": false,
+    "current_source_equivalence_claimed": false,
+    "archived_runtime_executed": false,
+    "hardware_accuracy_claimed": false,
+    "scope": "Archived mutable source bytes and original manifest bindings only; not runtime assets or numerical replay"
+  },
+  "archived_source_verification_receipt_sha256": "65eafad1722169faba104c6df7f193d7c5eae38f2ea58e53e25fea96ee5e0aed",
+  "legacy_reference_imports": [
+    {
+      "schema": "historical-resource-reference-import-1",
+      "split": "profile",
+      "manifest_sha256": "5032523f356c74eceec2f5bc0e1f877ec8ac1354d6a718b3edaedc7fb46fb1d4",
+      "split_records_sha256": "efc3e868ef7f4e3de6716e7b272d31a78d671dea67d25c0cb0ff6fe1d13b0ec6",
+      "historical_source_inventory_sha256": "0dfb453c3645ab7c672672f7b5b8395e5451af4e14aa95bd4692320390293e1b",
+      "current_working_tree_source_equivalence_claimed": false,
+      "bound_raw_files_verified": 127,
+      "target_sample_count": 3285,
+      "steady_reference_samples": 488,
+      "transition_or_outside_samples": 2797,
+      "transition_samples_discarded_as_outliers": false,
+      "resource_state_count": 16,
+      "physical_parameters_estimated": false,
+      "modeling_prediction_executed": false,
+      "legacy_ridge_fit_imported": false,
+      "missing_physical_parameters": [
+        "gpu_effective_flops_per_second",
+        "gpu_memory_bandwidth_bytes_per_second",
+        "host_fixed_overhead_ns"
+      ],
+      "missing_reason": "Whole completed PV intervals cannot separate device-active work, payload traffic, and exclusive host cost.",
+      "accuracy_accepted": false,
+      "complete_local_receipt_sha256": "18e8cc2dc354109ac76440c4ccd9405adc4ad5597c1ec046b736ca7f96f7e33c"
+    },
+    {
+      "schema": "historical-resource-reference-import-1",
+      "split": "heldout",
+      "manifest_sha256": "5032523f356c74eceec2f5bc0e1f877ec8ac1354d6a718b3edaedc7fb46fb1d4",
+      "split_records_sha256": "e723e606becbed9d96a865e4ca0e8e7e23c3967d38ad47c12aa4ed566f470d0a",
+      "historical_source_inventory_sha256": "0dfb453c3645ab7c672672f7b5b8395e5451af4e14aa95bd4692320390293e1b",
+      "current_working_tree_source_equivalence_claimed": false,
+      "bound_raw_files_verified": 85,
+      "target_sample_count": 1828,
+      "steady_reference_samples": 476,
+      "transition_or_outside_samples": 1352,
+      "transition_samples_discarded_as_outliers": false,
+      "resource_state_count": 16,
+      "physical_parameters_estimated": false,
+      "modeling_prediction_executed": false,
+      "legacy_ridge_fit_imported": false,
+      "missing_physical_parameters": [
+        "gpu_effective_flops_per_second",
+        "gpu_memory_bandwidth_bytes_per_second",
+        "host_fixed_overhead_ns"
+      ],
+      "missing_reason": "Whole completed PV intervals cannot separate device-active work, payload traffic, and exclusive host cost.",
+      "accuracy_accepted": false,
+      "complete_local_receipt_sha256": "f57af83ff47ff7019829d3a19c1651e5191b5fe4fb317c9affbf8e2f7ec9b988"
+    }
+  ],
+  "preserved_public_evidence_sha256": {
+    "docs/data/device-state-calibration-20261018.json": "5e2fa61c2cdee392df4b4ddac6de89c86e042eef385dc30c6d1381ca42d89d47",
+    "docs/data/unified-resource-smoke-20261018.json": "bbe708d623a3afd1d3b6234fc076d224e18bcf6821e79eb21bd7d74428b96c89"
+  },
+  "hardware_accuracy_improvement_claimed": false,
+  "new_hardware_measurement_executed": false,
+  "full_mapping_to_physical_graph_lowering_complete": false
+}
