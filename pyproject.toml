@@ -25,6 +25,7 @@ classifiers = [
 
 [project.optional-dependencies]
 gguf = ["gguf>=0.19.0", "numpy>=1.26"]
+profiling = ["numpy>=1.26"]
 
 [project.scripts]
 llm-sim = "llm_simulator.cli:main"

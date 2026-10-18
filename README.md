@@ -112,6 +112,8 @@ The [research evidence report](docs/RESEARCH_EVIDENCE_20261017.md) separates ind
 
 The [composition calibration study](docs/COMPOSITION_CALIBRATION_20261018.md) adds profile-only shared corrections and exact IR accounting for retained FFN/Attention chains. Confirmation median error decreases from 13.65% to 6.14%; held-out-geometry worst error is still 34.85% and quality acceptance remains 0/10. This retrospective, opt-in workflow preserves the original runtime timeline and does not replace the library's uncalibrated analytical defaults.
 
+The [accuracy validation suite](profiling/accuracy_suite/README.md) adds complete compiled Dense strategy replay, execution-chain diagnostics, real multi-layer Dense/MoE traces, tracked allocator boundaries, and asynchronous copy/compute experiments. Optional source-checkout tooling uses `pip install ".[profiling]"`; the installed simulator still needs no profiles or CUDA. The [validation report](docs/ACCURACY_VALIDATION_20261018.md) separates numerical correctness, prediction error, measurement stability and physical capacity. The suite does not establish universal hardware accuracy or change the analytical defaults.
+
 ## License and research use
 
 Original code uses the [MIT License](LICENSE). Attributed third-party data retains its own license; see [public routing data](profiling/data/public-routes/README.md). This is an **alpha research library**, with no associated accepted paper or accuracy claim. Citation metadata: [CITATION.cff](CITATION.cff).

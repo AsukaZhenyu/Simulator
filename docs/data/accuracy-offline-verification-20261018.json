@@ -1,0 +1,236 @@
+{
+  "schema": "normalized-offline-verifier-receipts/1",
+  "created_utc": "2026-10-18T06:15:33.509946+00:00",
+  "all_verified": true,
+  "protocols": [
+    {
+      "name": "chain",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "chain-calibration-verification-0.1",
+      "success_field": "verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/chain.json",
+      "raw_receipt_sha256": "ebb2edabcb720f3e72745fac341a03aa55a74d26363252d57916eb2e30b14da1",
+      "raw_stdout_sha256": "692183fa1b2ad756c0da2e9673ee032eb6683b0153726cd0279e40208029b7a3",
+      "started_utc": "2026-10-18T06:01:05.574026+00:00",
+      "completed_utc": "2026-10-18T06:01:42.201522+00:00",
+      "summary": {
+        "rows": 138,
+        "failed_rows": 0,
+        "heldout_used_for_fitting": false,
+        "timestamp_overhead_subtracted": false
+      }
+    },
+    {
+      "name": "highlevel",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "offline-highlevel-verification-v1",
+      "success_field": "status",
+      "success_value": "verified",
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/highlevel.json",
+      "raw_receipt_sha256": "1bc20f940e5b9816246e8c4c9edce8a543c655c1bb04ee7c3675420cc72e8b03",
+      "raw_stdout_sha256": "8f5b6d134c03f111376bb99b7f3a108a30ec66fb9b6eea76a191d2a9b6f6d669",
+      "started_utc": "2026-10-18T06:01:42.217733+00:00",
+      "completed_utc": "2026-10-18T06:14:33.462301+00:00",
+      "summary": {
+        "cases": 14,
+        "source_processes": 42,
+        "heldout_processes": 42,
+        "checked_programs": 56,
+        "checked_compiler_model_sources": 84,
+        "checked_heldout_materialized_ports": 1197,
+        "failed_or_unknown_processes": 0,
+        "all_cases_accepted": false,
+        "source_verification_mode": "strict_current_bytes_at_recorded_paths; archived_software_replay_not_supported"
+      }
+    },
+    {
+      "name": "overlap",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "overlap-evidence-verification-0.1",
+      "success_field": "verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/overlap.json",
+      "raw_receipt_sha256": "37597e72546f2f0b9b7b3255aac2fb65b524f4748a9b7a022bd82e35567672b1",
+      "raw_stdout_sha256": "f1af680ea6a567d245dc1932f4197a29c7d3ae70434c41cbbcfe8b325c00bf30",
+      "started_utc": "2026-10-18T06:14:33.479328+00:00",
+      "completed_utc": "2026-10-18T06:14:39.408677+00:00",
+      "summary": {
+        "failed_rows": [],
+        "processes": 108,
+        "heldout_used_for_fitting": false,
+        "physical_capacity_verified": false,
+        "kernel_overlap_proved": false
+      }
+    },
+    {
+      "name": "workload-cpu",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "workload_independent_all_expert_lifetime_audit/1",
+      "success_field": "all_records_verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/workload-cpu.json",
+      "raw_receipt_sha256": "e4149f6ef48b596cdb811247be1558a6cfadf80e8e3ce940ee4c7ac033b268b8",
+      "raw_stdout_sha256": "3b485de555732f52edc455c719b2c2c0abb64e605c38fb2eaf1aee9308d57f4a",
+      "started_utc": "2026-10-18T06:14:39.426739+00:00",
+      "completed_utc": "2026-10-18T06:14:41.294491+00:00",
+      "summary": {
+        "metadata_and_payload_causality_pass": true,
+        "corruption_tests_pass": true,
+        "timing_acceptance": false,
+        "physical_capacity_verified": false,
+        "records": 24,
+        "corruption_tests": 24
+      }
+    },
+    {
+      "name": "workload-cuda",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "workload_independent_all_expert_lifetime_audit/1",
+      "success_field": "all_records_verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/workload-cuda.json",
+      "raw_receipt_sha256": "a465fe2a0f5ef5e48904e4099ec33ebecf02ea0de85347fa4105d982a1bffa80",
+      "raw_stdout_sha256": "68746335c47f7960640e7d252c816d1f1b6eaace3bff948abfc0431c647c79c8",
+      "started_utc": "2026-10-18T06:14:41.312944+00:00",
+      "completed_utc": "2026-10-18T06:14:43.190070+00:00",
+      "summary": {
+        "metadata_and_payload_causality_pass": true,
+        "corruption_tests_pass": true,
+        "timing_acceptance": false,
+        "physical_capacity_verified": false,
+        "records": 24,
+        "corruption_tests": 24
+      }
+    },
+    {
+      "name": "capacity-cpu",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "workload_capacity_verification_receipt/1",
+      "success_field": "verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/capacity-cpu.json",
+      "raw_receipt_sha256": "4f91e1ed04d26bc9364e835a562da30350b00db24a8a2419ca0607e76f75fd4e",
+      "raw_stdout_sha256": "4ac617d95e762a789fea4597861e4127f127b2ea9300f99653931f517d84e9b5",
+      "started_utc": "2026-10-18T06:14:43.208381+00:00",
+      "completed_utc": "2026-10-18T06:14:44.553614+00:00",
+      "summary": {
+        "tracked_peak_bytes": 3846608,
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "cuda_private_workspace_bytes": null,
+        "capacity_report_exactly_reconstructed": true,
+        "metadata_and_payload_causality_verified": true,
+        "numeric_shape_known_bytes_lifetimes_and_reloads_verified": true,
+        "scope": "explicit_allocator_payload_budget_only"
+      }
+    },
+    {
+      "name": "capacity-cuda",
+      "verified": true,
+      "returncode": 0,
+      "success_schema": "workload_capacity_verification_receipt/1",
+      "success_field": "verified",
+      "success_value": true,
+      "raw_receipt": "profiling/results/20261018-comprehensive-verification-v1/capacity-cuda.json",
+      "raw_receipt_sha256": "c4b3b7f6054b9c44a17aad70e3551a69dae5140cf6b8be72d78f36967f35e8a6",
+      "raw_stdout_sha256": "ccbf7f1750af5a8a29ffe425584b091ff42addac479d69e5b5a11e2fd70b6444",
+      "started_utc": "2026-10-18T06:14:44.576880+00:00",
+      "completed_utc": "2026-10-18T06:14:45.887862+00:00",
+      "summary": {
+        "tracked_peak_bytes": 3846992,
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "cuda_private_workspace_bytes": null,
+        "capacity_report_exactly_reconstructed": true,
+        "metadata_and_payload_causality_verified": true,
+        "numeric_shape_known_bytes_lifetimes_and_reloads_verified": true,
+        "scope": "explicit_allocator_payload_budget_only"
+      }
+    }
+  ],
+  "inputs_unchanged": true,
+  "input_files": [
+    {
+      "path": "profiling/chain_calibration/results/campaign-v1/manifest.json",
+      "sha256": "e38d679cab42705fb05e3566ccf1d4e4430058634a4f1c98a63cf4ac4dd14d8e"
+    },
+    {
+      "path": "profiling/highlevel_accuracy/runs/representative-v3/report.json",
+      "sha256": "e65f28bf3c71ce18545d8d0d1c52bcb93606dd8d314cdc5ec0e5a11a22670f36"
+    },
+    {
+      "path": "profiling/overlap_accuracy/results/formal-v1/manifest.json",
+      "sha256": "2bda369d81068ec44329548f93af66c006c9449ffab9eeb3a9c843ddcc1ff35b"
+    },
+    {
+      "path": "profiling/overlap_accuracy/results/formal-v1/report.json",
+      "sha256": "4c1f49753fa64ab5c763ae6212e7b9307ae07e72023b09f290871a26fdd687ab"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cpu-20261018/manifest.json",
+      "sha256": "474f8ee0212ef1f21d0d9fa26dfe910b9f6e8c5ea652fedfc97d031a5fc97ae2"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cpu-20261018/report.json",
+      "sha256": "661150ca5a699577a647636db67f012aa9c2d05091aa265ca8ad2b7136704a1d"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cpu-20261018/binding.json",
+      "sha256": "0167970ea44482f372c4ee267d40e1b89cf32d900fe114acdd3c92f99a4911a7"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cuda-20261018/manifest.json",
+      "sha256": "8e0d24950e21c1072d63e346ec9fdbe8b30ba88534fc67619aa3236c92a0e9d3"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cuda-20261018/report.json",
+      "sha256": "cdf9691703c6ae24d11918c65fc120ae7927348db27e63c706494ea2476d0550"
+    },
+    {
+      "path": "profiling/workload_accuracy/formal-v2-cuda-20261018/binding.json",
+      "sha256": "0167970ea44482f372c4ee267d40e1b89cf32d900fe114acdd3c92f99a4911a7"
+    },
+    {
+      "path": "profiling/workload_accuracy/capacity-v2-cpu-20261018/capacity-report.json",
+      "sha256": "c8105d1504b282acd80f7e3f0003f48bea88c1d4e38bc722b03ced21905bc9c7"
+    },
+    {
+      "path": "profiling/workload_accuracy/capacity-v2-cpu-20261018/binding.json",
+      "sha256": "0167970ea44482f372c4ee267d40e1b89cf32d900fe114acdd3c92f99a4911a7"
+    },
+    {
+      "path": "profiling/workload_accuracy/capacity-v2-cuda-20261018/capacity-report.json",
+      "sha256": "7e7d64356850643d0d8a0bc3bce86644799120be6fbd4bf53ca2003a2e9157a2"
+    },
+    {
+      "path": "profiling/workload_accuracy/capacity-v2-cuda-20261018/binding.json",
+      "sha256": "0167970ea44482f372c4ee267d40e1b89cf32d900fe114acdd3c92f99a4911a7"
+    },
+    {
+      "path": "profiling/chain_calibration/results/campaign-v1/analysis/report.json",
+      "sha256": "e4a1749d2a802a112719beb75f5b9b9d4ae5e7cd620574fdbf4b1817655925f3"
+    },
+    {
+      "path": "profiling/chain_calibration/results/campaign-v1/trace-report.json",
+      "sha256": "f8b21fdc437c5c067d9a49ac97094c5263cbe0e9fdd5150d6eca5eaa258c2027"
+    },
+    {
+      "path": "profiling/chain_calibration/results/campaign-v1/shape-report.json",
+      "sha256": "31af6fbdf9dec2caac956c0dd8e9846899a78fd8b87f3f23762dbaec4d235b22"
+    }
+  ],
+  "normalization_note": "The v1 receipt adapter only recognized boolean verified/all_records_verified. The high-level verifier uses status='verified' and exited 0. Its raw receipt and the v1 adapter's false aggregate are retained unchanged; this summary checks the exact declared schema for each of all seven protocols.",
+  "original_adapter_summary_sha256": "94a5babdfb5174bbc06d8ba7047737f551d11c146bdcc9057ac1357505d4447a",
+  "hardware_executed": false,
+  "performance_acceptance_implied": false,
+  "physical_capacity_implied": false,
+  "raw_evidence_retained_locally": true,
+  "portable_full_raw_archive_included": false
+}

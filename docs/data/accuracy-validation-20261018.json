@@ -1,0 +1,1196 @@
+{
+  "schema": "portable-accuracy-validation-summary/1",
+  "date": "2026-10-18",
+  "created_utc": "2026-10-18T06:11:48.151054+00:00",
+  "assessment": {
+    "all_accuracy_gaps_closed": false,
+    "all_reported_latency_scopes_accepted": false,
+    "evidence_assembly_complete": true,
+    "source_assets_unchanged_during_assembly": true,
+    "assembler_executed_hardware": false,
+    "assembler_executed_protocol_verifiers": false,
+    "protocol_verification_status": "all_seven_protocols_verified",
+    "successful_protocol_verification_claimed": true,
+    "verifier_receipts": [
+      {
+        "path": "docs/data/accuracy-offline-verification-20261018.json",
+        "sha256": "a371a0c463d4c8ed37178db8f1c6b02763273586868ce25082e7ea6a029b0702"
+      }
+    ]
+  },
+  "hardware_observed": {
+    "cpu": "AMD Ryzen 9 7940HX",
+    "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "gpu_total_memory_mib": 8188,
+    "nvidia_driver": "581.57",
+    "observation_scope": "Recorded workstation observations; no new hardware probe for this portable aggregate"
+  },
+  "formal_process_counts": {
+    "native_latency": 378,
+    "profile": 189,
+    "heldout": 189,
+    "capacity_baseline_and_trials": 8,
+    "total": 386,
+    "exclusions": "Earlier failed/diagnostic campaigns, debug validations, software tests and duplicate focused test runs are excluded"
+  },
+  "fixed_acceptance_gates": {
+    "within_each_profile_source_and_heldout_process_cv_max": 0.15,
+    "between_independent_process_medians_cv_max": 0.2,
+    "heldout_relative_prediction_error_max": 0.2,
+    "minimum_independent_processes_per_split": 3,
+    "heldout_used_to_fit_baseline": false,
+    "error_units": "Chain/high-level/overlap: declared case/path pooled median. Workload: heldout process median. These distributions are not pooled across scopes."
+  },
+  "software_regressions": {
+    "tests": 2073,
+    "passed": 2065,
+    "skipped": 8,
+    "failed": 0,
+    "all_groups_passed": true,
+    "hardware_accuracy_claimed": false,
+    "initial_import_configuration_failures_retained": true,
+    "duplicate_or_focused_agent_runs_not_added": true,
+    "groups": [
+      {
+        "name": "Modeling",
+        "tests": 339,
+        "passed": 332,
+        "skipped": 7,
+        "status": "passed",
+        "log": "build/accuracy-modeling-tests-configured.log",
+        "log_sha256": "7c116d22e023d6fd5b08462b8877c0448a6b6711ba238b78a611506dc31a6340"
+      },
+      {
+        "name": "Mapping",
+        "tests": 1112,
+        "passed": 1112,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-mapping-tests-configured.log",
+        "log_sha256": "405d6c42d829ff8f58309f2011bddc50fd839d310f42dbf7fd4e17273dda0987"
+      },
+      {
+        "name": "Public library and offline distribution",
+        "tests": 53,
+        "passed": 53,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-all-public-tests.log",
+        "log_sha256": "0a7538af2405e2a616177ef9ff71319727bc4b0e60e0a7afb33291166d9c58ee"
+      },
+      {
+        "name": "Profiling contracts and high-level bridge",
+        "tests": 475,
+        "passed": 474,
+        "skipped": 1,
+        "status": "passed",
+        "log": "build/accuracy-final2-profiling-tests.log",
+        "log_sha256": "be8ca8804c69d348e1adae6b7f366487cde6b9abb63cb86504089b8a2c0327c8"
+      },
+      {
+        "name": "Common accuracy evidence and offline verifiers",
+        "tests": 54,
+        "passed": 54,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-final2-common-tests.log",
+        "log_sha256": "251ce2528c17ad218b7f929080c9530dabc02edf84642ce230bf87107ea471cb"
+      },
+      {
+        "name": "Chain contracts and private runtime provenance",
+        "tests": 13,
+        "passed": 13,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-final2-chain-tests.log",
+        "log_sha256": "9280fb43fd8f06e1a26a39772297403b2cc2caf3fac2b6b9699aa323f01184d1"
+      },
+      {
+        "name": "Overlap contracts",
+        "tests": 13,
+        "passed": 13,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-final2-overlap-tests.log",
+        "log_sha256": "affcf3df3dc4410c1e5b334d1a69bd2c014866bd4b2656c1f285e15847657758"
+      },
+      {
+        "name": "Multi-round workload contracts and real evidence audit",
+        "tests": 14,
+        "passed": 14,
+        "skipped": 0,
+        "status": "passed",
+        "log": "build/accuracy-final2-workload-tests.log",
+        "log_sha256": "87d7b1b9b7d2246f5713ec484b57ae8abf6addd4d62f8f1212c4bad2732871fe"
+      }
+    ]
+  },
+  "campaigns": {
+    "chain": {
+      "id": "chain-v1",
+      "source_directory": "profiling/chain_calibration/results/campaign-v1",
+      "scope": "F32 compact FFN and post-RoPE attention, exact native paths",
+      "case_count": 23,
+      "declared_paths": 143,
+      "profile_processes": 69,
+      "heldout_processes": 69,
+      "samples_per_metric_per_process": 51,
+      "process_coverage_complete": true,
+      "recorded_failures": 0,
+      "families": {
+        "attention": {
+          "cases": 9,
+          "declared_paths": 45,
+          "retained_processes": 54,
+          "measured_processes": 54,
+          "failures": 0
+        },
+        "ffn": {
+          "cases": 14,
+          "declared_paths": 98,
+          "retained_processes": 84,
+          "measured_processes": 84,
+          "failures": 0
+        }
+      },
+      "models": {
+        "independent": {
+          "path_count": 143,
+          "accepted_paths": 7,
+          "errors": {
+            "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+            "declared": 143,
+            "known": 143,
+            "unknown": 0,
+            "median": 0.06927710843373494,
+            "max": 0.5226437444947302,
+            "within_20_percent": 102
+          },
+          "gates": {
+            "assembler_minimum_evidence_processes": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "between_process_cv": {
+              "passed": 112,
+              "failed": 31,
+              "unknown": 0
+            },
+            "heldout_relative_error": {
+              "passed": 102,
+              "failed": 41,
+              "unknown": 0
+            },
+            "model_frozen_before_heldout": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "numeric_and_process_coverage": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "within_process_cv": {
+              "passed": 7,
+              "failed": 136,
+              "unknown": 0
+            }
+          }
+        },
+        "inchain": {
+          "path_count": 143,
+          "accepted_paths": 0,
+          "errors": {
+            "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+            "declared": 143,
+            "known": 143,
+            "unknown": 0,
+            "median": 0.03940763052208835,
+            "max": 0.24267200622948995,
+            "within_20_percent": 141
+          },
+          "gates": {
+            "between_process_cv": {
+              "passed": 5,
+              "failed": 138,
+              "unknown": 0
+            },
+            "heldout_relative_error": {
+              "passed": 141,
+              "failed": 2,
+              "unknown": 0
+            },
+            "independent_processes_at_least_three_each_split": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "model_frozen_before_heldout": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "numeric_and_process_coverage": {
+              "passed": 143,
+              "failed": 0,
+              "unknown": 0
+            },
+            "within_process_cv": {
+              "passed": 0,
+              "failed": 143,
+              "unknown": 0
+            }
+          }
+        },
+        "shared": {
+          "path_count": 60,
+          "accepted_paths": 0,
+          "errors": {
+            "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+            "declared": 60,
+            "known": 60,
+            "unknown": 0,
+            "median": 0.061861702655641324,
+            "max": 0.35340136995911237,
+            "within_20_percent": 53
+          },
+          "gates": {
+            "assembler_minimum_evidence_processes": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "between_process_cv": {
+              "passed": 36,
+              "failed": 24,
+              "unknown": 0
+            },
+            "heldout_relative_error": {
+              "passed": 53,
+              "failed": 7,
+              "unknown": 0
+            },
+            "model_frozen_before_heldout": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "numeric_and_process_coverage": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "prediction_available": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "profile_joint_target_between_process_cv": {
+              "passed": 0,
+              "failed": 60,
+              "unknown": 0
+            },
+            "profile_joint_target_within_process_cv": {
+              "passed": 0,
+              "failed": 60,
+              "unknown": 0
+            },
+            "shared_model_frozen_before_heldout": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "within_process_cv": {
+              "passed": 0,
+              "failed": 60,
+              "unknown": 0
+            }
+          }
+        },
+        "leave_one_case_out": {
+          "path_count": 60,
+          "accepted_paths": 0,
+          "errors": {
+            "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+            "declared": 60,
+            "known": 60,
+            "unknown": 0,
+            "median": 0.06505149556066356,
+            "max": 0.359431786896587,
+            "within_20_percent": 52
+          },
+          "gates": {
+            "assembler_minimum_evidence_processes": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "between_process_cv": {
+              "passed": 36,
+              "failed": 24,
+              "unknown": 0
+            },
+            "heldout_relative_error": {
+              "passed": 52,
+              "failed": 8,
+              "unknown": 0
+            },
+            "model_frozen_before_heldout": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "numeric_and_process_coverage": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "prediction_available": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "profile_joint_target_between_process_cv": {
+              "passed": 3,
+              "failed": 57,
+              "unknown": 0
+            },
+            "profile_joint_target_within_process_cv": {
+              "passed": 0,
+              "failed": 60,
+              "unknown": 0
+            },
+            "shared_model_frozen_before_heldout": {
+              "passed": 60,
+              "failed": 0,
+              "unknown": 0
+            },
+            "within_process_cv": {
+              "passed": 0,
+              "failed": 60,
+              "unknown": 0
+            }
+          }
+        }
+      },
+      "frozen_model_canonical_hashes": {
+        "model_frozen_before_heldout_sha256": "7061f4f245d668586b29cb1c36284cf2c13fa736170172d31aa340d92ec65cd3",
+        "trace_model_frozen_before_heldout_sha256": "7f42f176cae68fb7f6a91d7a38434ebd57d0e0ea76823082f92a11d5c4c51ddf",
+        "shape_models_frozen_before_heldout_sha256": "7a8d8ef39658b82a71e9ff86eedf3d8a2de9c5eed1a40f516f25e14a766ee13a"
+      },
+      "shared_and_leave_one_case_out_scope": "60 eligible hybrid paths; profile-only fitted coefficients; LOCO excludes all complete target rows for the excluded case but retains its independent component profiles",
+      "rankings": {
+        "scope": "common resident-input/weight and DRAM-output boundaries; descriptive independent-component model ranking",
+        "case_groups": 23,
+        "pairs": 300,
+        "correct_median_order_pairs": 248,
+        "decisive_process_median_interval_pairs": 228,
+        "correct_decisive_pairs": 209,
+        "accepted_case_groups": 0,
+        "near_crossing_profile_ratio_max": 1.25,
+        "near_crossing_pairs": 101,
+        "near_crossing_correct_median_orders": 60,
+        "pair_selection_uses": "profile-only proximity; no heldout tuning"
+      },
+      "limitations": [
+        "Compact FFN omits full decoder norm/residual; attention begins at post-RoPE Q/K/V.",
+        "In-chain trace diagnostic timing differs from uninstrumented target timing; instrumentation overhead is not subtracted.",
+        "No physical context-switch attribution, profiler-confirmed kernel overlap, or native capacity claim."
+      ]
+    },
+    "highlevel": {
+      "id": "highlevel-v3",
+      "source_directory": "profiling/highlevel_accuracy/runs/representative-v3",
+      "scope": "actual public ModelPlan.compile/run exported graph, operands and accepted serial actions",
+      "case_count": 14,
+      "declared_paths": 14,
+      "profile_processes": 42,
+      "heldout_processes": 42,
+      "samples_per_process": 31,
+      "profile_raw_processes": 42,
+      "heldout_raw_processes": 42,
+      "recorded_failures": 0,
+      "all_profiles_frozen_before_any_heldout": true,
+      "source_quality_passed": false,
+      "accepted_cases": 0,
+      "errors": {
+        "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+        "declared": 14,
+        "known": 14,
+        "unknown": 0,
+        "median": 0.1677783349863659,
+        "max": 1.5294791263198666,
+        "within_20_percent": 8
+      },
+      "profile_barrier_canonical_sha256": "b70fb4eada9127c60930d02e0953d34f1fd79eeae474441a0052596fbe392e0f",
+      "cases": [
+        {
+          "case_id": "h64-q1-history128-hybrid-macros",
+          "predicted_ns": 13175600,
+          "observed_pooled_median_ns": 13464900,
+          "signed_relative_error": -0.021485491908591968,
+          "absolute_relative_error": 0.021485491908591968,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h64-q1-history128-cpu-macros",
+          "predicted_ns": 1645200,
+          "observed_pooled_median_ns": 1583100,
+          "signed_relative_error": 0.03922683342808414,
+          "absolute_relative_error": 0.03922683342808414,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h64-q1-history128-gpu-macros",
+          "predicted_ns": 12822100,
+          "observed_pooled_median_ns": 14254700,
+          "signed_relative_error": -0.1005001859035967,
+          "absolute_relative_error": 0.1005001859035967,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h64-q1-history128-attention-ffn-cut60",
+          "predicted_ns": 8541900,
+          "observed_pooled_median_ns": 9475100,
+          "signed_relative_error": -0.0984897257021034,
+          "absolute_relative_error": 0.0984897257021034,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h64-q1-history128-attention-ffn-cut64",
+          "predicted_ns": 11831700,
+          "observed_pooled_median_ns": 10179900,
+          "signed_relative_error": 0.16226092594229805,
+          "absolute_relative_error": 0.16226092594229805,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h64-q1-history128-attention-ffn-cut68",
+          "predicted_ns": 12247100,
+          "observed_pooled_median_ns": 9553600,
+          "signed_relative_error": 0.28193560542622675,
+          "absolute_relative_error": 0.28193560542622675,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h128-q16-history0-hybrid-macros",
+          "predicted_ns": 2433900,
+          "observed_pooled_median_ns": 2944100,
+          "signed_relative_error": -0.17329574403043374,
+          "absolute_relative_error": 0.17329574403043374,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h128-q16-history0-attention-ffn-cut124",
+          "predicted_ns": 2966200,
+          "observed_pooled_median_ns": 8516200,
+          "signed_relative_error": -0.6516991146285902,
+          "absolute_relative_error": 0.6516991146285902,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h128-q16-history0-attention-ffn-cut128",
+          "predicted_ns": 2561700,
+          "observed_pooled_median_ns": 3017400,
+          "signed_relative_error": -0.1510240604493935,
+          "absolute_relative_error": 0.1510240604493935,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h128-q16-history0-attention-ffn-cut132",
+          "predicted_ns": 2655900,
+          "observed_pooled_median_ns": 7732400,
+          "signed_relative_error": -0.6565232010759919,
+          "absolute_relative_error": 0.6565232010759919,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h256-q32-history0-hybrid-macros",
+          "predicted_ns": 4728900,
+          "observed_pooled_median_ns": 8228900,
+          "signed_relative_error": -0.42533023854950236,
+          "absolute_relative_error": 0.42533023854950236,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h256-q32-history0-attention-ffn-cut252",
+          "predicted_ns": 15020300,
+          "observed_pooled_median_ns": 5938100,
+          "signed_relative_error": 1.5294791263198666,
+          "absolute_relative_error": 1.5294791263198666,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h256-q32-history0-attention-ffn-cut256",
+          "predicted_ns": 5140100,
+          "observed_pooled_median_ns": 14683500,
+          "signed_relative_error": -0.6499404093029592,
+          "absolute_relative_error": 0.6499404093029592,
+          "source_quality_passed": false,
+          "accepted": false
+        },
+        {
+          "case_id": "h256-q32-history0-attention-ffn-cut260",
+          "predicted_ns": 5129900,
+          "observed_pooled_median_ns": 5445600,
+          "signed_relative_error": -0.057973409725282796,
+          "absolute_relative_error": 0.057973409725282796,
+          "source_quality_passed": false,
+          "accepted": false
+        }
+      ],
+      "numerical_scope": "Recorded independent full-port NumPy and exact copy/action checks for full F32 Dense norm/residual, optional AttentionStages and FFNPartition; standalone protocol-verifier receipt is pending",
+      "rankings": {
+        "scope": "same true external boundary, logical weights, seeds and process cohorts",
+        "bootstrap_seed": 1907,
+        "bootstrap_repetitions": 2000,
+        "interval_unit": "independent process medians",
+        "comparable_groups": 3,
+        "unknown_or_incomparable_groups": 0,
+        "groups": [
+          {
+            "declared_geometry": {
+              "attention_gate": "sigmoid",
+              "head_dim": 16,
+              "heads": 4,
+              "hidden": 64,
+              "history": 128,
+              "intermediate": 128,
+              "kv_heads": 2,
+              "qk_norm": "rms",
+              "tokens": 1
+            },
+            "predicted_best": "h64-q1-history128-cpu-macros",
+            "observed_best": "h64-q1-history128-cpu-macros",
+            "selected_best": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "observed_winner_interval_separated": true,
+            "ambiguous_overlapping_intervals": false,
+            "selection_evidence_accepted": false
+          },
+          {
+            "declared_geometry": {
+              "attention_gate": "sigmoid",
+              "head_dim": 32,
+              "heads": 4,
+              "hidden": 128,
+              "history": 0,
+              "intermediate": 256,
+              "kv_heads": 2,
+              "qk_norm": "rms",
+              "tokens": 16
+            },
+            "predicted_best": "h128-q16-history0-hybrid-macros",
+            "observed_best": "h128-q16-history0-hybrid-macros",
+            "selected_best": true,
+            "selection_regret_ns": 0,
+            "selection_regret_relative": 0.0,
+            "observed_winner_interval_separated": false,
+            "ambiguous_overlapping_intervals": true,
+            "selection_evidence_accepted": false
+          },
+          {
+            "declared_geometry": {
+              "attention_gate": "sigmoid",
+              "head_dim": 32,
+              "heads": 8,
+              "hidden": 256,
+              "history": 0,
+              "intermediate": 512,
+              "kv_heads": 2,
+              "qk_norm": "rms",
+              "tokens": 32
+            },
+            "predicted_best": "h256-q32-history0-hybrid-macros",
+            "observed_best": "h256-q32-history0-attention-ffn-cut260",
+            "selected_best": false,
+            "selection_regret_ns": 2783300,
+            "selection_regret_relative": 0.5111098868811518,
+            "observed_winner_interval_separated": false,
+            "ambiguous_overlapping_intervals": true,
+            "selection_evidence_accepted": false
+          }
+        ],
+        "accepted_selection_groups": 0
+      },
+      "limitations": [
+        "Exactly one preallocated serial invocation; no multi-round high-level native equivalence or overlap claim.",
+        "EVICT is logical validity on preallocated independent backing; native physical memory/capacity accuracy is not established.",
+        "Gallocr plus CPU cplan workspace is a known lower scope; CUDA private scratch is unknown."
+      ]
+    },
+    "workloads": [
+      {
+        "id": "workload-v2-cpu",
+        "backend": "CPU",
+        "source_directory": "profiling/workload_accuracy/formal-v2-cpu-20261018",
+        "scope": "standalone traced multi-layer native evaluator with persistent KV, real layer outputs and selected-route expert lifecycle",
+        "compiler_bridge_distinction": "Public facade audits shape/state/route/output contracts; exact native physical graph/cost equivalence is not claimed.",
+        "case_count": 4,
+        "profile_processes": 12,
+        "heldout_processes": 12,
+        "samples_per_process": 31,
+        "process_coverage_complete": true,
+        "recorded_failures": 0,
+        "accepted": false,
+        "accepted_heldout_process_results": 0,
+        "errors": {
+          "unit": "one heldout process median error",
+          "declared": 12,
+          "known": 12,
+          "unknown": 0,
+          "median": 0.028065907689398227,
+          "max": 0.09355647559624468,
+          "within_20_percent": 12
+        },
+        "gate_counts": {
+          "exact_stage_and_host_gap_coverage": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_between_process_cv": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_process_coverage": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_relative_error": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "numerical_memory_checks": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "profile_between_process_cv": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "within_process_cv": {
+            "passed": 0,
+            "failed": 12,
+            "unknown": 0
+          }
+        },
+        "cases": [
+          {
+            "case_id": "dense-two-layer-trace",
+            "layer_kinds": [
+              "dense",
+              "dense"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "moe-two-layer-active-changing-revisited",
+            "layer_kinds": [
+              "moe",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "moe-two-layer-all-changing-revisited",
+            "layer_kinds": [
+              "moe",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "mixed-dense-moe-active-single-token-trace",
+            "layer_kinds": [
+              "dense",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        "peak_tracked_reserved_bytes": 5513680,
+        "all_recorded_final_tracked_reserved_bytes_zero": true,
+        "cuda_private_workspace_bytes": null,
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "host_gap_is_effective": true,
+        "suitable_for_uninstrumented_runtime_prediction": false,
+        "frozen_model_canonical_sha256": "faf344d84a25ccb571494bfd7f058080be5615e0860c5b68a3dc9412d79eb0db"
+      },
+      {
+        "id": "workload-v2-cuda",
+        "backend": "CUDA",
+        "source_directory": "profiling/workload_accuracy/formal-v2-cuda-20261018",
+        "scope": "standalone traced multi-layer native evaluator with persistent KV, real layer outputs and selected-route expert lifecycle",
+        "compiler_bridge_distinction": "Public facade audits shape/state/route/output contracts; exact native physical graph/cost equivalence is not claimed.",
+        "case_count": 4,
+        "profile_processes": 12,
+        "heldout_processes": 12,
+        "samples_per_process": 31,
+        "process_coverage_complete": true,
+        "recorded_failures": 0,
+        "accepted": false,
+        "accepted_heldout_process_results": 0,
+        "errors": {
+          "unit": "one heldout process median error",
+          "declared": 12,
+          "known": 12,
+          "unknown": 0,
+          "median": 0.12367915835503808,
+          "max": 0.22103099773290674,
+          "within_20_percent": 9
+        },
+        "gate_counts": {
+          "exact_stage_and_host_gap_coverage": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_between_process_cv": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_process_coverage": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "heldout_relative_error": {
+            "passed": 9,
+            "failed": 3,
+            "unknown": 0
+          },
+          "numerical_memory_checks": {
+            "passed": 12,
+            "failed": 0,
+            "unknown": 0
+          },
+          "profile_between_process_cv": {
+            "passed": 0,
+            "failed": 12,
+            "unknown": 0
+          },
+          "within_process_cv": {
+            "passed": 0,
+            "failed": 12,
+            "unknown": 0
+          }
+        },
+        "cases": [
+          {
+            "case_id": "dense-two-layer-trace",
+            "layer_kinds": [
+              "dense",
+              "dense"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "moe-two-layer-active-changing-revisited",
+            "layer_kinds": [
+              "moe",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "moe-two-layer-all-changing-revisited",
+            "layer_kinds": [
+              "moe",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              2,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "case_id": "mixed-dense-moe-active-single-token-trace",
+            "layer_kinds": [
+              "dense",
+              "moe"
+            ],
+            "layers": 2,
+            "rounds": 4,
+            "hidden": 128,
+            "intermediate": 256,
+            "tokens_by_round": [
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ],
+        "peak_tracked_reserved_bytes": 5514064,
+        "all_recorded_final_tracked_reserved_bytes_zero": true,
+        "cuda_private_workspace_bytes": null,
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "host_gap_is_effective": true,
+        "suitable_for_uninstrumented_runtime_prediction": false,
+        "frozen_model_canonical_sha256": "dc6f5f9c3384c01f30ba32ed97a1e57ded60a5733754e163d67185b329c7d520"
+      }
+    ],
+    "capacity": [
+      {
+        "backend": "CPU",
+        "source_directory": "profiling/workload_accuracy/capacity-v2-cpu-20261018",
+        "case_id": "moe-two-layer-active-changing-revisited",
+        "retained_processes": 4,
+        "tracked_peak_bytes": 3846608,
+        "tracked_budget_checks_passed": true,
+        "allocation_release_checked": true,
+        "expert_reload_observed": true,
+        "trials": [
+          {
+            "case": "one_byte_below",
+            "budget_bytes": 3846607,
+            "expected_tracked_acceptance": false,
+            "actual_tracked_acceptance": false,
+            "physical_capacity_verified": false
+          },
+          {
+            "case": "exact_peak",
+            "budget_bytes": 3846608,
+            "expected_tracked_acceptance": true,
+            "actual_tracked_acceptance": true,
+            "physical_capacity_verified": false
+          },
+          {
+            "case": "one_byte_above",
+            "budget_bytes": 3846609,
+            "expected_tracked_acceptance": true,
+            "actual_tracked_acceptance": true,
+            "physical_capacity_verified": false
+          }
+        ],
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "cuda_private_workspace_bytes": null,
+        "scope": "below/exact/above explicit tracked allocator budget only; device physical capacity remains unknown"
+      },
+      {
+        "backend": "CUDA",
+        "source_directory": "profiling/workload_accuracy/capacity-v2-cuda-20261018",
+        "case_id": "moe-two-layer-active-changing-revisited",
+        "retained_processes": 4,
+        "tracked_peak_bytes": 3846992,
+        "tracked_budget_checks_passed": true,
+        "allocation_release_checked": true,
+        "expert_reload_observed": true,
+        "trials": [
+          {
+            "case": "one_byte_below",
+            "budget_bytes": 3846991,
+            "expected_tracked_acceptance": false,
+            "actual_tracked_acceptance": false,
+            "physical_capacity_verified": false
+          },
+          {
+            "case": "exact_peak",
+            "budget_bytes": 3846992,
+            "expected_tracked_acceptance": true,
+            "actual_tracked_acceptance": true,
+            "physical_capacity_verified": false
+          },
+          {
+            "case": "one_byte_above",
+            "budget_bytes": 3846993,
+            "expected_tracked_acceptance": true,
+            "actual_tracked_acceptance": true,
+            "physical_capacity_verified": false
+          }
+        ],
+        "physical_capacity_verified": false,
+        "process_peak_bytes": null,
+        "cuda_private_workspace_bytes": null,
+        "scope": "below/exact/above explicit tracked allocator budget only; device physical capacity remains unknown"
+      }
+    ],
+    "overlap": {
+      "id": "overlap-v1",
+      "source_directory": "profiling/overlap_accuracy/results/formal-v1",
+      "scope": "real asynchronous CE H2D to distinct next-payload storage while resident-current GGML FFN executes",
+      "case_count": 18,
+      "declared_paths": 72,
+      "profile_processes": 54,
+      "heldout_processes": 54,
+      "samples_per_process": 51,
+      "process_coverage_complete": true,
+      "recorded_failures": 0,
+      "accepted_paths": 15,
+      "errors": {
+        "unit": "one declared case/path pooled-median relative error, unless stated otherwise",
+        "declared": 72,
+        "known": 72,
+        "unknown": 0,
+        "median": 0.025018430420466885,
+        "max": 0.4766271090343897,
+        "within_20_percent": 70
+      },
+      "gates": {
+        "all_declared_processes_measured": {
+          "passed": 72,
+          "failed": 0,
+          "unknown": 0
+        },
+        "between_process_cv": {
+          "passed": 70,
+          "failed": 2,
+          "unknown": 0
+        },
+        "common_fixed_compiler_runtime": {
+          "passed": 72,
+          "failed": 0,
+          "unknown": 0
+        },
+        "frozen_before_heldout": {
+          "passed": 72,
+          "failed": 0,
+          "unknown": 0
+        },
+        "heldout_relative_error": {
+          "passed": 70,
+          "failed": 2,
+          "unknown": 0
+        },
+        "minimum_processes": {
+          "passed": 72,
+          "failed": 0,
+          "unknown": 0
+        },
+        "within_process_cv": {
+          "passed": 15,
+          "failed": 57,
+          "unknown": 0
+        }
+      },
+      "common_fixed_tensor_compiler_runtime_exercised": true,
+      "highlevel_ModelPlan_coverage": false,
+      "kernel_overlap_proved": false,
+      "copy_events_prove_kernel_overlap": false,
+      "physical_capacity_verified": false,
+      "instrumentation_overhead_subtracted": false,
+      "limitations": [
+        "Tests fixed sum/max laws with a shared PCIe service resource; it does not identify a general contention law.",
+        "The second native stream is submitted before compute; the one-link tensor runtime queues its service after the first flow without pricing host submission overhead.",
+        "Host spans and CUDA copy-event elapsed times are separate diagnostics; a CUDA kernel overlap proof still requires profiler evidence.",
+        "Prefetch payload completion is checked, but a complete next decoder step or production prefetch speedup is not claimed."
+      ]
+    }
+  },
+  "strict_f32_runtime": {
+    "defect": "Pinned upstream custom CUDA MMF used explicit TF32 MMA for eligible F32 matrices despite GGML_PREC_F32 request and NVIDIA_TF32_OVERRIDE=0",
+    "failure_evidence": "Representative-v2 retained:42 source processes,10 frozen ledgers,4 H128/q16 cases failed independent numerical checks; no heldout collected",
+    "repair": "regular GGML_OP_MUL_MAT with requested GGML_PREC_F32 bypasses custom MMF TF32; MUL_MAT_ID unchanged; no loader-path observation",
+    "partial_rebuild_scope": "ONE patched router translation unit compiled; remaining supplied Release objects copied unchanged; not a clean GGML rebuild",
+    "reused_release_objects": 131,
+    "recompiled_translation_units": 1,
+    "original_router_sha256": "65389d299a774b8a777ac07b1a6558a46322638b3f99d337452d3f6f3d0cd50b",
+    "patched_router_sha256": "c89093943a035c621fb3ebdfa771d0ea9a19fcdfe685ce20c0d3f2997a32c9e3",
+    "cuda_backend_dll_sha256": "4b9a183771a76d35648ac7af20f5bfae0e140199b53a9869f2d5b5be91413433",
+    "provenance": {
+      "path": "profiling/native/highlevel_accuracy/build-runtime-f32-v2/bin/strict-f32-runtime.json",
+      "sha256": "9703cc636939c50d859ab5522424d68b2287aa13d7fbef6305e6d451f9ec8ddb"
+    },
+    "builder": "profiling/native/highlevel_accuracy/build_f32_runtime.py",
+    "untimed_postfix_q16_programs_checked": 4,
+    "untimed_postfix_max_absolute_error": 8.940696716308594e-07,
+    "numerical_tolerances_unchanged": true,
+    "clean_full_runtime_rebuild_claimed": false,
+    "resolved_loader_paths_observed": false
+  },
+  "remaining_scope_limits": [
+    "All error/stability gates retain their original thresholds; no sample trimming or heldout fitting.",
+    "Physical DRAM/VRAM capacity, process peak memory and complete CUDA private workspace remain unknown.",
+    "Tracked allocator budget checks are not physical-capacity validation.",
+    "No production next-step prefetch speedup or profiler-confirmed kernel concurrency is established.",
+    "Recorded source/runtime hashes certify current bytes at recorded paths, not external timestamp attestation or archived-software replay.",
+    "Successful numerical/software checks do not by themselves establish latency accuracy or close every supported-model gap."
+  ],
+  "provenance": {
+    "path_base": "Simulator repository root",
+    "aggregate_source": {
+      "path": "profiling/results/20261018-comprehensive-accuracy/report.json",
+      "sha256": "1911f30002a3f3c83f7f26b0b5ef6399513bfaf3562e0c0d857ebfa9cbaa782c"
+    },
+    "report_created_utc": "2026-10-18T06:07:30.809223+00:00",
+    "source_files": [
+      {
+        "path": "profiling/results/20261018-comprehensive-accuracy/report.json",
+        "sha256": "1911f30002a3f3c83f7f26b0b5ef6399513bfaf3562e0c0d857ebfa9cbaa782c"
+      },
+      {
+        "path": "build/accuracy-regressions-v2.json",
+        "sha256": "b046e25c7af6d8c57cdd5181916266ae5ab94a01c3dfefbafa7cf6e47e28cb92"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/suite.json",
+        "sha256": "bfecb1ad500348a180ed770f3796863eeffe24f621ce11ee845c35bcbfa40ece"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/manifest.json",
+        "sha256": "e38d679cab42705fb05e3566ccf1d4e4430058634a4f1c98a63cf4ac4dd14d8e"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/prediction-model.json",
+        "sha256": "7061f4f245d668586b29cb1c36284cf2c13fa736170172d31aa340d92ec65cd3"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/trace-model.json",
+        "sha256": "7f42f176cae68fb7f6a91d7a38434ebd57d0e0ea76823082f92a11d5c4c51ddf"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/trace-report.json",
+        "sha256": "f8b21fdc437c5c067d9a49ac97094c5263cbe0e9fdd5150d6eca5eaa258c2027"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/shape-models.json",
+        "sha256": "7a8d8ef39658b82a71e9ff86eedf3d8a2de9c5eed1a40f516f25e14a766ee13a"
+      },
+      {
+        "path": "profiling/chain_calibration/results/campaign-v1/shape-report.json",
+        "sha256": "31af6fbdf9dec2caac956c0dd8e9846899a78fd8b87f3f23762dbaec4d235b22"
+      },
+      {
+        "path": "profiling/highlevel_accuracy/runs/representative-v3/campaign.json",
+        "sha256": "59851b9298cb1b36583013550103152737f0a0daa79789b28a7e11508dde95a0"
+      },
+      {
+        "path": "profiling/highlevel_accuracy/runs/representative-v3/all_profiles_frozen.json",
+        "sha256": "c31f124c306c81455a77bc700bf619f6b12e2e2606d96b81239eed205e6ec1cd"
+      },
+      {
+        "path": "profiling/highlevel_accuracy/runs/representative-v3/report.json",
+        "sha256": "e65f28bf3c71ce18545d8d0d1c52bcb93606dd8d314cdc5ec0e5a11a22670f36"
+      },
+      {
+        "path": "profiling/workload_accuracy/formal-v2-cpu-20261018/report.json",
+        "sha256": "661150ca5a699577a647636db67f012aa9c2d05091aa265ca8ad2b7136704a1d"
+      },
+      {
+        "path": "profiling/workload_accuracy/formal-v2-cpu-20261018/frozen-model.json",
+        "sha256": "faf344d84a25ccb571494bfd7f058080be5615e0860c5b68a3dc9412d79eb0db"
+      },
+      {
+        "path": "profiling/workload_accuracy/formal-v2-cuda-20261018/report.json",
+        "sha256": "cdf9691703c6ae24d11918c65fc120ae7927348db27e63c706494ea2476d0550"
+      },
+      {
+        "path": "profiling/workload_accuracy/formal-v2-cuda-20261018/frozen-model.json",
+        "sha256": "dc6f5f9c3384c01f30ba32ed97a1e57ded60a5733754e163d67185b329c7d520"
+      },
+      {
+        "path": "profiling/workload_accuracy/capacity-v2-cpu-20261018/capacity-report.json",
+        "sha256": "c8105d1504b282acd80f7e3f0003f48bea88c1d4e38bc722b03ced21905bc9c7"
+      },
+      {
+        "path": "profiling/workload_accuracy/capacity-v2-cuda-20261018/capacity-report.json",
+        "sha256": "7e7d64356850643d0d8a0bc3bce86644799120be6fbd4bf53ca2003a2e9157a2"
+      },
+      {
+        "path": "profiling/overlap_accuracy/results/formal-v1/suite.json",
+        "sha256": "1c355e15a052cc7480d59d3f712a73a68cb7ff7e8519ec7ae66ad6dca77ad43d"
+      },
+      {
+        "path": "profiling/overlap_accuracy/results/formal-v1/report.json",
+        "sha256": "4c1f49753fa64ab5c763ae6212e7b9307ae07e72023b09f290871a26fdd687ab"
+      },
+      {
+        "path": "profiling/overlap_accuracy/results/formal-v1/frozen-model.json",
+        "sha256": "1e945757155ff0b8e4d0fa4d0523128c04432f7e290f61cd62ae46448653077b"
+      },
+      {
+        "path": "profiling/native/highlevel_accuracy/build-runtime-f32-v2/bin/strict-f32-runtime.json",
+        "sha256": "9703cc636939c50d859ab5522424d68b2287aa13d7fbef6305e6d451f9ec8ddb"
+      }
+    ],
+    "raw_arrays_included": false,
+    "absolute_workstation_paths_included": false,
+    "final_receipts_to_be_added_by_root": false,
+    "receipt_directory": "profiling/results/20261018-comprehensive-verification-v2"
+  }
+}
