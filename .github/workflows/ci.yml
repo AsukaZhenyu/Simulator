@@ -67,6 +67,8 @@ jobs:
         run: python -m unittest discover -s profiling/state_calibration/tests -v
       - name: State probe source and execution-boundary provenance without CUDA
         run: python -m unittest discover -s profiling/native/state_calibration -p 'test_*.py' -v
+      - name: Unified resource functional and phased collection without hardware
+        run: python -m unittest discover -s profiling/resource_calibration/tests -v
       - name: Modeling tests
         run: python -m unittest discover -s modeling/tests -v
       - name: Mapping tests

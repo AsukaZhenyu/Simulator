@@ -1,5 +1,10 @@
 # Device-State Calibration and Accuracy Validation
 
+**Historical diagnostic protocol.** Its constant and named-condition tables
+compare measurement regimes; they are not separate intended simulator models.
+The primary interface is now [one resource-trace functional](UNIFIED_RESOURCE_FUNCTIONAL.md).
+All results and failed gates below remain unchanged.
+
 **Status: engineering implemented and software tested; formal experimental
 evidence independently verified; performance accuracy FAILED under the unchanged
 gates.** The earlier accuracy failures have not been reclassified as device noise

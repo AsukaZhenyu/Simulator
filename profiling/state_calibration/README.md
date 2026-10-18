@@ -1,5 +1,10 @@
 # State-aligned performance calibration
 
+This is the preserved diagnostic protocol. Its constant and condition-specific
+tables are experimental controls, not the intended primary model interface.
+New modeling uses [one resource-trace functional](../../docs/UNIFIED_RESOURCE_FUNCTIONAL.md)
+and the [continuous foreground trajectory collector](../resource_calibration/README.md).
+
 This optional source-checkout workflow measures identical numerical programs
 under declared execution regimes, records device observations on the same
 monotonic clock as native execution, and validates profile-only conditional
