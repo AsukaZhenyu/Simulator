@@ -123,6 +123,19 @@
         "log": "build/accuracy-final2-workload-tests.log",
         "log_sha256": "87d7b1b9b7d2246f5713ec484b57ae8abf6addd4d62f8f1212c4bad2732871fe"
       }
+    ],
+    "additional_checks_not_added_to_total": [
+      {
+        "name": "High-level bridge tests without PYTHONPATH after checkout-path bootstrap fix",
+        "tests": 15,
+        "passed": 14,
+        "skipped": 1,
+        "failed": 0,
+        "log": "build/accuracy-ci-import-fix-v2.log",
+        "log_sha256": "7b5597f16fd80d6b074768e0177aa13e44d2b9bbd1d44e26e80f14ef48a0c564",
+        "original_ci_failure": "https://github.com/AsukaZhenyu/Simulator/actions/runs/39103462256",
+        "failure_scope": "test module import path only; no measurement, prediction, gate or frozen evidence changed"
+      }
     ]
   },
   "campaigns": {

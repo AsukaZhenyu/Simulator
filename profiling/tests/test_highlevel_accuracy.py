@@ -8,11 +8,17 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+for directory in (ROOT / "profiling", ROOT / "modeling", ROOT / "mapping"):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
 
 from highlevel_accuracy.bridge import (BOUNDARY, BridgeError, export_plan, reference_ports,
                                       sha, validate_program, verify_native)
