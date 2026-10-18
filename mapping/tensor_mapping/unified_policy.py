@@ -87,6 +87,10 @@ class UnifiedPolicy(DeclarativePolicy):
 
     @staticmethod
     def _resource_available(observation, resource, compute=False):
+        from llm_infer_model.m2.causal import compute_service_available
+        if resource in ("cpu_compute", "gpu_compute") and not compute_service_available(
+                observation, "cpu" if resource == "cpu_compute" else "gpu"):
+            return False
         busy = {entry.resource for entry in observation.running}
         if resource in busy:
             return False

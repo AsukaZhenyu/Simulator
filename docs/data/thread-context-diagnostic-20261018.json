@@ -1,0 +1,1141 @@
+{
+  "schema": "public-thread-context-diagnostic-0.1",
+  "created_utc": "2026-10-18T08:26:34.309832+00:00",
+  "case": "H128, q16, identical compiled Dense attention/FFN graph and numeric inputs",
+  "fresh_native_processes": 12,
+  "numerically_and_protocol_verified_processes": 12,
+  "protocol": {
+    "blocks": 3,
+    "minimum_block_ms": 200,
+    "warmup": 20,
+    "interval_ms": 50,
+    "process_timeout_seconds": 180,
+    "affinity_mask": 3,
+    "iteration_policy": "minimum_wall_time",
+    "fixed_iterations_environment_unset": true,
+    "fresh_process_count": 12,
+    "cost_fit": false,
+    "heldout_accuracy_claimed": false,
+    "equal_invocation_counts_claimed": false
+  },
+  "report": {
+    "schema": "CPU-thread-context-diagnostic-0.1",
+    "groups": [
+      {
+        "mode": "isolated",
+        "threads": 1,
+        "declared_process_count": 3,
+        "successful_process_count": 3,
+        "all_three_successful": true,
+        "process_target_medians_ns": [
+          1996200.0,
+          1952050.0,
+          1928850.0
+        ],
+        "diagnostic_median_of_process_medians_ns": 1952050.0,
+        "between_process_median_cv": 0.014259793920741667,
+        "within_process_target_cv": [
+          0.5976386747389496,
+          0.4528694516518293,
+          0.10294248655208549
+        ],
+        "failed_job_ids": []
+      },
+      {
+        "mode": "isolated",
+        "threads": 2,
+        "declared_process_count": 3,
+        "successful_process_count": 3,
+        "all_three_successful": true,
+        "process_target_medians_ns": [
+          4807050.0,
+          1922400.0,
+          1938400.0
+        ],
+        "diagnostic_median_of_process_medians_ns": 1938400.0,
+        "between_process_median_cv": 0.4693487588359578,
+        "within_process_target_cv": [
+          0.07490932604106582,
+          0.42963700837591257,
+          0.11012398899902903
+        ],
+        "failed_job_ids": []
+      },
+      {
+        "mode": "mixed",
+        "threads": 1,
+        "declared_process_count": 3,
+        "successful_process_count": 3,
+        "all_three_successful": true,
+        "process_target_medians_ns": [
+          2226200,
+          4686600.0,
+          4652700
+        ],
+        "diagnostic_median_of_process_medians_ns": 4652700,
+        "between_process_median_cv": 0.29880329827995794,
+        "within_process_target_cv": [
+          0.4232788389608324,
+          0.31240358206370866,
+          0.3317018852644421
+        ],
+        "failed_job_ids": []
+      },
+      {
+        "mode": "mixed",
+        "threads": 2,
+        "declared_process_count": 3,
+        "successful_process_count": 3,
+        "all_three_successful": true,
+        "process_target_medians_ns": [
+          5474600.0,
+          5561700.0,
+          1924000.0
+        ],
+        "diagnostic_median_of_process_medians_ns": 5474600.0,
+        "between_process_median_cv": 0.3922760240687358,
+        "within_process_target_cv": [
+          0.043458739450072004,
+          0.02313387036677402,
+          0.09332097275088978
+        ],
+        "failed_job_ids": []
+      }
+    ],
+    "paired_comparisons": [
+      {
+        "mode": "isolated",
+        "repeat": 0,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 2.4081003907424106
+      },
+      {
+        "mode": "isolated",
+        "repeat": 1,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 0.9848108398862734
+      },
+      {
+        "mode": "isolated",
+        "repeat": 2,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 1.0049511366876636
+      },
+      {
+        "mode": "mixed",
+        "repeat": 0,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 2.459168089120474
+      },
+      {
+        "mode": "mixed",
+        "repeat": 1,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 1.186723850979388
+      },
+      {
+        "mode": "mixed",
+        "repeat": 2,
+        "both_successful": true,
+        "threads_2_over_1_target_median_ratio": 0.4135233305392568
+      }
+    ],
+    "limits": {
+      "intervention": "CPU backend/threadpool requested thread count 1 versus 2, including all CPU-operation and surrounding runtime-context effects. Polling policy is unchanged and is not isolated.",
+      "graph": "Exact existing compiled graph, actions, bindings, seed and tensor data. Only physical.threads and dependent identity hashes differ. No strategy recompilation or cost-table update is claimed.",
+      "thread_evidence": "The bound native Executor reads physical.threads and configures the backend and persistent pool. Direct OS worker-count readback is not available in this native binary.",
+      "statistics": "Minimum-wall-time sampling retains every invocation. Counts may differ. Process medians and paired ratios are descriptive; pooled equal-count calibration gates are not applied.",
+      "causality": "Controlled requested-configuration comparison with matched affinity and numeric inputs. Device state and external applications remain observed, uncontrolled context; no pure polling or GPU-kernel causal attribution.",
+      "scope": "No cost fitting, heldout claim, outlier removal, interpolation, universal slowdown multiplier or hardware-setting changes."
+    },
+    "cost_fitted": false,
+    "heldout_accuracy_claimed": false,
+    "equal_invocation_counts_claimed": false,
+    "pure_polling_effect_proven": false,
+    "performance_acceptance_implied": false,
+    "all_twelve_successful": true,
+    "manifest_sha256": "a1c6062c5601a020be1283714c544f49d296f034e526fa0dab0b05cac8aab609",
+    "source_inventory_verified_unchanged": true,
+    "rows_sha256": "aa52cd71ee8c044f6f2b9cfdc3d3cc4e7441ce1f6783706a0d4865034a08b101",
+    "tool_sha256": "edb9ee2afff48c293e0d8a456f09df4b27e2373519dbea7927589fe7c20ecffb"
+  },
+  "jobs": [
+    {
+      "job": {
+        "id": "repeat-0-threads-1-isolated",
+        "split": "diagnostic",
+        "repeat": 0,
+        "threads": 1,
+        "mode": "isolated",
+        "program_key": "repeat-0-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1996200.0,
+      "target_cv": 0.5976386747389496,
+      "iteration_median_ns": 2009500.0,
+      "iteration_cv": 0.5945294744313269,
+      "sample_count": 274,
+      "samples_per_block": [
+        83,
+        95,
+        96
+      ],
+      "block_target_medians_ns": [
+        2028100,
+        2025200,
+        1929550.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 71.875,
+        "gpu.gpu_util_percent": 0.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642578944.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943161344.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 13.38,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "bb143b28d44f5ce9045bbac0268ec97a238f08c6dcbafae156c8cf9388c6fe37",
+        "alignment.json": "799577040d55a90853bdf6d09dff6aecccf74e0b8a4bde862bfe6108019535b7",
+        "native.json": "94bec41af56fd6f4de0b4d5b8dbf98d4727dcb29b3e84d55acacffb81894d4db",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "61cbbac248e72acf13b889962920e760779c8a16da17e22729b7a206136a011b",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "bc266a81216f90e3f1bc3b5683d91f3c0340c9c1dbf769750b30f6b7e594795c",
+        "telemetry.jsonl": "f0b2ecb5d2f9a2c5a7c1bcbf1c24380a65af5add41af1799b4a792d84ad8f2f1"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-0-threads-2-isolated",
+        "split": "diagnostic",
+        "repeat": 0,
+        "threads": 2,
+        "mode": "isolated",
+        "program_key": "repeat-0-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 4807050.0,
+      "target_cv": 0.07490932604106582,
+      "iteration_median_ns": 4817200.0,
+      "iteration_cv": 0.07452736531154842,
+      "sample_count": 126,
+      "samples_per_block": [
+        41,
+        43,
+        42
+      ],
+      "block_target_medians_ns": [
+        4922500,
+        4720100,
+        4770700.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 17.894736842105264,
+        "gpu.gpu_util_percent": 6.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 7001.0,
+        "gpu.memory_free_bytes": 7642742784.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 942997504.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 14.038,
+        "gpu.pstate": 3.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 64.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "383e9d7b1bc3d6af2954f31d2e550a470e47750ce6a168d5b95145072bebd274",
+        "alignment.json": "8c7566b3fcf9d3611f901d85e82ae6fcfae2449a4f2c7aacdaf570ae1e360464",
+        "native.json": "d2bb34f87fca9227b7aa7b5ac5aadb2b6cd129089de660678e7b0ff4834f112c",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "ea1fbb5f271f401ab165f7b4d0c39540ac341f1fa49d47b7565169383310b4d7",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "f7a82b8a7dee57ffbe61653a5ac32257b6c68af88b4014f35dca097598a534a2",
+        "telemetry.jsonl": "0d8e31e7a28d123075397120e440618085897126ef07bb6eb60c13e2ef3e0f9f"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-0-threads-2-mixed",
+        "split": "diagnostic",
+        "repeat": 0,
+        "threads": 2,
+        "mode": "mixed",
+        "program_key": "repeat-0-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 5474600.0,
+      "target_cv": 0.043458739450072004,
+      "iteration_median_ns": 10180450.0,
+      "iteration_cv": 0.038359316154850664,
+      "sample_count": 60,
+      "samples_per_block": [
+        20,
+        20,
+        20
+      ],
+      "block_target_medians_ns": [
+        5393700.0,
+        5465500.0,
+        5589450.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 9.174311926605505,
+        "gpu.gpu_util_percent": 2.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 7001.0,
+        "gpu.memory_free_bytes": 7642185728.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943554560.0,
+        "gpu.memory_util_percent": 1.0,
+        "gpu.power_w": 13.804,
+        "gpu.pstate": 3.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 64.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "84a2104baaf63e0630695aba171008a306e0d8a602ea8e86fa4c657ebdf292e6",
+        "alignment.json": "102bbabf25dbf3a9ce51cbd94fa543e911d780455d0d9657bc3e52a9c47e38ac",
+        "native.json": "1218d665f6001d715f1ad2791180c9a2ac53de1d646f1f199fa544ae7c46d13d",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "0a743f2f9a2887ca1b7db3a367e21dfd2c06b54646e490f226040430d69c7bbe",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "947bd994ec468e7db7a2a8e360516bcb1f819e609d6b4fada24782101f08cdcc",
+        "telemetry.jsonl": "b1169d14148efe24bfde3f458b2d31b631b05d3bc0821f8b800dd3c34b3fa6f1"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-0-threads-1-mixed",
+        "split": "diagnostic",
+        "repeat": 0,
+        "threads": 1,
+        "mode": "mixed",
+        "program_key": "repeat-0-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 2226200,
+      "target_cv": 0.4232788389608324,
+      "iteration_median_ns": 4795800,
+      "iteration_cv": 0.32069771045285805,
+      "sample_count": 101,
+      "samples_per_block": [
+        37,
+        34,
+        30
+      ],
+      "block_target_medians_ns": [
+        2096900,
+        2132200.0,
+        3148600.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 7.608695652173913,
+        "gpu.gpu_util_percent": 0.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642316800.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943423488.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 5.688,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "bbd69308787166d0dec335114eb15395cb8ec48249bb93322807bff82cc84e32",
+        "alignment.json": "27a8656ce28a27e89120c16ecc82b3c54a0b2a64c13e36a022b26b958b884e03",
+        "native.json": "156012e8350c240d7ae44700f88380bc470097728186f1bd33438d21d8c0221d",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "bcaec4f97ccceb8f373cb4051abda1e59a35018c81d4536e1bb171c5041c25f4",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "b88452441a728cf5b984963ee017b27290f7a0f9a7df190ea47b0788c750d7fe",
+        "telemetry.jsonl": "1c01efa0e10ef7b78fcbdb46eeb2dbd927a8c6d443ed936b93a38fe5131ee78a"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-1-threads-2-mixed",
+        "split": "diagnostic",
+        "repeat": 1,
+        "threads": 2,
+        "mode": "mixed",
+        "program_key": "repeat-1-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 5561700.0,
+      "target_cv": 0.02313387036677402,
+      "iteration_median_ns": 10156400.0,
+      "iteration_cv": 0.033866440976063575,
+      "sample_count": 60,
+      "samples_per_block": [
+        20,
+        20,
+        20
+      ],
+      "block_target_medians_ns": [
+        5552600.0,
+        5568350.0,
+        5561700.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 9.090909090909092,
+        "gpu.gpu_util_percent": 4.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 7001.0,
+        "gpu.memory_free_bytes": 7641006080.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 944734208.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 13.193,
+        "gpu.pstate": 3.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 64.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "227b5c7946fbe2ff234bc2b96f451b07e6c1a0716edf9f37d8eec22cc20b55ae",
+        "alignment.json": "ec91b48ce86ab9bb35396d63efa30707b288f9101f82f70746dc714f52ada904",
+        "native.json": "5803c8421b7b5ce6d3e96ee37c5adf93d01a553caf2f25570d27b46797ddc085",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "2088007d4cc3c7be33ae8557dbc07a83528f1fcb84fc6ebb485413b74bcc4b7f",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "dacf81cc680e95bf08099207812a2b3b01fcb36820c8aaadf0a8df0877f1d9d5",
+        "telemetry.jsonl": "dff8d72427bef81c1530db62b0040be64ea50a16570c899c77a8a98b74bee4a5"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-1-threads-1-mixed",
+        "split": "diagnostic",
+        "repeat": 1,
+        "threads": 1,
+        "mode": "mixed",
+        "program_key": "repeat-1-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 4686600.0,
+      "target_cv": 0.31240358206370866,
+      "iteration_median_ns": 8365700.0,
+      "iteration_cv": 0.24873623636341616,
+      "sample_count": 82,
+      "samples_per_block": [
+        24,
+        27,
+        31
+      ],
+      "block_target_medians_ns": [
+        4743700.0,
+        4687400,
+        2411900
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 6.956521739130435,
+        "gpu.gpu_util_percent": 1.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642316800.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943423488.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 10.914,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "b9d7e5454c9c89b4d6ba100511267c36b14bad6d615e912874823a282f5624ba",
+        "alignment.json": "300edcc89d2ced5dacd2bc50415f3055bc70d69ad09e437179db0a06e2a161ea",
+        "native.json": "1002f0d6c9b400dc08806fe3debed684cbb4014bd7818cf11c13c1d453571e04",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "ae099edb84f9892bd5d9802073a9c2d800b2cb9372602bfcdfd0a1f4bc61f886",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "850334c30702ff28b32fbf0508bd6c237bb0006da88bf69ba50fac029be0a9c5",
+        "telemetry.jsonl": "125369c6450ac13e3eca58fc1afca8f5b43c056347a2ad9e67c84a38bcc6e5a6"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-1-threads-1-isolated",
+        "split": "diagnostic",
+        "repeat": 1,
+        "threads": 1,
+        "mode": "isolated",
+        "program_key": "repeat-1-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1952050.0,
+      "target_cv": 0.4528694516518293,
+      "iteration_median_ns": 1962450.0,
+      "iteration_cv": 0.4512266250837173,
+      "sample_count": 228,
+      "samples_per_block": [
+        68,
+        83,
+        77
+      ],
+      "block_target_medians_ns": [
+        1991600.0,
+        1948200,
+        1923300
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 8.771929824561404,
+        "gpu.gpu_util_percent": 34.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642251264.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943489024.0,
+        "gpu.memory_util_percent": 4.0,
+        "gpu.power_w": 5.048,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "c0218741cdb8d096fe6c4080466c9d0a213a0f7a17d8e17305c3d2bbf91b8205",
+        "alignment.json": "3f884b7069319678727c912b9b86c6cc4036a68481a71e73cd09b46a2e652ab3",
+        "native.json": "85e35e3331194962bfdc5e629d985e66dd3efca031f47d60a3f5f9097f4ad225",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "4fe10730d5ce2ba9c9047c4d2a2f0d87584396a4b675102cf9deb3fea77a5162",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "7aa199e2e52fbe3478d653a03a5cfa8789607eeb9cabb1ae3bade2a86a8bdc89",
+        "telemetry.jsonl": "830b8af406338a768628b7c9786e18ecb0fc1f0200118e599b293362318ae644"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-1-threads-2-isolated",
+        "split": "diagnostic",
+        "repeat": 1,
+        "threads": 2,
+        "mode": "isolated",
+        "program_key": "repeat-1-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1922400.0,
+      "target_cv": 0.42963700837591257,
+      "iteration_median_ns": 1933150.0,
+      "iteration_cv": 0.4279342696196166,
+      "sample_count": 260,
+      "samples_per_block": [
+        73,
+        101,
+        86
+      ],
+      "block_target_medians_ns": [
+        1986300,
+        1922100,
+        1890950.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 7.2727272727272725,
+        "gpu.gpu_util_percent": 4.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7641923584.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943816704.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 10.791,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "b38deff82ee04f18f315d908458cc2050ae92edb069e775003a963fe24884c26",
+        "alignment.json": "1ef6aed3c48b82d5721ac0d5165222fea8ced6357206eb7ac873fe2b49055f39",
+        "native.json": "fa47b5547c70d9e1a0e27ced0809f5f63f5710f0915de7ebb62a9e597a5f26bd",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "52086e2edce704fbb7052f1a98284448377dbbd1662b931eb3e82163bf6eaec6",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "c245b74f4fd96c18c7843a5e242a19db23cea788ed753f0f7b2be2f5510e9e3f",
+        "telemetry.jsonl": "79e9efea620a4c8f55e221eea3ea410a3975c65872b2b0f7301b85cf07c8109b"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-2-threads-1-isolated",
+        "split": "diagnostic",
+        "repeat": 2,
+        "threads": 1,
+        "mode": "isolated",
+        "program_key": "repeat-2-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1928850.0,
+      "target_cv": 0.10294248655208549,
+      "iteration_median_ns": 1939900.0,
+      "iteration_cv": 0.10250061620235909,
+      "sample_count": 302,
+      "samples_per_block": [
+        98,
+        104,
+        100
+      ],
+      "block_target_medians_ns": [
+        1947350.0,
+        1884950.0,
+        1948250.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 8.148148148148149,
+        "gpu.gpu_util_percent": 5.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7641923584.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943816704.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 8.339,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "38cfbda8aeb01d1f7098dde4266ab00a10efc59a1ac9796b66c4504e6cd03ecc",
+        "alignment.json": "637f442eb46e63c51bd9c7491a5ec13b4831bbf13a5389d3d970d54496f56216",
+        "native.json": "c5ded665dd51928d1e74eb20bc8a9caf51fd1875d008528c072c3c6bee598fc7",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "c0dee437e7433b8b3a9a54758578c227a4cc64deafa41d9406fe977a2da414fc",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "2b25cb55faa86034275ad73bc2b91bb15f9b3ceb7abe7e281c3baaae1bae92e7",
+        "telemetry.jsonl": "c19ece0ee94171cf3126ebb29ae1a3e1fa3ce8f7c500df3b0421f4828913b972"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-2-threads-2-isolated",
+        "split": "diagnostic",
+        "repeat": 2,
+        "threads": 2,
+        "mode": "isolated",
+        "program_key": "repeat-2-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1938400.0,
+      "target_cv": 0.11012398899902903,
+      "iteration_median_ns": 1957350.0,
+      "iteration_cv": 0.10965131996302833,
+      "sample_count": 300,
+      "samples_per_block": [
+        98,
+        99,
+        103
+      ],
+      "block_target_medians_ns": [
+        1949600.0,
+        1950900,
+        1918700
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 15.929203539823009,
+        "gpu.gpu_util_percent": 18.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 7001.0,
+        "gpu.memory_free_bytes": 7641923584.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 943816704.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 7.349,
+        "gpu.pstate": 3.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "b041f12967bfaa0a85206e6e8ae9865ac9848b9f06e4d2df3218e7311fa57590",
+        "alignment.json": "381e552523c420dd7a8d78599d735f23212bdfd24107b40c2bf1ff63435eda5b",
+        "native.json": "ee05512f937b4027d47df497c403c405a179964f92af96bf6465ae6332214258",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "7e375d4e6dcdde53fb021aa1959adb227cf161ac40a7b131895d6791e4965101",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "ea6294ae69dfc3d35685ac33812c8c1c952618001aaee1ad2bd759a314cd8e8e",
+        "telemetry.jsonl": "44b6a4953d55a390d7d845f18faa7ea543dd3359123a856d79be39c5058d9f17"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-2-threads-2-mixed",
+        "split": "diagnostic",
+        "repeat": 2,
+        "threads": 2,
+        "mode": "mixed",
+        "program_key": "repeat-2-threads-2",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 2,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 1924000.0,
+      "target_cv": 0.09332097275088978,
+      "iteration_median_ns": 4377300.0,
+      "iteration_cv": 0.06735436123618643,
+      "sample_count": 134,
+      "samples_per_block": [
+        43,
+        45,
+        46
+      ],
+      "block_target_medians_ns": [
+        1947200,
+        1921400,
+        1888450.0
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 19.63036963036963,
+        "gpu.gpu_util_percent": 4,
+        "gpu.graphics_clock_mhz": 1605,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642644480.0,
+        "gpu.memory_total_bytes": 8585740288,
+        "gpu.memory_used_bytes": 943095808,
+        "gpu.memory_util_percent": 0,
+        "gpu.power_w": 13.56,
+        "gpu.pstate": 0,
+        "gpu.sm_clock_mhz": 1605,
+        "gpu.temperature_c": 63
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "41a96bc46aeab7be71c4e9252d6dbda984dadc7023b14bd529f9df930a8834c8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "fdaa826f49fe1a06a7863efa357a472969acc60be1e99fab9184e9faeb66fd0f",
+        "alignment.json": "b57a54a8854c86e365d4592e68af3b32c722af9e8500454dcc9f43175263d4c2",
+        "native.json": "3ffb7c98fa19149092b8a062e60c7cef02fc56f32465854cdcaf62913472d507",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "4349d2716a361f4aee8f109511351c6a5628378f20c5a715d3bd3f16d19d1087",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "98c7d3ea943dc59d46a324df4a730b74d9d3a7d6164ba01515c26169dc78a3c7",
+        "telemetry.jsonl": "26378468e66ac294d4fb8eeec5a89ac6f45cbef44998bc344cea6b2ffd49bd57"
+      }
+    },
+    {
+      "job": {
+        "id": "repeat-2-threads-1-mixed",
+        "split": "diagnostic",
+        "repeat": 2,
+        "threads": 1,
+        "mode": "mixed",
+        "program_key": "repeat-2-threads-1",
+        "seed": 27101,
+        "condition": "baseline",
+        "instrumentation": "stamped",
+        "telemetry": true,
+        "execution_boundary": "legacy_double_sync"
+      },
+      "status": "measured",
+      "returncode": 0,
+      "requested_threads": 1,
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000,
+        "cross_process": true,
+        "wall_clock_used_for_alignment": false
+      },
+      "affinity": {
+        "applied": true,
+        "requested_mask": 3,
+        "observed_mask": 3
+      },
+      "fixed_iterations_environment_unset": true,
+      "target_median_ns": 4652700,
+      "target_cv": 0.3317018852644421,
+      "iteration_median_ns": 8341100,
+      "iteration_cv": 0.26384763998496114,
+      "sample_count": 85,
+      "samples_per_block": [
+        24,
+        24,
+        37
+      ],
+      "block_target_medians_ns": [
+        4802900.0,
+        4744900.0,
+        2036300
+      ],
+      "alignment_model_ready": true,
+      "observed_device_state_medians": {
+        "cpu.busy_percent": 7.407407407407407,
+        "gpu.gpu_util_percent": 0.0,
+        "gpu.graphics_clock_mhz": 1605.0,
+        "gpu.memory_clock_mhz": 8001.0,
+        "gpu.memory_free_bytes": 7642775552.0,
+        "gpu.memory_total_bytes": 8585740288.0,
+        "gpu.memory_used_bytes": 942964736.0,
+        "gpu.memory_util_percent": 0.0,
+        "gpu.power_w": 13.973,
+        "gpu.pstate": 0.0,
+        "gpu.sm_clock_mhz": 1605.0,
+        "gpu.temperature_c": 63.0
+      },
+      "numerical": {
+        "passed": true,
+        "maximum_absolute_error": 9.685754776000977e-07,
+        "atol": 5e-05,
+        "rtol": 5e-05,
+        "oracle": "independent NumPy reference_ports outside all timed native work"
+      },
+      "input_sha256": {
+        "program": "9ccb453eb029c5ee8719bd9e9c766342db5e3f897e2bba04e9340f1970ca47e8",
+        "reference": "8b6fe0660f0999a4ecc0e83c87b0559bfb3cff98bb8b408003b86d0d767d9767",
+        "execution": "603e2cb5ffcf77f91b212af0899630d0d5d8f61893358f77844e4ecb3f7597a9",
+        "alignment.json": "5a646e75e8069672e3c87401136f89281b717782c714a30eb1fa68df96ec86f4",
+        "native.json": "877ddc7955870e1c9d645abf3db671f3beeb38be5d4840696288763146faf28d",
+        "native.stderr": "d8a1129c16b04a27ec8575049f256d2265c5be88a6664a411ac57b2e36f1a107",
+        "native.stdout": "ee50f9ed7799cb8fcce3e40d5222e426329676863d5b839357e7e15d0cb937b4",
+        "numerical.json": "cfa926a9b664ff4440ede014d83af34a72c5fe59266842e484664f3b2d51f515",
+        "telemetry-metadata.json": "f684233b15a318ed14599f9fffef51d463096dd28cf6741c484c165c94c24384",
+        "telemetry.jsonl": "faa595a3622f618284f0e1fa59d66f11b2bd00dd4172262e6f9013053ae07d5d"
+      }
+    }
+  ],
+  "input_sha256": {
+    "manifest": "a1c6062c5601a020be1283714c544f49d296f034e526fa0dab0b05cac8aab609",
+    "rows": "aa52cd71ee8c044f6f2b9cfdc3d3cc4e7441ce1f6783706a0d4865034a08b101",
+    "report": "1f0e166d18e951b07de5960c77ccb9ba6dc0c27a6030f699946ee98b4a65da41",
+    "tool": "edb9ee2afff48c293e0d8a456f09df4b27e2373519dbea7927589fe7c20ecffb",
+    "focused_tests": "05c5fdc2ca713c7000a0677a60d410f77bba6758de3fbfa1224aaf3b44e0083e",
+    "formal_manifest": "7a77056af75548d8f93a93d07e4116e5f392ec1b926e0fd4115317a6550f3eef",
+    "thread_source_inventory": "bf9178b7abc3debbb0ba5389d4ffd0a6b4cb6aa9b19b1e35712f75ba7eaa73a3"
+  },
+  "source_and_artifact_verification": {
+    "thread_inventory_unchanged": true,
+    "formal_inventory_unchanged": true,
+    "thread_inventory_file_count": 3664,
+    "every_declared_raw_artifact_digest_verified": true
+  },
+  "interpretation": {
+    "thread_count_alone_explains_large_error": false,
+    "pure_polling_effect_proven": false,
+    "observed_thread_effect_direction_consistent": false,
+    "accepted_cost_scope": null,
+    "cost_fitted": false,
+    "heldout_claimed": false,
+    "all_individual_invocations_retained_locally": true,
+    "public_digest_contains_complete_raw_bundle": false,
+    "telemetry_scope": "Block-aligned observed state summaries; NVML values can use driver rolling windows and are not instantaneous kernel state.",
+    "finding": "One-thread mixed GPU target medians remain approximately 2.23, 4.69 and 4.65 ms; two-thread mixed medians are 5.47, 5.56 and 1.92 ms. The direction of paired differences reverses. Removing the second CPU thread does not eliminate the slow regime.",
+    "stability": "Six of twelve invocation-level target CVs exceed 0.15; three of four between-process median CVs exceed 0.20. These descriptive comparisons do not turn this variable-count diagnostic into accepted calibration.",
+    "next_measurement_boundary": "Further attribution requires runtime/driver/per-thread activity evidence rather than fitting a universal thread or device-state multiplier."
+  }
+}

@@ -33,6 +33,27 @@ class DevicePrice:
     duration_ns: int
     workspace_bytes: int
     allocated_workspace_bytes: int | None = None
+    # Reference duration above never changes. This separate estimate assumes
+    # the currently observed rate remains constant for the whole operation.
+    # Model-owned observations use None when the effective service rate is 0.
+    current_duration_ns: int | None = None
+
+
+def compute_service_available(observation, device: str) -> bool:
+    """Current public availability only; no prediction about future recovery."""
+    if device not in ("cpu", "gpu"):
+        raise InvalidInput("compute availability requires cpu or gpu")
+    return ((device != "cpu" or observation.cpu_available)
+            and getattr(observation, f"{device}_service_rate_numerator", 1) > 0)
+
+
+def current_compute_duration_ns(reference_duration_ns: int, observation, device: str) -> int | None:
+    """Whole-operation estimate at the current explicit reference-service rate."""
+    if not compute_service_available(observation, device):
+        return None
+    numerator = getattr(observation, f"{device}_service_rate_numerator", 1)
+    denominator = getattr(observation, f"{device}_service_rate_denominator", 1)
+    return (reference_duration_ns * denominator + numerator - 1) // numerator
 
 
 @dataclass(frozen=True)
@@ -126,6 +147,10 @@ class CausalObservation:
     reclaim_records: tuple[Any, ...] = ()
     control_running: Any | None = None
     control_costs: Any | None = None
+    cpu_service_rate_numerator: int = 1
+    cpu_service_rate_denominator: int = 1
+    gpu_service_rate_numerator: int = 1
+    gpu_service_rate_denominator: int = 1
 
 
 class _MoEVisibility:
@@ -319,7 +344,8 @@ class CausalM2Session:
             operation = scenario.workload.operation_by_id[operation_id]
             task = tasks[operation_id]
             prices = tuple(DevicePrice(device, price.duration_ns, price.workspace_bytes,
-                                       scenario.workspace_alloc(operation_id, device))
+                                       scenario.workspace_alloc(operation_id, device),
+                                       current_compute_duration_ns(price.duration_ns, base, device))
                            for device in scenario.mapspace.devices_for(operation_id)
                            for price in (scenario.costs.compute_cost(operation_id, device),)
                            if price is not None)
@@ -377,7 +403,9 @@ class CausalM2Session:
                                  safe_weight_release_candidates=tuple(tid for tid in base.safe_weight_release_candidates
                                                                       if tid in visible),
                                  reclaim_records=base.reclaim_records, control_running=base.control_running,
-                                 control_costs=base.control_costs)
+                                 control_costs=base.control_costs,
+                                 **{f"{device}_service_rate_{part}": getattr(base, f"{device}_service_rate_{part}")
+                                    for device in ("cpu", "gpu") for part in ("numerator", "denominator")})
 
     def submit(self, action: Action, *, source_index: int | None = None):
         return self._runtime.submit(action, source_index=source_index)
@@ -476,4 +504,5 @@ class CausalM2Session:
                         for location in ("dram", "vram", "ssd")})
                 for tensor in self._runtime.scenario.workload.tensors],
             running=[asdict(task) for task in self._runtime.state.running],
+            compute_progress=[asdict(row) for row in self._runtime.compute_progress_document()],
             resumable_checkpoint=False, scope="runtime_inventory_not_a_checkpoint")

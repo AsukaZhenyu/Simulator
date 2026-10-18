@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 import hashlib
 from pathlib import Path
 
-from llm_infer_model.m2.causal import (CausalObservation, DevicePrice,
+from llm_infer_model.m2.causal import (CausalObservation, DevicePrice, current_compute_duration_ns,
     PublicOperation, PublicTensor, TransferPrice)
 from llm_infer_model.tensor.engine import (Action, ACTION_ADVANCE,
     ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD)
@@ -149,7 +149,8 @@ class CausalBlockSession:
             task = self._task_by_id[oid]
             op = scenario.workload.operation_by_id[oid]
             prices = tuple(DevicePrice(device, cost.duration_ns, cost.workspace_bytes,
-                                       scenario.workspace_alloc(oid, device))
+                                       scenario.workspace_alloc(oid, device),
+                                       current_compute_duration_ns(cost.duration_ns, base, device))
                 for device in scenario.mapspace.devices_for(oid)
                 for cost in (scenario.costs.compute_cost(oid, device),) if cost is not None)
             operations.append(PublicOperation(id=oid, kind=task.kind, status=state.op(oid),
@@ -216,6 +217,8 @@ class CausalBlockSession:
             pending_reclaim=base.pending_reclaim,
             safe_weight_release_candidates=tuple(tid for tid in base.safe_weight_release_candidates if tid in visible),
             reclaim_records=base.reclaim_records, control_running=base.control_running, control_costs=base.control_costs,
+            **{f"{device}_service_rate_{part}": getattr(base, f"{device}_service_rate_{part}")
+               for device in ("cpu", "gpu") for part in ("numerator", "denominator")},
             layer_order=self.model.layer_order,
             active_invocations=((active.invocation_id, active.layer_id),) if active else (),
             weight_catalogue=tuple(("w:" + layer, layer, "dense_ffn", None) for layer in self.model.layer_order),
@@ -257,6 +260,7 @@ class CausalBlockSession:
                 copies={location:state.copy_at(t.id, location) for location in ("dram", "vram", "ssd")})
                 for t in self._runtime.scenario.workload.tensors],
             running=[asdict(task) for task in state.running],
+            compute_progress=[asdict(row) for row in self._runtime.compute_progress_document()],
             completed_blocks=[task.operation_id for task in self.model.tasks if state.op(task.operation_id) == OP_DONE],
             resumable_checkpoint=False, scope="runtime_inventory_not_a_checkpoint")
 

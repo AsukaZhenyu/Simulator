@@ -520,5 +520,6 @@ class GlobalM2Session(CausalM2Session):
             weight_partitions=self._compiled.physical_boundary.get("ffn_execution",{}).get("weight_partitions",[]),
             declared_parent_versions=self._compiled.physical_boundary["global_execution"]["declared_parent_versions"],
             runtime_state=asdict(self._runtime.state),
+            compute_progress=[asdict(row) for row in self._runtime.compute_progress_document()],
             services=self.service_document() if hasattr(self._runtime,"service_document") else None,
             resumable_checkpoint=False,scope="runtime_inventory_not_a_checkpoint")

@@ -20,7 +20,7 @@ from .engine import (ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
     Action, CODE_CAPACITY_EXCEEDED, CODE_ILLEGAL_ACTION, CODE_RESOURCE_BUSY,
     MappingError, State, _accumulate_transfer_bytes, _event_for, advance_elapsed, transition)
 from .environment import (CODE_ENVIRONMENT_DEADLOCK, CODE_INFORMATION_NOT_KNOWN,
-    CODE_RECLAIM_ADMISSION, CODE_CONTROL_BUSY, EnvironmentEvent, ServiceInterval, SessionStep, SimulationSession)
+    CODE_RECLAIM_ADMISSION, CODE_CONTROL_BUSY, EnvironmentEvent, SessionStep, SimulationSession)
 from .spec import (COPY_ABSENT, COPY_READY, DOMAINS, DOMAIN_OF_DEVICE,
     LOC_DRAM, LOC_SSD, LOC_VRAM, OP_DONE, RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE,
     RESOURCE_PCIE_COPY, ROUTE_ENDS, Scenario, InvalidInput, Unsupported)
@@ -357,7 +357,8 @@ class ServiceSession(SimulationSession):
         if self.finished:
             return self._fail("actions_remain_after_goal", "advance follows the completed goal", action_index=index)
         rates = self._project_rates()
-        paused = () if self._cpu_available else (RESOURCE_CPU_COMPUTE,)
+        self._project_compute_rates()
+        paused = self._paused_compute_resources()
         active = [task for task in self.state.running if task.resource not in paused]
         times = [self.state.t + task.remaining_ns for task in active]
         times.extend(self._extra_boundary_times())
@@ -371,9 +372,7 @@ class ServiceSession(SimulationSession):
         for key, remaining in list(self._flows.items()):
             served = min(remaining, rates[key[0]] * elapsed)
             amounts[key] = served; self._flows[key] -= served
-        for task in active:
-            self._service.append(ServiceInterval(self._launches[(task.resource, task.target_id)],
-                                                task.resource, task.target_id, before.t, destination))
+        self._record_service_progress(before, destination, active)
         if amounts:
             budget = Fraction(self.services.bandwidth_bytes_per_second, 10**9) * elapsed
             assert sum(amounts.values()) <= budget
@@ -383,6 +382,7 @@ class ServiceSession(SimulationSession):
                            "rate_bytes_per_ns": _fraction(rates[key[0]]), "served_bytes": _fraction(value)}
                           for key, value in sorted(amounts.items())]})
         self._state = advance_elapsed(self.scenario, before, elapsed, paused)
+        self._close_completed_compute_work()
         after_keys = {(task.resource, task.target_id) for task in self.state.running}
         for task in before.running:
             key = (task.resource, task.target_id)

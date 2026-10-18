@@ -203,6 +203,7 @@ def _runtime_signature(session):
                 "nominal_ends": result.nominal_ends, "action_sources": result.action_sources}
     document["reclaim_records"] = [asdict(row) for row in getattr(result, "reclaim_records", ())]
     document["control_events"] = [asdict(row) for row in getattr(result, "control_events", ())]
+    document["compute_progress"] = [asdict(row) for row in result.compute_progress]
     observation = session.observe()
     document["pending_reclaim"] = asdict(observation.pending_reclaim) if observation.pending_reclaim else None
     document["control_running"] = asdict(observation.control_running) if observation.control_running else None
@@ -358,7 +359,10 @@ def write_unified_result(output, compiled, result):
                                                     for index, event in enumerate(evaluation.events)]})
     write_json(output / "states.json", {"visibility_scope": "modeling_private_debug_not_policy_input", "states": [asdict(row) for row in evaluation.states]})
     write_json(output / "environments.json", {"events": [asdict(row) for row in runtime.environment_events]})
-    write_json(output / "service_intervals.json", {"intervals": [asdict(row) for row in runtime.service_intervals]})
+    write_json(output / "service_intervals.json", {
+        "intervals": [asdict(row) for row in runtime.service_intervals],
+        "compute_progress": [asdict(row) for row in runtime.compute_progress],
+        "compute_rate_semantics": "reference_cost_ns_per_wall_ns; exact_work; completion_ceil_to_integer_ns"})
     write_json(output / "persistent_state.json", session.persistent_state_document())
     write_json(output / "policy_audit.json", policy.audit_document())
     write_json(output / "history_out.json", policy.history_document())

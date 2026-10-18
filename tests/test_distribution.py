@@ -48,7 +48,7 @@ class DistributionTests(unittest.TestCase):
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
                 )
             source_assets = [
-                "CITATION.cff", "docs/LIBRARY_GUIDE.md",
+                "CITATION.cff", "docs/LIBRARY_GUIDE.md", "docs/DEVICE_STATE_RUNTIME.md",
                 "docs/OPEN_SOURCE_AND_PREPRINT.md", "docs/RELEASE_0_1.md",
                 "tests/test_distribution.py", "tests/test_library.py",
                 "tests/test_analytical_inputs.py",

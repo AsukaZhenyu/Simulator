@@ -1,0 +1,408 @@
+{
+  "schema": "device-state-validation-receipt-0.1",
+  "software": {
+    "unique_tests": 2338,
+    "skipped": 8,
+    "passed": 2330,
+    "all_final_groups_passed": true,
+    "suites": [
+      {
+        "name": "modeling",
+        "tests": 355,
+        "skipped": 7,
+        "returncode": 0,
+        "log_sha256": "8b97989c7b8d8ab32bf3a13e77d5d4e206bcf9e724adec681c98067340d75048"
+      },
+      {
+        "name": "mapping",
+        "tests": 1119,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "da2de096be513718cd02dc1c71bfab0861a50d958805528db332b8ff1196707f"
+      },
+      {
+        "name": "public",
+        "tests": 56,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "164e5806138ca7cf48677662807b1cdbce7fbba299351df5b1a271260e19a08e"
+      },
+      {
+        "name": "profiling",
+        "tests": 475,
+        "skipped": 1,
+        "returncode": 0,
+        "log_sha256": "78ecb6171e4873a899e3b06911ae3068c318d092102b9947cdca5c8208f541c9"
+      },
+      {
+        "name": "execution",
+        "tests": 54,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "f298a864d0009ecc3ba17749a8b5894d502f39ca71fd134ccdeaf47030b15a60"
+      },
+      {
+        "name": "batched",
+        "tests": 15,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "3166725b2b3cae0dee9515836816a77596c7eda05e82ab72b75d9f24896da656"
+      },
+      {
+        "name": "composition",
+        "tests": 26,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "182cdcccfba7c38e3abea908e6db7768c5a5c56fa74ed8def2ddd46c27ee81cd"
+      },
+      {
+        "name": "accuracy",
+        "tests": 54,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "9f46675f4666aadb2d6d1601513a0508c4aec679e00f50504e1705c384692c9e"
+      },
+      {
+        "name": "chain",
+        "tests": 13,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "47a3bbdc6fd5b9fb3dfe5db718a24f0657dc284f002a6cc3e7a9691c7938fffb"
+      },
+      {
+        "name": "overlap",
+        "tests": 13,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "47a4f37d685d1c4efd1008d751454088ca9f682c57f93c7465e5e0b103395d55"
+      },
+      {
+        "name": "workload",
+        "tests": 14,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "8616e04b7efb0839e8184b22be8979df4adea4250f2d8330ba74af8da052b8ca"
+      },
+      {
+        "name": "native_batch",
+        "tests": 8,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "73e91877801f88cbb66818c083c647e7cd65d4e4a7e586e1d085e0493d7229e1"
+      },
+      {
+        "name": "state",
+        "tests": 130,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "de7231450354610100f341f926721f61882acf34b60e695d1c5c9258cba9586d",
+        "supersedes_initial_fixture_failure": true
+      },
+      {
+        "name": "native_state",
+        "tests": 6,
+        "skipped": 0,
+        "returncode": 0,
+        "log_sha256": "38370d475bd13cc203732a3f32bc7f75bde1c994905d4aa966b6f2c6aa706e28"
+      }
+    ],
+    "initial_run_summary_sha256": "2be1f3160364e288b3a402ca7ae057c48eae8f6b1c89a31eaa509f00d8324dc8",
+    "rerun_reason": "The new model guard rejects malformed profile jobs before the adapter fixture assertion; only the test expectation changed. The affected state suite was rerun, including six added thread-context tests; no unaffected groups rerun.",
+    "distribution_followup": {
+      "tests": 1,
+      "passed": 1,
+      "log_sha256": "ba573f622e9600ef32826f27baa340253cc7288a56923b0e361a7ba67edd1fa9",
+      "unique_test_count_increment": 0,
+      "reason": "Runtime-state usage guide added to the source distribution; its existing offline wheel/sdist test rerun successfully."
+    }
+  },
+  "formal_verification": {
+    "schema": "state-calibration-verification-0.1",
+    "verified": true,
+    "errors": [],
+    "input_count": 4799,
+    "inputs_unchanged": true,
+    "input_bindings_sha256": "bc6d3de50461816382c4894e9bbcdeaf5f68ae0db20b736a71620fea71ce5960",
+    "declared_jobs": 114,
+    "retained_jobs": 114,
+    "measured_jobs_verified": 114,
+    "failed_jobs_retained": 0,
+    "unknown_failed_job_scopes": 0,
+    "unknown_optional_diagnostic_jobs": [],
+    "accuracy_acceptance": {
+      "constant": {
+        "cell_count": 24,
+        "accepted_count": 0,
+        "known_error_count": 24,
+        "unknown_error_count": 0,
+        "all_cells_accepted": false
+      },
+      "conditional": {
+        "cell_count": 24,
+        "accepted_count": 0,
+        "known_error_count": 24,
+        "unknown_error_count": 0,
+        "all_cells_accepted": false
+      }
+    },
+    "accuracy_acceptance_overridden": false,
+    "native_processes_launched": 0,
+    "causal_slowdown_explanation_proven": false,
+    "resolved_kernel_path_proven": false,
+    "physical_capacity_proven": false,
+    "cuda_private_workspace_bytes": null,
+    "scope": "Read-only evidence reconstruction, source/heldout separation and fixed-gate evaluation; failure records and unknown accuracy scopes remain unchanged."
+  },
+  "formal_verification_raw_sha256": "cd4d3a2fdd731b54417f4fc8b2df434f97d82ac1615211623e3a8f772fc7cae0",
+  "runtime_adapter": {
+    "schema": "formal-measured-target-timing-check-0.1",
+    "checks": [
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "condition": "baseline",
+        "kind": "constant",
+        "expected_finish_ns": 1969950,
+        "actual_finish_ns": 1969950,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "condition": "cpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 5845100,
+        "actual_finish_ns": 5845100,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "condition": "cpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 984975,
+        "expected_finish_ns": 3907525,
+        "actual_finish_ns": 3907525,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "condition": "gpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 2744450,
+        "actual_finish_ns": 2744450,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "condition": "gpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 984975,
+        "expected_finish_ns": 2357200,
+        "actual_finish_ns": 2357200,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "condition": "baseline",
+        "kind": "constant",
+        "expected_finish_ns": 5116000,
+        "actual_finish_ns": 5116000,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "condition": "cpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 4691850,
+        "actual_finish_ns": 4691850,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "condition": "cpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 2558000,
+        "expected_finish_ns": 4903925,
+        "actual_finish_ns": 4903925,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "condition": "gpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 2710000,
+        "actual_finish_ns": 2710000,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "condition": "gpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 2558000,
+        "expected_finish_ns": 3913000,
+        "actual_finish_ns": 3913000,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "condition": "baseline",
+        "kind": "constant",
+        "expected_finish_ns": 3662000,
+        "actual_finish_ns": 3662000,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "condition": "cpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 8444500,
+        "actual_finish_ns": 8444500,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "condition": "cpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 1831000,
+        "expected_finish_ns": 6053250,
+        "actual_finish_ns": 6053250,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "condition": "gpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 5182300,
+        "actual_finish_ns": 5182300,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "condition": "gpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 1831000,
+        "expected_finish_ns": 4422150,
+        "actual_finish_ns": 4422150,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "condition": "baseline",
+        "kind": "constant",
+        "expected_finish_ns": 7968650,
+        "actual_finish_ns": 7968650,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "condition": "cpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 9737550,
+        "actual_finish_ns": 9737550,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "condition": "cpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 3984325,
+        "expected_finish_ns": 8853100,
+        "actual_finish_ns": 8853100,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "condition": "gpu_replay_load",
+        "kind": "constant",
+        "expected_finish_ns": 5329400,
+        "actual_finish_ns": 5329400,
+        "passed": true,
+        "diagnostic_only": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "condition": "gpu_replay_load",
+        "kind": "mid_operation_change",
+        "change_ns": 3984325,
+        "expected_finish_ns": 6649025,
+        "actual_finish_ns": 6649025,
+        "passed": true,
+        "diagnostic_only": true
+      }
+    ],
+    "default_rejections": [
+      {
+        "case_id": "h128-q16",
+        "mode": "isolated",
+        "unaccepted_source_rejected": true
+      },
+      {
+        "case_id": "h128-q16",
+        "mode": "mixed",
+        "unaccepted_source_rejected": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "isolated",
+        "unaccepted_source_rejected": true
+      },
+      {
+        "case_id": "h256-q32",
+        "mode": "mixed",
+        "unaccepted_source_rejected": true
+      }
+    ],
+    "all_checks_passed": true,
+    "native_processes_launched": 0,
+    "physical_capacity_proven": false,
+    "whole_llm_timing_proven": false,
+    "heldout_prediction_accuracy_validated_here": false,
+    "scope": "Exact common-runtime progress arithmetic using diagnostic-only profile medians; no hardware accuracy claim"
+  },
+  "runtime_adapter_raw_sha256": "e514354542307bce021ef9adcc178b1108658ad8134f59c5ec8a183542590ad5",
+  "public_inputs_sha256": {
+    "device-state-calibration-20261018.json": "5e2fa61c2cdee392df4b4ddac6de89c86e042eef385dc30c6d1381ca42d89d47",
+    "device-state-background-20261018.json": "293f2b9bbb367eae88cdc38db82dedc8c11896d6ee9874f534eebaef39565d78",
+    "thread-context-diagnostic-20261018.json": "e8f2f55119e93b84c5769324c44299609d45740375bad95b201499e2f773fcee"
+  },
+  "accuracy_acceptance_overridden": false,
+  "raw_measurements_in_repository": false,
+  "scope": "Portable receipts and compact research evidence. Software and evidence-consistency passes do not establish hardware accuracy; both formal models retain 0/24 accepted cells.",
+  "final_formal_and_thread_source_inventories_unchanged": true
+}

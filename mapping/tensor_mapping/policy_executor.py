@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from llm_infer_model.m2.causal import CausalObservation, RevealedRoute
+from llm_infer_model.m2.causal import CausalObservation, RevealedRoute, compute_service_available
 from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
     ACTION_READ_SSD, ACTION_WRITE_SSD,
@@ -185,6 +185,9 @@ class DeclarativePolicy:
 
     @staticmethod
     def _resource_available(observation, resource, compute=False):
+        if resource in (RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE) and not compute_service_available(
+                observation, "cpu" if resource == RESOURCE_CPU_COMPUTE else "gpu"):
+            return False
         busy = {entry.resource for entry in observation.running}
         if resource in busy:
             return False
@@ -244,8 +247,7 @@ class DeclarativePolicy:
 
     def _devices(self, operation, observation, tensors):
         preferred = self._placement(operation)
-        available = [price for price in operation.prices
-                     if price.device != "cpu" or observation.cpu_available]
+        available = [price for price in operation.prices if compute_service_available(observation, price.device)]
         dynamic = operation.kind in EXPERT_COMPUTE_KINDS and self.policy.expert_device_rule != "fixed"
         if self.policy.expert_device_rule in ("fiddler_paths", "hybrimoe_queues"):
             if operation.kind == "expert_ffn" and isinstance(operation.expert_id, int):
@@ -280,7 +282,7 @@ class DeclarativePolicy:
     def _fiddler_device(self, operation, observation, tensors):
         if operation.id in self._fiddler_devices:
             chosen = self._fiddler_devices[operation.id]
-            return () if chosen == "cpu" and not observation.cpu_available else (chosen,)
+            return (chosen,) if compute_service_available(observation, chosen) else ()
         consumers = [consumer for consumer in observation.operations
                      if set(consumer.inputs) & set(operation.outputs)]
         if not consumers or any(consumer.kind != "scatter_rows" or self._placement(consumer) != "gpu"
@@ -419,7 +421,7 @@ class DeclarativePolicy:
         price = next((price for price in operation.prices if price.device == device), None)
         if price is None:
             raise Unsupported(f"no exact public {device} cost for {operation.id}")
-        if device == "cpu" and not observation.cpu_available:
+        if not compute_service_available(observation, device):
             return None
         workspace = price.allocated_workspace_bytes
         if workspace is None:

@@ -270,7 +270,8 @@ class SerialDemandPolicy:
                     if decision is None:
                         raise Unsupported(f"no ready source for current input {tensor_id!r}")
                     return decision
-            if self.device == "cpu" and not observation.cpu_available:
+            from llm_infer_model.m2.causal import compute_service_available
+            if not compute_service_available(observation, self.device):
                 return Decision(ACTION_ADVANCE)
             return Decision(ACTION_COMPUTE, operation.id, device=self.device)
         for tensor_id, location in observation.deliveries:

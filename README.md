@@ -114,6 +114,8 @@ The [composition calibration study](docs/COMPOSITION_CALIBRATION_20261018.md) ad
 
 The [accuracy validation suite](profiling/accuracy_suite/README.md) adds complete compiled Dense strategy replay, execution-chain diagnostics, real multi-layer Dense/MoE traces, tracked allocator boundaries, and asynchronous copy/compute experiments. Optional source-checkout tooling uses `pip install ".[profiling]"`; the installed simulator still needs no profiles or CUDA. The [validation report](docs/ACCURACY_VALIDATION_20261018.md) separates numerical correctness, prediction error, measurement stability and physical capacity. The suite does not establish universal hardware accuracy or change the analytical defaults.
 
+The [state-aligned calibration workflow](profiling/state_calibration/README.md) records bounded device observations on the native execution clock and freezes exact-context conditional costs before independent validation. The [device-state study](docs/DEVICE_STATE_CALIBRATION_20261018.md) reports rejected observations as well as accepted evidence. [Explicit CPU/GPU service rates](docs/DEVICE_STATE_RUNTIME.md) support mid-operation speed changes, pauses and recovery with exact remaining-work accounting; they do not infer an unmeasured slowdown from utilization or clocks.
+
 ## License and research use
 
 Original code uses the [MIT License](LICENSE). Attributed third-party data retains its own license; see [public routing data](profiling/data/public-routes/README.md). This is an **alpha research library**, with no associated accepted paper or accuracy claim. Citation metadata: [CITATION.cff](CITATION.cff).

@@ -3,13 +3,16 @@
 External memory is an absolute, non-evictable allocation in addition to the
 scenario's runtime reserve. CPU availability is a service blackout: an in-flight
 CPU task pauses without losing its input locks, output reservation or workspace.
-It is not a CPU-utilization-to-latency formula or an operating-system model.
-Costs and workspace sizes remain fixed throughout a session.
+Explicit rational CPU/GPU service rates can change at a boundary, including
+while work is running. Rates consume reference-cost nanoseconds per wall-clock
+nanosecond; they are not inferred from utilization, clocks or an OS model.
+Reference costs and workspace sizes remain fixed throughout a session.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from typing import Iterable, Protocol
 
 from .engine import (
@@ -132,6 +135,10 @@ class EnvironmentEvent:
     dram_external_bytes: int | None = None
     vram_external_bytes: int | None = None
     cpu_available: bool | None = None
+    cpu_service_rate_numerator: int | None = None
+    cpu_service_rate_denominator: int | None = None
+    gpu_service_rate_numerator: int | None = None
+    gpu_service_rate_denominator: int | None = None
 
     def __post_init__(self) -> None:
         for name in ("t_ns", "dram_external_bytes", "vram_external_bytes"):
@@ -142,8 +149,19 @@ class EnvironmentEvent:
                 raise InvalidInput(f"environment.{name} must be a non-negative integer")
         if self.cpu_available is not None and not isinstance(self.cpu_available, bool):
             raise InvalidInput("environment.cpu_available must be a boolean")
+        for device in ("cpu", "gpu"):
+            numerator = getattr(self, f"{device}_service_rate_numerator")
+            denominator = getattr(self, f"{device}_service_rate_denominator")
+            if (numerator is None) != (denominator is None):
+                raise InvalidInput(f"environment.{device}_service_rate requires both numerator and denominator")
+            if numerator is not None and (
+                    type(numerator) is not int or numerator < 0 or
+                    type(denominator) is not int or denominator <= 0):
+                raise InvalidInput(f"environment.{device}_service_rate requires non-negative integer numerator "
+                                   "and positive integer denominator")
         if all(getattr(self, key) is None for key in
-               ("dram_external_bytes", "vram_external_bytes", "cpu_available")):
+               ("dram_external_bytes", "vram_external_bytes", "cpu_available",
+                "cpu_service_rate_numerator", "gpu_service_rate_numerator")):
             raise InvalidInput("environment event must change at least one field")
 
 
@@ -187,6 +205,10 @@ class Observation:
     reclaim_records: tuple[ReclaimRecord, ...] = ()
     control_running: ControlRunningObservation | None = None
     control_costs: ControlCosts | None = None
+    cpu_service_rate_numerator: int = 1
+    cpu_service_rate_denominator: int = 1
+    gpu_service_rate_numerator: int = 1
+    gpu_service_rate_denominator: int = 1
 
 
 @dataclass(frozen=True)
@@ -197,6 +219,10 @@ class EnvironmentRecord:
     cpu_available: bool
     memory: tuple[MemoryUsage, ...]
     accepted: bool
+    cpu_service_rate_numerator: int = 1
+    cpu_service_rate_denominator: int = 1
+    gpu_service_rate_numerator: int = 1
+    gpu_service_rate_denominator: int = 1
 
 
 @dataclass(frozen=True)
@@ -206,6 +232,21 @@ class ServiceInterval:
     target_id: str
     start_ns: int
     end_ns: int
+    service_rate_numerator: int = 1
+    service_rate_denominator: int = 1
+    reference_service_ns_numerator: int | None = None
+    reference_service_ns_denominator: int | None = None
+
+
+@dataclass(frozen=True)
+class ComputeProgress:
+    """Privileged exact progress; integer task durations alone are not a checkpoint."""
+    resource: str
+    target_id: str
+    remaining_reference_ns_numerator: int
+    remaining_reference_ns_denominator: int
+    service_rate_numerator: int
+    service_rate_denominator: int
 
 
 @dataclass(frozen=True)
@@ -229,6 +270,7 @@ class SessionResult:
     action_sources: tuple[int | None, ...]
     reclaim_records: tuple[ReclaimRecord, ...] = ()
     control_events: tuple[ControlEvent, ...] = ()
+    compute_progress: tuple[ComputeProgress, ...] = ()
 
 
 class SimulationSession:
@@ -261,7 +303,8 @@ class SimulationSession:
         for event in queue:
             if event.t_ns != group_time:
                 group_time, group_fields = event.t_ns, set()
-            for field in ("dram_external_bytes", "vram_external_bytes", "cpu_available"):
+            for field in ("dram_external_bytes", "vram_external_bytes", "cpu_available",
+                          "cpu_service_rate_numerator", "gpu_service_rate_numerator"):
                 if getattr(event, field) is not None:
                     if field in group_fields:
                         raise InvalidInput(f"same-time environment group repeats {field}")
@@ -292,6 +335,8 @@ class SimulationSession:
         self._visibility = visibility
         self._dram_external = self._vram_external = 0
         self._cpu_available = True
+        self._compute_rates = {RESOURCE_CPU_COMPUTE: Fraction(1), RESOURCE_GPU_COMPUTE: Fraction(1)}
+        self._compute_work: dict[tuple[str, str], Fraction] = {}
         self._error_code: str | None = None
         self._error_message: str | None = None
         self._error_t: int | None = None
@@ -367,6 +412,7 @@ class SimulationSession:
         if self._queue_index >= len(self._queue) or self._queue[self._queue_index].t_ns != self._state.t:
             return
         dram, vram, cpu = self._dram_external, self._vram_external, self._cpu_available
+        rates = dict(self._compute_rates)
         while self._queue_index < len(self._queue) and self._queue[self._queue_index].t_ns == self._state.t:
             event = self._queue[self._queue_index]
             if event.dram_external_bytes is not None:
@@ -375,17 +421,25 @@ class SimulationSession:
                 vram = event.vram_external_bytes
             if event.cpu_available is not None:
                 cpu = event.cpu_available
+            for device, resource in (("cpu", RESOURCE_CPU_COMPUTE), ("gpu", RESOURCE_GPU_COMPUTE)):
+                numerator = getattr(event, f"{device}_service_rate_numerator")
+                if numerator is not None:
+                    rates[resource] = Fraction(numerator, getattr(event, f"{device}_service_rate_denominator"))
             self._queue_index += 1
         memory = self._memory(dram=dram, vram=vram)
         conflict = self._capacity_message(memory)
         self._environment_records.append(EnvironmentRecord(self._state.t, dram, vram, cpu,
-                                                           memory, conflict is None))
+            memory, conflict is None, rates[RESOURCE_CPU_COMPUTE].numerator,
+            rates[RESOURCE_CPU_COMPUTE].denominator, rates[RESOURCE_GPU_COMPUTE].numerator,
+            rates[RESOURCE_GPU_COMPUTE].denominator))
         if conflict:
             self._fail(CODE_EXTERNAL_MEMORY_CONFLICT,
                        "under this environment trace, external allocation was rejected: " + conflict,
                        action_index=action_index)
         else:
             self._dram_external, self._vram_external, self._cpu_available = dram, vram, cpu
+            self._compute_rates = rates
+            self._project_compute_rates()
 
     def _apply_reclaim_notices(self) -> None:
         if self._error_code:
@@ -555,6 +609,74 @@ class SimulationSession:
         return replace(raw, used_dram_bytes=raw.used_dram_bytes + self._dram_external,
                        used_vram_bytes=raw.used_vram_bytes + self._vram_external)
 
+    def _effective_compute_rate(self, resource: str) -> Fraction:
+        if resource == RESOURCE_CPU_COMPUTE and not self._cpu_available:
+            return Fraction(0)
+        return self._compute_rates[resource]
+
+    def _paused_compute_resources(self) -> tuple[str, ...]:
+        return tuple(resource for resource in self._compute_rates
+                     if not self._effective_compute_rate(resource))
+
+    def _project_compute_rates(self) -> None:
+        """Expose integer wall-time projections without rounding remaining work.
+
+        At zero rate ``remaining_ns`` is the ceiling of reference work, not a
+        completion prediction. Only the sidecar plus current rate is sufficient
+        to reconstruct progress; paused resources never enter completion times.
+        """
+        running = []
+        for task in self._state.running:
+            key = (task.resource, task.target_id)
+            if key in self._compute_work:
+                rate = self._effective_compute_rate(task.resource)
+                value = self._compute_work[key] / rate if rate else self._compute_work[key]
+                task = replace(task, remaining_ns=-(-value.numerator // value.denominator))
+            running.append(task)
+        self._state = replace(self._state, running=tuple(sorted(running)))
+
+    def _register_compute_work(self) -> None:
+        for task in self._state.running:
+            if task.resource in self._compute_rates:
+                self._compute_work.setdefault((task.resource, task.target_id), Fraction(task.remaining_ns))
+        self._project_compute_rates()
+
+    def _record_service_progress(self, before: State, destination: int, active) -> None:
+        """Consume exact work, clamping only the last integer-nanosecond tick."""
+        elapsed = destination - before.t
+        for task in active:
+            key = (task.resource, task.target_id)
+            rate, served = Fraction(1), None
+            if key in self._compute_work:
+                rate = self._effective_compute_rate(task.resource)
+                served = min(self._compute_work[key], rate * elapsed)
+                self._compute_work[key] -= served
+            self._service.append(ServiceInterval(self._launches[key], task.resource, task.target_id,
+                before.t, destination, rate.numerator, rate.denominator,
+                None if served is None else served.numerator,
+                None if served is None else served.denominator))
+
+    def _close_completed_compute_work(self) -> None:
+        keys = {(task.resource, task.target_id) for task in self._state.running}
+        for key in tuple(self._compute_work):
+            if key not in keys:
+                if self._compute_work[key] != 0:
+                    raise AssertionError("compute completed before its reference work was served")
+                del self._compute_work[key]
+        self._project_compute_rates()
+
+    def _current_rate_fields(self) -> dict[str, int]:
+        return {f"{device}_service_rate_{part}": getattr(self._effective_compute_rate(resource), part)
+                for device, resource in (("cpu", RESOURCE_CPU_COMPUTE), ("gpu", RESOURCE_GPU_COMPUTE))
+                for part in ("numerator", "denominator")}
+
+    def compute_progress_document(self) -> tuple[ComputeProgress, ...]:
+        """Exact privileged in-flight progress, with no future environment data."""
+        return tuple(ComputeProgress(resource, target, work.numerator, work.denominator,
+                     self._effective_compute_rate(resource).numerator,
+                     self._effective_compute_rate(resource).denominator)
+                     for (resource, target), work in sorted(self._compute_work.items()))
+
     def observe(self) -> Observation:
         operations = set(self._visibility.visible_operation_ids(self._state)) if self._visibility else set(
             self._scenario.workload.operation_by_id)
@@ -576,6 +698,7 @@ class SimulationSession:
             tuple(sorted(tid for tid in tensors if self._safe_weight_release(tid)))
             if self._control_costs is not None else (),
             tuple(self._reclaim_records), self._control_running, self._control_costs,
+            **self._current_rate_fields(),
         )
 
     def submit(self, action: Action, source_index: int | None = None) -> SessionStep:
@@ -598,6 +721,11 @@ class SimulationSession:
         if action.kind == ACTION_COMPUTE and action.device == "cpu" and not self._cpu_available:
             return self._fail(CODE_RESOURCE_BUSY, "CPU service is currently unavailable",
                               action_index=action_index)
+        if action.kind == ACTION_COMPUTE and action.device in ("cpu", "gpu", None):
+            resource = RESOURCE_CPU_COMPUTE if action.device == "cpu" else RESOURCE_GPU_COMPUTE
+            if not self._effective_compute_rate(resource):
+                return self._fail(CODE_RESOURCE_BUSY, f"{action.device or 'gpu'} compute service rate is zero",
+                                  action_index=action_index)
         try:
             candidate = transition(self._scenario, self._state, action)
         except MappingError as error:
@@ -610,6 +738,7 @@ class SimulationSession:
         if conflict:
             return self._fail(CODE_CAPACITY_EXCEEDED, conflict, action_index=action_index)
         self._state = candidate
+        self._register_compute_work()
         event = _event_for(self._scenario, self._state, len(self._events), action)
         self._nominal_ends.append(event.end_ns)
         if event.resource is not None and action.kind != "EVICT":
@@ -636,7 +765,8 @@ class SimulationSession:
         if self.finished:
             return self._fail(REASON_ACTIONS_REMAIN_AFTER_GOAL, "advance follows the completed goal",
                               action_index=action_index)
-        paused = () if self._cpu_available else (RESOURCE_CPU_COMPUTE,)
+        self._project_compute_rates()
+        paused = self._paused_compute_resources()
         active = [task for task in self._state.running if task.resource not in paused]
         times = [self._state.t + task.remaining_ns for task in active]
         times.extend(self._extra_boundary_times())
@@ -653,10 +783,9 @@ class SimulationSession:
                               action_index=action_index)
         destination = min(times)
         before = self._state
-        for task in active:
-            self._service.append(ServiceInterval(self._launches[(task.resource, task.target_id)],
-                                                 task.resource, task.target_id, before.t, destination))
+        self._record_service_progress(before, destination, active)
         self._state = advance_elapsed(self._scenario, before, destination - before.t, paused)
+        self._close_completed_compute_work()
         after_keys = {(task.resource, task.target_id) for task in self._state.running}
         for task in before.running:
             key = (task.resource, task.target_id)
@@ -694,7 +823,8 @@ class SimulationSession:
         )
         return SessionResult(evaluation, self._state, tuple(self._environment_records),
                              tuple(self._service), tuple(self._nominal_ends), tuple(self._sources),
-                             tuple(self._reclaim_records), tuple(self._control_events))
+                             tuple(self._reclaim_records), tuple(self._control_events),
+                             self.compute_progress_document())
 
     @staticmethod
     def _validate_source(source_index: int | None) -> None:

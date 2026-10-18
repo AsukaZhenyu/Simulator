@@ -10,7 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, replace
 
-from llm_infer_model.m2.causal import CausalObservation
+from llm_infer_model.m2.causal import CausalObservation, compute_service_available
 from llm_infer_model.tensor.engine import (
     ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
 )
@@ -396,7 +396,7 @@ class CompositionPolicy(UnifiedPolicy):
         from llm_infer_model.m2.execution_pipeline import TRANSFORM_KINDS
         if operation.kind in TRANSFORM_KINDS and len(operation.prices)==1:
             device=self._placement(operation)
-            return () if device=="cpu" and not observation.cpu_available else (device,)
+            return (device,) if compute_service_available(observation, device) else ()
         if self.spec.reconfiguration is not None and self.spec.reconfiguration.cpu_response == "current_cost" and operation.kind != "state_update":
             return self._current_cost_devices(operation, observation, tensors)
         if operation.kind not in EXPERT_COMPUTE_KINDS or not isinstance(operation.expert_id, int):
@@ -407,10 +407,10 @@ class CompositionPolicy(UnifiedPolicy):
         key = self._region_key(operation)
         if key in self._region_devices:
             device = self._region_devices[key]
-            return () if device == "cpu" and not observation.cpu_available else (device,)
+            return (device,) if compute_service_available(observation, device) else ()
         paths = self._region_paths(operation, observation, tensors)
         available = [path for path in paths if path["budget_feasible"] and path["physical_feasible"] and
-                     (path["device"] != "cpu" or observation.cpu_available)]
+                     compute_service_available(observation, path["device"])]
         if not available:
             return ()
         _, weights, _, _ = self._region_parts(operation, observation, tensors)
@@ -440,17 +440,17 @@ class CompositionPolicy(UnifiedPolicy):
         key = self._region_key(operation)
         bound = self._region_devices.get(key) if is_region else self._operation_devices.get(operation.id)
         if bound is not None:
-            return () if bound == "cpu" and not observation.cpu_available else (bound,)
+            return (bound,) if compute_service_available(observation, bound) else ()
         preferred = self._placement(operation)
         if is_region:
             paths = self._region_paths(operation, observation, tensors)
             available = [path for path in paths if path["budget_feasible"] and path["physical_feasible"]
-                         and (path["device"] != "cpu" or observation.cpu_available)]
+                         and compute_service_available(observation, path["device"])]
             self._region_estimates[key] = paths
             return (min(available, key=lambda path: (path["total_ns"], path["device"] != preferred, path["device"]))["device"],) if available else ()
         candidates = []
         for price in operation.prices:
-            if price.device == "cpu" and not observation.cpu_available:
+            if not compute_service_available(observation, price.device):
                 continue
             if price.allocated_workspace_bytes is None:
                 raise Unsupported("current_cost requires exact allocated workspace; unknown is not zero")

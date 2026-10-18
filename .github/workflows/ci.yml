@@ -55,16 +55,18 @@ jobs:
         run: python -m unittest discover -s profiling/accuracy_suite/tests -v
       - name: Real chain profiling contracts without hardware
         run: python -m unittest discover -s profiling/chain_calibration/tests -v
-      - name: High-level strategy execution bridge contracts
-        run: python -m unittest discover -s profiling/tests -p test_highlevel_accuracy.py -v
-      - name: Strict F32 backend provenance guards without CUDA
-        run: python -m unittest discover -s profiling/tests -p test_highlevel_f32_runtime.py -v
+      - name: Profiling, execution bridge and strict F32 provenance contracts without hardware
+        run: python -m unittest discover -s profiling/tests -v
       - name: Multi-round workload and memory accuracy contracts
         run: python -m unittest discover -s profiling/workload_accuracy/tests -v
       - name: Copy-compute overlap and shared-link contracts without hardware
         run: python -m unittest discover -s profiling/overlap_accuracy/tests -v
       - name: Native batch source generation without CUDA
         run: python -m unittest discover -s profiling/native/execution_transforms_batch -p 'test_*.py' -v
+      - name: State-aligned telemetry, frozen costs and runtime integration without hardware
+        run: python -m unittest discover -s profiling/state_calibration/tests -v
+      - name: State probe source and execution-boundary provenance without CUDA
+        run: python -m unittest discover -s profiling/native/state_calibration -p 'test_*.py' -v
       - name: Modeling tests
         run: python -m unittest discover -s modeling/tests -v
       - name: Mapping tests

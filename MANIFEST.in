@@ -1,6 +1,6 @@
 include README.md LICENSE pyproject.toml MANIFEST.in
 include CITATION.cff
-include docs/LIBRARY_GUIDE.md docs/OPEN_SOURCE_AND_PREPRINT.md docs/RELEASE_0_1.md
+include docs/LIBRARY_GUIDE.md docs/OPEN_SOURCE_AND_PREPRINT.md docs/RELEASE_0_1.md docs/DEVICE_STATE_RUNTIME.md
 recursive-include examples/library *.py *.md
 recursive-include src/llm_simulator *.py py.typed
 recursive-include src/llm_simulator/data *

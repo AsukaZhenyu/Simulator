@@ -57,6 +57,22 @@ class BlockCompositionTests(unittest.TestCase):
         self.assertEqual(len(graph["tasks"]), 8)
         self.assertEqual(session.result().evaluation.actions, ())
 
+    def test_block_adapter_exposes_current_rate_and_builtin_policy_waits(self):
+        model = load_block_model_file(self.path)
+        session = create_session(model, environment_events=(
+            EnvironmentEvent(0, gpu_service_rate_numerator=0, gpu_service_rate_denominator=1),
+            EnvironmentEvent(100000, gpu_service_rate_numerator=1, gpu_service_rate_denominator=2)))
+        initial = session.observe()
+        self.assertEqual(initial.gpu_service_rate_numerator, 0)
+        self.assertTrue(all(price.current_duration_ns is None
+                            for operation in initial.operations for price in operation.prices))
+        run = run_causal(SerialDemandPolicy("gpu"), session, max_decisions=1000)
+        self.assertEqual(run.evaluation.status, "valid")
+        self.assertTrue(all(row.start_ns >= 100000 for row in run.evaluation.events if row.kind == "COMPUTE"))
+        self.assertTrue(all(price.current_duration_ns == price.duration_ns * 2
+                            for operation in session.observe().operations for price in operation.prices))
+        self.assertEqual(session.persistent_state_document()["compute_progress"], [])
+
     def test_traversal_is_enforced_by_modeling_not_only_policy(self):
         for order, second in (("layer_major", "op:g0:L0:B1"), ("batch_major", "op:g0:L1:B0")):
             self.raw["order"] = order

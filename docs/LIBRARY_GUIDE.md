@@ -115,6 +115,13 @@ absolute allocation in addition to reserves/tensors. Infeasible allocations
 remain failures. This builder supports `environment-trace-0.1`; reclaim with
 explicit control costs uses `ModelPlan` and `environment-trace-0.2`.
 
+CPU/GPU compute rates can also change while work is running, using exact
+`cpu_service_rate_numerator`/`cpu_service_rate_denominator` or corresponding
+`gpu_` fields. Remaining work survives slowdowns and pauses without restarting;
+these rates are explicit inputs, not inferred from utilization. See
+[device-state runtime semantics](DEVICE_STATE_RUNTIME.md) for examples, current
+price estimates, checkpoint behavior and calibration limits.
+
 ## Exact costs and execution transforms
 
 ```python

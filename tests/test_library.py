@@ -146,6 +146,48 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(delayed.success, delayed.summary())
         self.assertEqual(delayed.makespan_ns, baseline.makespan_ns + 100000)
 
+    def test_explicit_cpu_rate_scales_the_public_generated_multiround_workload(self):
+        simulator, scheduling = make_demo("dense", device="cpu")
+        baseline = simulator.run(scheduling=scheduling)
+        delayed = simulator.run(scheduling=scheduling, environment_events=(EnvironmentEvent(
+            0, cpu_service_rate_numerator=1, cpu_service_rate_denominator=2),))
+        self.assertTrue(delayed.success, delayed.summary())
+        self.assertEqual(delayed.makespan_ns, baseline.makespan_ns * 2)
+        self.assertFalse(delayed.summary()["calibrated"])
+        observations = [row.observation for row in delayed.raw[0].decisions]
+        self.assertTrue(all((row.cpu_service_rate_numerator, row.cpu_service_rate_denominator) == (1, 2)
+                            for row in observations))
+
+    def test_mid_compute_rate_checkpoint_replays_fractional_work_exactly(self):
+        simulator, scheduling = make_demo("dense", device="cpu")
+        events = (EnvironmentEvent(0, cpu_service_rate_numerator=2, cpu_service_rate_denominator=3),
+                  EnvironmentEvent(1, cpu_service_rate_numerator=5, cpu_service_rate_denominator=4))
+        with simulator.compile(scheduling=scheduling, environment_events=events) as compiled:
+            partial = compiled.run(max_decisions=2)  # Launch first CPU op, stop at its t=1 rate boundary.
+            self.assertFalse(partial.success)
+            self.assertEqual(partial.raw[1].observe().t_ns, 1)
+            progress = partial.raw[0].runtime_result.compute_progress
+            self.assertTrue(progress)
+            self.assertEqual(progress[0].remaining_reference_ns_denominator, 3)
+            resumed = compiled.run(checkpoint=partial.checkpoint())
+            reference = compiled.run()
+            self.assertTrue(resumed.success, resumed.summary())
+            self.assertEqual(resumed.raw[0].runtime_result, reference.raw[0].runtime_result)
+            self.assertEqual(resumed.events, reference.events)
+
+    def test_zero_gpu_rate_waits_for_recovery_in_the_builtin_policy(self):
+        simulator, scheduling = make_demo("dense", device="gpu")
+        recovery = 100000
+        delayed = simulator.run(scheduling=scheduling, environment_events=(
+            EnvironmentEvent(0, gpu_service_rate_numerator=0, gpu_service_rate_denominator=1),
+            EnvironmentEvent(recovery, gpu_service_rate_numerator=1, gpu_service_rate_denominator=1)))
+        self.assertTrue(delayed.success, delayed.summary())
+        computes = [event for event in delayed.events if event.kind == "COMPUTE"]
+        self.assertTrue(computes)
+        self.assertTrue(all(event.start_ns >= recovery for event in computes))
+        self.assertTrue(any(row.observation.gpu_service_rate_numerator == 0
+                            for row in delayed.raw[0].decisions))
+
     def test_impossible_vram_is_failure_not_cpu_fallback(self):
         simulator, scheduling = make_demo("dense")
         simulator = Simulator(model=simulator.model, hardware=replace(simulator.hardware, vram_capacity_bytes=1),

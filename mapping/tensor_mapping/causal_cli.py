@@ -32,7 +32,12 @@ def parse_environment(document):
     if not isinstance(document["events"], list):
         raise InvalidInput("environment.events must be an explicit array")
     events = []
-    allowed = {"t_ns", "dram_external_bytes", "vram_external_bytes", "cpu_available"}
+    # Optional exact service-rate pairs extend the existing trace format. An
+    # omitted pair preserves the current rate, initially one, rather than
+    # inferring a rate from utilization or a device name.
+    allowed = {"t_ns", "dram_external_bytes", "vram_external_bytes", "cpu_available",
+               "cpu_service_rate_numerator", "cpu_service_rate_denominator",
+               "gpu_service_rate_numerator", "gpu_service_rate_denominator"}
     for index, row in enumerate(document["events"]):
         if not isinstance(row, dict) or "t_ns" not in row or set(row) - allowed:
             raise InvalidInput(f"environment.events[{index}] has missing/unknown fields")
@@ -111,12 +116,14 @@ def write_causal_run(output, run, session, sources, *, policy_name, max_decision
     ))
     write_json(output / "events.json", dict(
         format_version="causal-events-0.1", completion_semantics="actual_wall_span_end_null_while_unfinished",
-        busy_time_source="service_intervals.json_excludes_cpu_blackouts",
+        busy_time_source="service_intervals.json_excludes_zero_rate_compute_intervals",
         events=[dict(**asdict(event), nominal_end_ns=runtime.nominal_ends[index])
                 for index, event in enumerate(evaluation.events)],
     ))
     write_json(output / "service_intervals.json", dict(
         format_version="causal-service-0.1", intervals=[asdict(interval) for interval in runtime.service_intervals],
+        compute_progress=[asdict(row) for row in runtime.compute_progress],
+        compute_rate_semantics="reference_cost_ns_per_wall_ns; exact_work; completion_ceil_to_integer_ns",
     ))
     write_json(output / "environments.json", dict(
         format_version="causal-environments-0.1", visibility_scope="already_processed_environment_events",
