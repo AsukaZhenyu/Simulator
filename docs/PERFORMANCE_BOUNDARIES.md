@@ -122,6 +122,31 @@ snapshot; rewriting an old manifest or raw result to match new code would destro
 that evidence. A verification of frozen historical sources is distinct from a
 new validation of the current implementation.
 
+## Complete single-layer measurements
+
+The optional `profiling/single_layer_calibration` workflow measures the actual
+compiled serial Dense action inventory in three ways: isolated actions, actions
+in their real execution order, and independently timed whole invocations.
+Profiling owns the observations, medians, histograms, source checks and frozen
+artifacts. Model-owned `performance.serial_actions` constructs the dependency
+chain from inclusive completed-action durations and explicitly disjoint gaps.
+An inclusive action price already includes submission, device work and waits;
+internal kernel or synchronization prices must not be added to it again.
+
+Adding action medians is a deterministic approximation to whole-program median
+latency, not a statistical identity. `performance.serial_distributions` supplies
+a bounded secondary model: choose one profiled process with equal weight, then
+draw serial intervals independently from that process's supplied marginals.
+Its expected duration follows linearity; its median and tail estimates require
+conditional independence. Profiling estimates the marginals; modeling computes
+the resulting latency. Complete measured totals are not input prices or fitted
+corrections. Fresh uninstrumented measurements validate both alternatives while
+the original primary acceptance gates remain unchanged.
+
+These scoped host-completed prices do not establish pure FLOP/s, memory bandwidth,
+CUDA kernel durations, physical memory capacity or transfer to arbitrary unseen
+strategies. The new adapter does not automatically recalibrate `AnalyticalCosts`.
+
 ## Scope of the first implementation
 
 The first resource graph model is a mechanism-oriented building block, with

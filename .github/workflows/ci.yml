@@ -71,8 +71,24 @@ jobs:
         run: python -m unittest discover -s profiling/resource_calibration/tests -v
       - name: Profiling parameter evidence and modeling calibration boundaries
         run: python -m unittest discover -s profiling/parameter_calibration/tests -v
+      - name: Single-layer source-bound calibration contracts without hardware
+        env:
+          PYTHONPATH: profiling
+        run: python -m unittest discover -s profiling/single_layer_calibration/tests -v
+      - name: Same-process paired diagnostic contracts without hardware
+        env:
+          PYTHONPATH: profiling
+        run: python -m unittest discover -s profiling/single_layer_context_pair/tests -v
+      - name: Single-layer native source and provenance guards without CUDA
+        run: python -m unittest discover -s profiling/native/single_layer_calibration -p 'test_build.py' -v
+      - name: Paired native source and provenance guards without CUDA
+        run: python -m unittest discover -s profiling/native/single_layer_context_pair -p 'test_build.py' -v
+      - name: NVTX diagnostic source and provenance guards without CUDA
+        run: python -m unittest discover -s profiling/native/single_layer_wait_diagnosis -p 'test_build.py' -v
       - name: Installed performance ownership boundaries
         run: python -m unittest discover -s tests -p test_performance_boundaries.py -v
+      - name: Portable calibration report integrity without hardware
+        run: python -m unittest discover -s tools/tests -v
       - name: Modeling tests
         run: python -m unittest discover -s modeling/tests -v
       - name: Mapping tests

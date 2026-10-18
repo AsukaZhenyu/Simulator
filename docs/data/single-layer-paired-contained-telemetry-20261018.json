@@ -1,0 +1,2864 @@
+{
+  "schema": "single-layer-paired-contained-telemetry-v1",
+  "diagnostic_only": true,
+  "usable_for_parameter_fit": false,
+  "usable_for_heldout_acceptance": false,
+  "phase_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\phase.json",
+  "phase_sha256": "b574f4c4be78d3c122b1f7551adf2adb8072fa7d3679464a8b2360d4b614555e",
+  "summary_sha256": "32058b9c3511750ddf71858002d18d416b51f249cd37c790d4b8e3525444a47f",
+  "alignment_rule": "Entire combined GPU/CPU query lies within one sampling envelope. CPU busy also requires its complete OS counter interval inside that same envelope. No interpolation. NVML rolling windows are not known to be contained.",
+  "blocks": [
+    {
+      "run_id": "h128-q16-history0-attention-ffn-cut128--repeat-0--poll-default--context_vs_isolated",
+      "case_id": "h128-q16-history0-attention-ffn-cut128",
+      "repeat": 0,
+      "poll": "default",
+      "process_id": 35540,
+      "order": "ABBA",
+      "block_index": 0,
+      "label": "A",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 4839200,
+        "denominator": 1
+      },
+      "latency_cv": 0.06997080657155275,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 380171492305,
+          "end_tick": 380176368809,
+          "main_thread_cpu_ns": 187500000,
+          "non_main_cpu_ns": 0,
+          "process_cpu_ns": 187500000,
+          "wall_ns": 487650400
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h128-q16-history0-attention-ffn-cut128--repeat-0--poll-default--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "60735aea91eda5b85eab41c862196977342add346d3801265758da2665c8ca31",
+      "telemetry_metadata_sha256": "b47fd281f36d9de4847fbf67c8e3f165f96466218ec985a38fc572d2fde0d25d",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 380171492305,
+          "end_tick": 380176368809,
+          "duration_ms": 487.6504,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 16,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.923633406227084,
+          "query_fraction": 0.012167733277774406,
+          "max_sample_gap_ms": 50.2001,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 9,
+              "min": 9.345794392523365,
+              "median": 15.909090909090908,
+              "max": 29.62962962962963
+            },
+            "gpu.gpu_util_percent": {
+              "n": 10,
+              "min": 1,
+              "median": 6.0,
+              "max": 6
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 10,
+              "min": 210,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 10,
+              "min": 405,
+              "median": 7001.0,
+              "max": 7001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 10,
+              "min": 7695196160,
+              "median": 7695196160.0,
+              "max": 7695917056
+            },
+            "gpu.memory_total_bytes": {
+              "n": 10,
+              "min": 8585740288,
+              "median": 8585740288.0,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 10,
+              "min": 889823232,
+              "median": 890544128.0,
+              "max": 890544128
+            },
+            "gpu.memory_util_percent": {
+              "n": 10,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 10,
+              "min": 4.694,
+              "median": 14.737,
+              "max": 14.737
+            },
+            "gpu.pstate": {
+              "n": 10,
+              "min": 3,
+              "median": 3.0,
+              "max": 8
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 10,
+              "min": 210,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 10,
+              "min": 67,
+              "median": 68.0,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": true,
+            "reasons": [],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 16,
+          "query_begin_tick": 380171663662,
+          "query_end_tick": 380171669322,
+          "gpu_provider_query_begin_tick": 380171663732,
+          "gpu_provider_query_end_tick": 380171664876,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 1,
+            "graphics_clock_mhz": 210,
+            "memory_clock_mhz": 405,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 4.694,
+            "pstate": 8,
+            "sm_clock_mhz": 210,
+            "temperature_c": 67
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380171167249,
+          "cpu_interval_end_tick": 380171669110,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 17,
+          "query_begin_tick": 380172163609,
+          "query_end_tick": 380172169005,
+          "gpu_provider_query_begin_tick": 380172163689,
+          "gpu_provider_query_end_tick": 380172164929,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380171669110,
+          "cpu_interval_end_tick": 380172168849,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.11111111111111
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 18,
+          "query_begin_tick": 380172665274,
+          "query_end_tick": 380172672189,
+          "gpu_provider_query_begin_tick": 380172665424,
+          "gpu_provider_query_end_tick": 380172667007,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380172168849,
+          "cpu_interval_end_tick": 380172671993,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 27.586206896551722
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 19,
+          "query_begin_tick": 380173163673,
+          "query_end_tick": 380173169430,
+          "gpu_provider_query_begin_tick": 380173163785,
+          "gpu_provider_query_end_tick": 380173165246,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695917056,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889823232,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380172671993,
+          "cpu_interval_end_tick": 380173169259,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 9.345794392523365
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 20,
+          "query_begin_tick": 380173664120,
+          "query_end_tick": 380173669988,
+          "gpu_provider_query_begin_tick": 380173664203,
+          "gpu_provider_query_end_tick": 380173665436,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380173169259,
+          "cpu_interval_end_tick": 380173669866,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.827956989247312
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 21,
+          "query_begin_tick": 380174161290,
+          "query_end_tick": 380174167383,
+          "gpu_provider_query_begin_tick": 380174161380,
+          "gpu_provider_query_end_tick": 380174162666,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380173669866,
+          "cpu_interval_end_tick": 380174167101,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 15.909090909090908
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 22,
+          "query_begin_tick": 380174661422,
+          "query_end_tick": 380174667850,
+          "gpu_provider_query_begin_tick": 380174661535,
+          "gpu_provider_query_end_tick": 380174663219,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380174167101,
+          "cpu_interval_end_tick": 380174667653,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 29.62962962962963
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 23,
+          "query_begin_tick": 380175163423,
+          "query_end_tick": 380175168479,
+          "gpu_provider_query_begin_tick": 380175163501,
+          "gpu_provider_query_end_tick": 380175164634,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380174667653,
+          "cpu_interval_end_tick": 380175168268,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 22.448979591836736
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 24,
+          "query_begin_tick": 380175661676,
+          "query_end_tick": 380175666821,
+          "gpu_provider_query_begin_tick": 380175661765,
+          "gpu_provider_query_end_tick": 380175663006,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380175168268,
+          "cpu_interval_end_tick": 380175666700,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 17.687074829931973
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 25,
+          "query_begin_tick": 380176160746,
+          "query_end_tick": 380176167764,
+          "gpu_provider_query_begin_tick": 380176160837,
+          "gpu_provider_query_end_tick": 380176162128,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 6,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695196160,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890544128,
+            "memory_util_percent": 0,
+            "power_w": 14.737,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380175666700,
+          "cpu_interval_end_tick": 380176167541,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 15.294117647058824
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 77
+    },
+    {
+      "run_id": "h128-q16-history0-attention-ffn-cut128--repeat-0--poll-default--context_vs_isolated",
+      "case_id": "h128-q16-history0-attention-ffn-cut128",
+      "repeat": 0,
+      "poll": "default",
+      "process_id": 35540,
+      "order": "ABBA",
+      "block_index": 3,
+      "label": "A",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 1493200,
+        "denominator": 1
+      },
+      "latency_cv": 0.05259297741323666,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 380191451726,
+          "end_tick": 380192951810,
+          "main_thread_cpu_ns": 140625000,
+          "non_main_cpu_ns": 46875000,
+          "process_cpu_ns": 187500000,
+          "wall_ns": 150008400
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h128-q16-history0-attention-ffn-cut128--repeat-0--poll-default--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "60735aea91eda5b85eab41c862196977342add346d3801265758da2665c8ca31",
+      "telemetry_metadata_sha256": "b47fd281f36d9de4847fbf67c8e3f165f96466218ec985a38fc572d2fde0d25d",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 380191451726,
+          "end_tick": 380192951810,
+          "duration_ms": 150.0084,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            56,
+            57,
+            58
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 56,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.6681939144741228,
+          "query_fraction": 0.0163370851232331,
+          "max_sample_gap_ms": 49.9365,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 2,
+              "min": 14.0,
+              "median": 16.693877551020407,
+              "max": 19.387755102040817
+            },
+            "gpu.gpu_util_percent": {
+              "n": 3,
+              "min": 9,
+              "median": 9,
+              "max": 15
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 3,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 3,
+              "min": 6001,
+              "median": 6001,
+              "max": 6001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 3,
+              "min": 7696703488,
+              "median": 7696703488,
+              "max": 7696703488
+            },
+            "gpu.memory_total_bytes": {
+              "n": 3,
+              "min": 8585740288,
+              "median": 8585740288,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 3,
+              "min": 889036800,
+              "median": 889036800,
+              "max": 889036800
+            },
+            "gpu.memory_util_percent": {
+              "n": 3,
+              "min": 0,
+              "median": 0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 3,
+              "min": 12.547,
+              "median": 12.547,
+              "max": 13.421000000000001
+            },
+            "gpu.pstate": {
+              "n": 3,
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 3,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 3,
+              "min": 68,
+              "median": 68,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": true,
+            "reasons": [],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 56,
+          "query_begin_tick": 380191664572,
+          "query_end_tick": 380191672965,
+          "gpu_provider_query_begin_tick": 380191664651,
+          "gpu_provider_query_end_tick": 380191665790,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 15,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696703488,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889036800,
+            "memory_util_percent": 0,
+            "power_w": 13.421000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380191170807,
+          "cpu_interval_end_tick": 380191672799,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 57,
+          "query_begin_tick": 380192161644,
+          "query_end_tick": 380192171848,
+          "gpu_provider_query_begin_tick": 380192161730,
+          "gpu_provider_query_end_tick": 380192163062,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 9,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696703488,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889036800,
+            "memory_util_percent": 0,
+            "power_w": 12.547,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380191672799,
+          "cpu_interval_end_tick": 380192171695,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 14.0
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 58,
+          "query_begin_tick": 380192661009,
+          "query_end_tick": 380192666919,
+          "gpu_provider_query_begin_tick": 380192661086,
+          "gpu_provider_query_end_tick": 380192662286,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 9,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696703488,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889036800,
+            "memory_util_percent": 0,
+            "power_w": 12.547,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 380192171695,
+          "cpu_interval_end_tick": 380192666743,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 19.387755102040817
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 77
+    },
+    {
+      "run_id": "h128-q16-history0-attention-ffn-cut128--repeat-1--poll-0--context_vs_isolated",
+      "case_id": "h128-q16-history0-attention-ffn-cut128",
+      "repeat": 1,
+      "poll": "0",
+      "process_id": 40496,
+      "order": "ABBA",
+      "block_index": 0,
+      "label": "A",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 4786300,
+        "denominator": 1
+      },
+      "latency_cv": 0.04726674406685617,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 382156932534,
+          "end_tick": 382161789281,
+          "main_thread_cpu_ns": 171875000,
+          "non_main_cpu_ns": 0,
+          "process_cpu_ns": 171875000,
+          "wall_ns": 485674700
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h128-q16-history0-attention-ffn-cut128--repeat-1--poll-0--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "2d263a22ce7bebeed8e87daf25c2e3426498b29d591ef352775f697eb22563dc",
+      "telemetry_metadata_sha256": "a977eb6a48d93f0b89d85ae41763ae66a3cd01adb0b8a66e281669336c714a8b",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 382156932534,
+          "end_tick": 382161789281,
+          "duration_ms": 485.6747,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 16,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.9273138996122302,
+          "query_fraction": 0.008067539857439557,
+          "max_sample_gap_ms": 50.4423,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 9,
+              "min": 6.60377358490566,
+              "median": 11.11111111111111,
+              "max": 14.583333333333334
+            },
+            "gpu.gpu_util_percent": {
+              "n": 10,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 10,
+              "min": 210,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 10,
+              "min": 405,
+              "median": 7001.0,
+              "max": 7001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 10,
+              "min": 7695392768,
+              "median": 7695392768.0,
+              "max": 7695392768
+            },
+            "gpu.memory_total_bytes": {
+              "n": 10,
+              "min": 8585740288,
+              "median": 8585740288.0,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 10,
+              "min": 890347520,
+              "median": 890347520.0,
+              "max": 890347520
+            },
+            "gpu.memory_util_percent": {
+              "n": 10,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 10,
+              "min": 4.47,
+              "median": 13.165000000000001,
+              "max": 13.165000000000001
+            },
+            "gpu.pstate": {
+              "n": 10,
+              "min": 3,
+              "median": 3.0,
+              "max": 8
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 10,
+              "min": 210,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 10,
+              "min": 67,
+              "median": 68.0,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": true,
+            "reasons": [],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 16,
+          "query_begin_tick": 382156963269,
+          "query_end_tick": 382156967240,
+          "gpu_provider_query_begin_tick": 382156963335,
+          "gpu_provider_query_end_tick": 382156964372,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 210,
+            "memory_clock_mhz": 405,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 4.47,
+            "pstate": 8,
+            "sm_clock_mhz": 210,
+            "temperature_c": 67
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382156468427,
+          "cpu_interval_end_tick": 382156967124,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 17,
+          "query_begin_tick": 382157461667,
+          "query_end_tick": 382157464849,
+          "gpu_provider_query_begin_tick": 382157461731,
+          "gpu_provider_query_end_tick": 382157462639,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 210,
+            "memory_clock_mhz": 405,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 4.47,
+            "pstate": 8,
+            "sm_clock_mhz": 210,
+            "temperature_c": 67
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382156967124,
+          "cpu_interval_end_tick": 382157464733,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 10.526315789473685
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 18,
+          "query_begin_tick": 382157961350,
+          "query_end_tick": 382157966341,
+          "gpu_provider_query_begin_tick": 382157961412,
+          "gpu_provider_query_end_tick": 382157962283,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382157464733,
+          "cpu_interval_end_tick": 382157966104,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 14.583333333333334
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 19,
+          "query_begin_tick": 382158465773,
+          "query_end_tick": 382158469719,
+          "gpu_provider_query_begin_tick": 382158465862,
+          "gpu_provider_query_end_tick": 382158466860,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382157966104,
+          "cpu_interval_end_tick": 382158469588,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.871287128712872
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 20,
+          "query_begin_tick": 382158962919,
+          "query_end_tick": 382158967409,
+          "gpu_provider_query_begin_tick": 382158963035,
+          "gpu_provider_query_end_tick": 382158964516,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382158469588,
+          "cpu_interval_end_tick": 382158967280,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.11111111111111
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 21,
+          "query_begin_tick": 382159464620,
+          "query_end_tick": 382159467822,
+          "gpu_provider_query_begin_tick": 382159464688,
+          "gpu_provider_query_end_tick": 382159465565,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382158967280,
+          "cpu_interval_end_tick": 382159467707,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 6.60377358490566
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 22,
+          "query_begin_tick": 382159964536,
+          "query_end_tick": 382159968976,
+          "gpu_provider_query_begin_tick": 382159964596,
+          "gpu_provider_query_end_tick": 382159965425,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382159467707,
+          "cpu_interval_end_tick": 382159968862,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.844036697247706
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 23,
+          "query_begin_tick": 382160461953,
+          "query_end_tick": 382160465962,
+          "gpu_provider_query_begin_tick": 382160462009,
+          "gpu_provider_query_end_tick": 382160462843,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382159968862,
+          "cpu_interval_end_tick": 382160465851,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 6.741573033707865
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 24,
+          "query_begin_tick": 382160963360,
+          "query_end_tick": 382160966631,
+          "gpu_provider_query_begin_tick": 382160963413,
+          "gpu_provider_query_end_tick": 382160964227,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382160465851,
+          "cpu_interval_end_tick": 382160966523,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 10.0
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 25,
+          "query_begin_tick": 382161463318,
+          "query_end_tick": 382161466998,
+          "gpu_provider_query_begin_tick": 382161463377,
+          "gpu_provider_query_end_tick": 382161464299,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 0,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7695392768,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 890347520,
+            "memory_util_percent": 0,
+            "power_w": 13.165000000000001,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382160966523,
+          "cpu_interval_end_tick": 382161466881,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 13.157894736842104
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 57
+    },
+    {
+      "run_id": "h128-q16-history0-attention-ffn-cut128--repeat-1--poll-0--context_vs_isolated",
+      "case_id": "h128-q16-history0-attention-ffn-cut128",
+      "repeat": 1,
+      "poll": "0",
+      "process_id": 40496,
+      "order": "ABBA",
+      "block_index": 3,
+      "label": "A",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 1439400,
+        "denominator": 1
+      },
+      "latency_cv": 0.05890713868801049,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 382178346026,
+          "end_tick": 382179805283,
+          "main_thread_cpu_ns": 140625000,
+          "non_main_cpu_ns": 0,
+          "process_cpu_ns": 140625000,
+          "wall_ns": 145925700
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h128-q16-history0-attention-ffn-cut128--repeat-1--poll-0--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "2d263a22ce7bebeed8e87daf25c2e3426498b29d591ef352775f697eb22563dc",
+      "telemetry_metadata_sha256": "a977eb6a48d93f0b89d85ae41763ae66a3cd01adb0b8a66e281669336c714a8b",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 382178346026,
+          "end_tick": 382179805283,
+          "duration_ms": 145.9257,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            59,
+            60,
+            61
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 59,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.6913388114636421,
+          "query_fraction": 0.01392900633678646,
+          "max_sample_gap_ms": 50.2026,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 2,
+              "min": 8.16326530612245,
+              "median": 8.720807910793184,
+              "max": 9.278350515463918
+            },
+            "gpu.gpu_util_percent": {
+              "n": 3,
+              "min": 14,
+              "median": 14,
+              "max": 14
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 3,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 3,
+              "min": 6001,
+              "median": 6001,
+              "max": 6001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 3,
+              "min": 7696244736,
+              "median": 7696244736,
+              "max": 7696244736
+            },
+            "gpu.memory_total_bytes": {
+              "n": 3,
+              "min": 8585740288,
+              "median": 8585740288,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 3,
+              "min": 889495552,
+              "median": 889495552,
+              "max": 889495552
+            },
+            "gpu.memory_util_percent": {
+              "n": 3,
+              "min": 0,
+              "median": 0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 3,
+              "min": 12.133000000000001,
+              "median": 12.133000000000001,
+              "max": 12.133000000000001
+            },
+            "gpu.pstate": {
+              "n": 3,
+              "min": 4,
+              "median": 4,
+              "max": 4
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 3,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 3,
+              "min": 68,
+              "median": 68,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": false,
+            "reasons": [
+              "action_shorter_than_three_sampling_periods"
+            ],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 59,
+          "query_begin_tick": 382178463514,
+          "query_end_tick": 382178470121,
+          "gpu_provider_query_begin_tick": 382178463588,
+          "gpu_provider_query_end_tick": 382178464716,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696244736,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889495552,
+            "memory_util_percent": 0,
+            "power_w": 12.133000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382177968690,
+          "cpu_interval_end_tick": 382178470005,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 60,
+          "query_begin_tick": 382178965540,
+          "query_end_tick": 382178970914,
+          "gpu_provider_query_begin_tick": 382178965633,
+          "gpu_provider_query_end_tick": 382178966885,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696244736,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889495552,
+            "memory_util_percent": 0,
+            "power_w": 12.133000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382178470005,
+          "cpu_interval_end_tick": 382178970736,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 9.278350515463918
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 61,
+          "query_begin_tick": 382179464010,
+          "query_end_tick": 382179472355,
+          "gpu_provider_query_begin_tick": 382179464081,
+          "gpu_provider_query_end_tick": 382179465475,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7696244736,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 889495552,
+            "memory_util_percent": 0,
+            "power_w": 12.133000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 382178970736,
+          "cpu_interval_end_tick": 382179472204,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 8.16326530612245
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 57
+    },
+    {
+      "run_id": "h256-q32-history0-attention-ffn-cut252--repeat-1--poll-default--context_vs_isolated",
+      "case_id": "h256-q32-history0-attention-ffn-cut252",
+      "repeat": 1,
+      "poll": "default",
+      "process_id": 40876,
+      "order": "ABBA",
+      "block_index": 1,
+      "label": "B",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 2987800,
+        "denominator": 1
+      },
+      "latency_cv": 0.5460300282064822,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 381748560617,
+          "end_tick": 381756099089,
+          "main_thread_cpu_ns": 671875000,
+          "non_main_cpu_ns": 531250000,
+          "process_cpu_ns": 1203125000,
+          "wall_ns": 753847200
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h256-q32-history0-attention-ffn-cut252--repeat-1--poll-default--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "e998ad6481a0be7cb133f2905f9eabe2241fc591010af747d8a894b53d30517f",
+      "telemetry_metadata_sha256": "001b5040bb35393edc9299fc562867d8bcad3655d6e5cbde16194382fe01f7a3",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 381748560617,
+          "end_tick": 381756099089,
+          "duration_ms": 753.8472,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 38,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.9291657513618145,
+          "query_fraction": 0.014939632328673503,
+          "max_sample_gap_ms": 50.1724,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 14,
+              "min": 9.90990990990991,
+              "median": 19.809278350515463,
+              "max": 34.09090909090909
+            },
+            "gpu.gpu_util_percent": {
+              "n": 15,
+              "min": 19,
+              "median": 24,
+              "max": 24
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 15,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 15,
+              "min": 7001,
+              "median": 8001,
+              "max": 8001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 15,
+              "min": 7690608640,
+              "median": 7690608640,
+              "max": 7691198464
+            },
+            "gpu.memory_total_bytes": {
+              "n": 15,
+              "min": 8585740288,
+              "median": 8585740288,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 15,
+              "min": 894541824,
+              "median": 895131648,
+              "max": 895131648
+            },
+            "gpu.memory_util_percent": {
+              "n": 15,
+              "min": 0,
+              "median": 0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 15,
+              "min": 13.926,
+              "median": 14.486,
+              "max": 14.486
+            },
+            "gpu.pstate": {
+              "n": 15,
+              "min": 0,
+              "median": 0,
+              "max": 3
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 15,
+              "min": 1605,
+              "median": 1605,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 15,
+              "min": 68,
+              "median": 68,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": true,
+            "reasons": [],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 38,
+          "query_begin_tick": 381748724192,
+          "query_end_tick": 381748730893,
+          "gpu_provider_query_begin_tick": 381748724310,
+          "gpu_provider_query_end_tick": 381748726093,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381748233897,
+          "cpu_interval_end_tick": 381748730733,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 39,
+          "query_begin_tick": 381749223980,
+          "query_end_tick": 381749233779,
+          "gpu_provider_query_begin_tick": 381749224109,
+          "gpu_provider_query_end_tick": 381749225556,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381748730733,
+          "cpu_interval_end_tick": 381749233468,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 23.30827067669173
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 40,
+          "query_begin_tick": 381749725308,
+          "query_end_tick": 381749733207,
+          "gpu_provider_query_begin_tick": 381749725409,
+          "gpu_provider_query_end_tick": 381749726795,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690870784,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 894869504,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381749233468,
+          "cpu_interval_end_tick": 381749732995,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 32.142857142857146
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 41,
+          "query_begin_tick": 381750224627,
+          "query_end_tick": 381750236994,
+          "gpu_provider_query_begin_tick": 381750224725,
+          "gpu_provider_query_end_tick": 381750226164,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7691198464,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 894541824,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381749732995,
+          "cpu_interval_end_tick": 381750236651,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 28.181818181818183
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 42,
+          "query_begin_tick": 381750725404,
+          "query_end_tick": 381750733267,
+          "gpu_provider_query_begin_tick": 381750725518,
+          "gpu_provider_query_end_tick": 381750727109,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381750236651,
+          "cpu_interval_end_tick": 381750733069,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 34.09090909090909
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 43,
+          "query_begin_tick": 381751225916,
+          "query_end_tick": 381751236396,
+          "gpu_provider_query_begin_tick": 381751226026,
+          "gpu_provider_query_end_tick": 381751227351,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381750733069,
+          "cpu_interval_end_tick": 381751236187,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 24.489795918367346
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 44,
+          "query_begin_tick": 381751725036,
+          "query_end_tick": 381751731544,
+          "gpu_provider_query_begin_tick": 381751725134,
+          "gpu_provider_query_end_tick": 381751726480,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381751236187,
+          "cpu_interval_end_tick": 381751731296,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 33.333333333333336
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 45,
+          "query_begin_tick": 381752225342,
+          "query_end_tick": 381752232397,
+          "gpu_provider_query_begin_tick": 381752225471,
+          "gpu_provider_query_end_tick": 381752227112,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 24,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 8001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 14.486,
+            "pstate": 0,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381751731296,
+          "cpu_interval_end_tick": 381752232235,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 19.0
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 46,
+          "query_begin_tick": 381752725515,
+          "query_end_tick": 381752732984,
+          "gpu_provider_query_begin_tick": 381752725662,
+          "gpu_provider_query_end_tick": 381752727763,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381752232235,
+          "cpu_interval_end_tick": 381752732809,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 17.142857142857142
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 47,
+          "query_begin_tick": 381753222966,
+          "query_end_tick": 381753230061,
+          "gpu_provider_query_begin_tick": 381753223061,
+          "gpu_provider_query_end_tick": 381753224792,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381752732809,
+          "cpu_interval_end_tick": 381753229926,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.371134020618557
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 48,
+          "query_begin_tick": 381753724268,
+          "query_end_tick": 381753729207,
+          "gpu_provider_query_begin_tick": 381753724332,
+          "gpu_provider_query_end_tick": 381753725295,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381753229926,
+          "cpu_interval_end_tick": 381753728941,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.745098039215685
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 49,
+          "query_begin_tick": 381754225992,
+          "query_end_tick": 381754234641,
+          "gpu_provider_query_begin_tick": 381754226060,
+          "gpu_provider_query_end_tick": 381754227015,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381753728941,
+          "cpu_interval_end_tick": 381754234515,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 20.61855670103093
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 50,
+          "query_begin_tick": 381754724284,
+          "query_end_tick": 381754730758,
+          "gpu_provider_query_begin_tick": 381754724346,
+          "gpu_provider_query_end_tick": 381754725263,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381754234515,
+          "cpu_interval_end_tick": 381754730631,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.607142857142858
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 51,
+          "query_begin_tick": 381755224578,
+          "query_end_tick": 381755228625,
+          "gpu_provider_query_begin_tick": 381755224640,
+          "gpu_provider_query_end_tick": 381755225540,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381754730631,
+          "cpu_interval_end_tick": 381755228502,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.76595744680851
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 52,
+          "query_begin_tick": 381755723405,
+          "query_end_tick": 381755728682,
+          "gpu_provider_query_begin_tick": 381755723510,
+          "gpu_provider_query_end_tick": 381755724803,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 13.926,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381755228502,
+          "cpu_interval_end_tick": 381755728508,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 9.90990990990991
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 228
+    },
+    {
+      "run_id": "h256-q32-history0-attention-ffn-cut252--repeat-1--poll-default--context_vs_isolated",
+      "case_id": "h256-q32-history0-attention-ffn-cut252",
+      "repeat": 1,
+      "poll": "default",
+      "process_id": 40876,
+      "order": "ABBA",
+      "block_index": 2,
+      "label": "B",
+      "metric": "selected_completed_GPU_attention_pv",
+      "latency_median_ns": {
+        "numerator": 7523100,
+        "denominator": 1
+      },
+      "latency_cv": 0.5325062798925871,
+      "native_sampling_envelopes": [
+        {
+          "begin_tick": 381759564065,
+          "end_tick": 381771390901,
+          "main_thread_cpu_ns": 593750000,
+          "non_main_cpu_ns": 1015625000,
+          "process_cpu_ns": 1609375000,
+          "wall_ns": 1182683600
+        }
+      ],
+      "clock": {
+        "clock_id": "windows_qpc",
+        "frequency_hz": 10000000
+      },
+      "nominal_interval_ms": 50.0,
+      "telemetry_file": "profiling\\single_layer_context_pair\\results\\diagnostic-v1\\jobs\\h256-q32-history0-attention-ffn-cut252--repeat-1--poll-default--context_vs_isolated\\telemetry.jsonl",
+      "telemetry_sha256": "e998ad6481a0be7cb133f2905f9eabe2241fc591010af747d8a894b53d30517f",
+      "telemetry_metadata_sha256": "001b5040bb35393edc9299fc562867d8bcad3655d6e5cbde16194382fe01f7a3",
+      "alignment": [
+        {
+          "schema": "device-state-alignment-0.1",
+          "action_index": 0,
+          "begin_tick": 381759564065,
+          "end_tick": 381771390901,
+          "duration_ms": 1182.6836,
+          "clock": {
+            "clock_id": "windows_qpc",
+            "frequency_hz": 10000000
+          },
+          "contained_sample_indices": [
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            74,
+            75,
+            76,
+            77,
+            78,
+            79,
+            80,
+            81,
+            82,
+            83
+          ],
+          "boundary_ambiguous_sample_indices": [],
+          "excluded_rolling_intervals": [
+            {
+              "sample_index": 60,
+              "provider": "cpu",
+              "reason": "CPU rolling interval not contained in action"
+            }
+          ],
+          "observation_span_fraction": 0.9732854163192929,
+          "query_fraction": 0.012992316795464146,
+          "max_sample_gap_ms": 51.1045,
+          "observed_fields": {
+            "cpu.busy_percent": {
+              "n": 23,
+              "min": 9.803921568627452,
+              "median": 14.736842105263158,
+              "max": 28.282828282828284
+            },
+            "gpu.gpu_util_percent": {
+              "n": 24,
+              "min": 14,
+              "median": 14.0,
+              "max": 19
+            },
+            "gpu.graphics_clock_mhz": {
+              "n": 24,
+              "min": 1605,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.memory_clock_mhz": {
+              "n": 24,
+              "min": 6001,
+              "median": 6001.0,
+              "max": 7001
+            },
+            "gpu.memory_free_bytes": {
+              "n": 24,
+              "min": 7690608640,
+              "median": 7692050432.0,
+              "max": 7692050432
+            },
+            "gpu.memory_total_bytes": {
+              "n": 24,
+              "min": 8585740288,
+              "median": 8585740288.0,
+              "max": 8585740288
+            },
+            "gpu.memory_used_bytes": {
+              "n": 24,
+              "min": 893689856,
+              "median": 893689856.0,
+              "max": 895131648
+            },
+            "gpu.memory_util_percent": {
+              "n": 24,
+              "min": 0,
+              "median": 0.0,
+              "max": 0
+            },
+            "gpu.power_w": {
+              "n": 24,
+              "min": 12.332,
+              "median": 12.851,
+              "max": 12.966000000000001
+            },
+            "gpu.pstate": {
+              "n": 24,
+              "min": 3,
+              "median": 4.0,
+              "max": 4
+            },
+            "gpu.sm_clock_mhz": {
+              "n": 24,
+              "min": 1605,
+              "median": 1605.0,
+              "max": 1605
+            },
+            "gpu.temperature_c": {
+              "n": 24,
+              "min": 68,
+              "median": 68.0,
+              "max": 68
+            }
+          },
+          "unknown_counts": {},
+          "quality": {
+            "model_ready": true,
+            "reasons": [],
+            "model_ready_scope": "Sustained-block descriptive state association only; not causal, instantaneous, per-kernel or effective throughput evidence."
+          },
+          "interpolation_performed": false
+        }
+      ],
+      "contained_samples": [
+        {
+          "sample_index": 60,
+          "query_begin_tick": 381759726085,
+          "query_end_tick": 381759732655,
+          "gpu_provider_query_begin_tick": 381759726177,
+          "gpu_provider_query_end_tick": 381759727517,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381759226667,
+          "cpu_interval_end_tick": 381759732463,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {},
+          "cpu_interval_contained": false
+        },
+        {
+          "sample_index": 61,
+          "query_begin_tick": 381760223854,
+          "query_end_tick": 381760227727,
+          "gpu_provider_query_begin_tick": 381760223930,
+          "gpu_provider_query_end_tick": 381760225012,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7690608640,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 895131648,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381759732463,
+          "cpu_interval_end_tick": 381760227598,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 14.0
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 62,
+          "query_begin_tick": 381760722539,
+          "query_end_tick": 381760728672,
+          "gpu_provider_query_begin_tick": 381760722661,
+          "gpu_provider_query_end_tick": 381760724284,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7691264000,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 894476288,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381760227598,
+          "cpu_interval_end_tick": 381760728530,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.631578947368421
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 63,
+          "query_begin_tick": 381761225259,
+          "query_end_tick": 381761232040,
+          "gpu_provider_query_begin_tick": 381761225359,
+          "gpu_provider_query_end_tick": 381761227174,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381760728530,
+          "cpu_interval_end_tick": 381761231832,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 21.05263157894737
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 64,
+          "query_begin_tick": 381761724992,
+          "query_end_tick": 381761729337,
+          "gpu_provider_query_begin_tick": 381761725072,
+          "gpu_provider_query_end_tick": 381761726196,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381761231832,
+          "cpu_interval_end_tick": 381761729212,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.818181818181818
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 65,
+          "query_begin_tick": 381762222789,
+          "query_end_tick": 381762233131,
+          "gpu_provider_query_begin_tick": 381762222880,
+          "gpu_provider_query_end_tick": 381762224007,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 19,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 7001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.332,
+            "pstate": 3,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381761729212,
+          "cpu_interval_end_tick": 381762233005,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 18.58407079646018
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 66,
+          "query_begin_tick": 381762733834,
+          "query_end_tick": 381762739277,
+          "gpu_provider_query_begin_tick": 381762733935,
+          "gpu_provider_query_end_tick": 381762735207,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381762233005,
+          "cpu_interval_end_tick": 381762739075,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 9.803921568627452
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 67,
+          "query_begin_tick": 381763225049,
+          "query_end_tick": 381763232605,
+          "gpu_provider_query_begin_tick": 381763225120,
+          "gpu_provider_query_end_tick": 381763226199,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381762739075,
+          "cpu_interval_end_tick": 381763232467,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 16.049382716049383
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 68,
+          "query_begin_tick": 381763724198,
+          "query_end_tick": 381763731790,
+          "gpu_provider_query_begin_tick": 381763724385,
+          "gpu_provider_query_end_tick": 381763726770,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381763232467,
+          "cpu_interval_end_tick": 381763731609,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 13.392857142857142
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 69,
+          "query_begin_tick": 381764226470,
+          "query_end_tick": 381764231674,
+          "gpu_provider_query_begin_tick": 381764226544,
+          "gpu_provider_query_end_tick": 381764227599,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381763731609,
+          "cpu_interval_end_tick": 381764231398,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 17.02127659574468
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 70,
+          "query_begin_tick": 381764722271,
+          "query_end_tick": 381764730759,
+          "gpu_provider_query_begin_tick": 381764722341,
+          "gpu_provider_query_end_tick": 381764723626,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381764231398,
+          "cpu_interval_end_tick": 381764730608,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.307692307692308
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 71,
+          "query_begin_tick": 381765225912,
+          "query_end_tick": 381765230537,
+          "gpu_provider_query_begin_tick": 381765225978,
+          "gpu_provider_query_end_tick": 381765226953,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381764730608,
+          "cpu_interval_end_tick": 381765230297,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.222222222222221
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 72,
+          "query_begin_tick": 381765725328,
+          "query_end_tick": 381765730548,
+          "gpu_provider_query_begin_tick": 381765725404,
+          "gpu_provider_query_end_tick": 381765726815,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381765230297,
+          "cpu_interval_end_tick": 381765730409,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 28.282828282828284
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 73,
+          "query_begin_tick": 381766222497,
+          "query_end_tick": 381766227532,
+          "gpu_provider_query_begin_tick": 381766222571,
+          "gpu_provider_query_end_tick": 381766223587,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381765730409,
+          "cpu_interval_end_tick": 381766227379,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 17.647058823529413
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 74,
+          "query_begin_tick": 381766725058,
+          "query_end_tick": 381766730173,
+          "gpu_provider_query_begin_tick": 381766725131,
+          "gpu_provider_query_end_tick": 381766726179,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381766227379,
+          "cpu_interval_end_tick": 381766730038,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 20.930232558139537
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 75,
+          "query_begin_tick": 381767224862,
+          "query_end_tick": 381767231286,
+          "gpu_provider_query_begin_tick": 381767224972,
+          "gpu_provider_query_end_tick": 381767226314,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.966000000000001,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381766730038,
+          "cpu_interval_end_tick": 381767230962,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 14.736842105263158
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 76,
+          "query_begin_tick": 381767723439,
+          "query_end_tick": 381767728511,
+          "gpu_provider_query_begin_tick": 381767723539,
+          "gpu_provider_query_end_tick": 381767724828,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381767230962,
+          "cpu_interval_end_tick": 381767728374,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 20.90909090909091
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 77,
+          "query_begin_tick": 381768222247,
+          "query_end_tick": 381768226895,
+          "gpu_provider_query_begin_tick": 381768222346,
+          "gpu_provider_query_end_tick": 381768223636,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381767728374,
+          "cpu_interval_end_tick": 381768226680,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 16.049382716049383
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 78,
+          "query_begin_tick": 381768723268,
+          "query_end_tick": 381768727497,
+          "gpu_provider_query_begin_tick": 381768723344,
+          "gpu_provider_query_end_tick": 381768724513,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381768226680,
+          "cpu_interval_end_tick": 381768727366,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 18.01801801801802
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 79,
+          "query_begin_tick": 381769223155,
+          "query_end_tick": 381769230239,
+          "gpu_provider_query_begin_tick": 381769223260,
+          "gpu_provider_query_end_tick": 381769224951,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381768727366,
+          "cpu_interval_end_tick": 381769229993,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.5
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 80,
+          "query_begin_tick": 381769725068,
+          "query_end_tick": 381769732814,
+          "gpu_provider_query_begin_tick": 381769725216,
+          "gpu_provider_query_end_tick": 381769727164,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381769229993,
+          "cpu_interval_end_tick": 381769732528,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 13.513513513513514
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 81,
+          "query_begin_tick": 381770223646,
+          "query_end_tick": 381770231843,
+          "gpu_provider_query_begin_tick": 381770223788,
+          "gpu_provider_query_end_tick": 381770225700,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381769732528,
+          "cpu_interval_end_tick": 381770231643,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 11.363636363636363
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 82,
+          "query_begin_tick": 381770723607,
+          "query_end_tick": 381770729750,
+          "gpu_provider_query_begin_tick": 381770723702,
+          "gpu_provider_query_end_tick": 381770725171,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381770231643,
+          "cpu_interval_end_tick": 381770729570,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 18.446601941747574
+          },
+          "cpu_interval_contained": true
+        },
+        {
+          "sample_index": 83,
+          "query_begin_tick": 381771225179,
+          "query_end_tick": 381771236972,
+          "gpu_provider_query_begin_tick": 381771225370,
+          "gpu_provider_query_end_tick": 381771227252,
+          "gpu_status": "ok",
+          "gpu_values": {
+            "gpu_util_percent": 14,
+            "graphics_clock_mhz": 1605,
+            "memory_clock_mhz": 6001,
+            "memory_free_bytes": 7692050432,
+            "memory_total_bytes": 8585740288,
+            "memory_used_bytes": 893689856,
+            "memory_util_percent": 0,
+            "power_w": 12.851,
+            "pstate": 4,
+            "sm_clock_mhz": 1605,
+            "temperature_c": 68
+          },
+          "gpu_unknown": {},
+          "cpu_interval_begin_tick": 381770729570,
+          "cpu_interval_end_tick": 381771236789,
+          "cpu_status": "ok",
+          "cpu_values_if_entire_interval_contained": {
+            "busy_percent": 12.903225806451612
+          },
+          "cpu_interval_contained": true
+        }
+      ],
+      "provider_semantics": {
+        "utilization_semantics": "Driver-defined rolling sample window; NVML documents product-dependent windows approximately 1 second to 1/6 second. Window boundaries are not exposed by these queries; values do not establish instantaneous activity, contention, kernel concurrency or causality.",
+        "gpu_util_semantics": "Percent of rolling interval with one or more kernels executing; includes the measured workload.",
+        "power_semantics": "NVML power usage is averaged over 1 second on Ampere (except GA100) and newer GPUs; architecture-dependent instantaneous semantics on older devices. This query does not expose averaging boundaries.",
+        "clock_semantics": "Observed clock query; not a per-action effective throughput measurement."
+      },
+      "cpu_provider_semantics": "Busy CPU time / total CPU time between consecutive successful OS reads; Windows kernel includes idle and scopes >64-CPU hosts to primary processor group; Linux iowait treated as idle; not per-process contention or frequency.",
+      "sampling_thread_error": null,
+      "missed_periods_entire_PID": 228
+    }
+  ]
+}

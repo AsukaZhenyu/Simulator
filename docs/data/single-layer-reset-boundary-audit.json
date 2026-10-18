@@ -1,0 +1,384 @@
+{
+  "schema": "single-layer-reset-boundary-audit-v1",
+  "audited_utc": "2026-10-18T13:23:55.594077+00:00",
+  "campaign": "profiling/single_layer_calibration/results/formal-v1",
+  "frozen_manifest_sha256": "13d46f7a0d8d0e877884443afc1cb2ad5b4a6815198f284220cf0a313bfaecb2",
+  "read_scope": "one prepared profile-0 program per each of 14 cases; JSON prefix before initial_values only; full file SHA values are copied from the frozen manifest, not rehashed here",
+  "measurement_scope": "read-only static source/program-metadata audit; no tests, builds, measurements, fitting, source edits or manifest edits",
+  "all_audited_initial_locations_only_dram": true,
+  "all_audited_initial_outputs_disjoint": true,
+  "rows": [
+    {
+      "case_id": "h64-q1-history128-hybrid-macros",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-hybrid-macros--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "33fcc7274481d6316bc32842aac2555420c387cfce392940147a5827d9f537a7",
+      "metadata_prefix_sha256": "4e241b14b80f15c565ca9018a5c564d99324fa3fa63f7c7374f71db01805cce9",
+      "metadata_prefix_bytes": 220860,
+      "initial_tensor_count": 142,
+      "reset_call_write_count": 142,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 136,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 134,
+        "vram_to_dram": 2
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 50176,
+        "vram_to_dram": 512
+      }
+    },
+    {
+      "case_id": "h64-q1-history128-cpu-macros",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-cpu-macros--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "b0d820925694d7ff300d6ce53c7742f1a95cd9cc65df2f72c727657409bfd17b",
+      "metadata_prefix_sha256": "b2e5e00a7ce920fa01940820a91f575d7c7b1128e4c4ba49c360f82f23cfa99b",
+      "metadata_prefix_bytes": 176289,
+      "initial_tensor_count": 142,
+      "reset_call_write_count": 142,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 0,
+      "timed_COPY_count_by_route": {},
+      "timed_COPY_payload_bytes_by_route": {}
+    },
+    {
+      "case_id": "h64-q1-history128-gpu-macros",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-gpu-macros--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "e190cf12640a0e6b78d862514f248f49c20d6b89c40d787628905af26f2aac6b",
+      "metadata_prefix_sha256": "ae73b1ab97719056b4271240dc6afbf541e05eeaf9ae7d398e636833df35d7b1",
+      "metadata_prefix_bytes": 222639,
+      "initial_tensor_count": 142,
+      "reset_call_write_count": 142,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 144,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 142,
+        "vram_to_dram": 2
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 197508,
+        "vram_to_dram": 512
+      }
+    },
+    {
+      "case_id": "h64-q1-history128-attention-ffn-cut60",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-attention-ffn-cut60--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "ddd579fd74dfa2ff510f86a1631781c0f0f5ec1317608a1670707a4f3e6febc7",
+      "metadata_prefix_sha256": "15808edc1a1831950719a39ac2676da316cf5f5850e4440aa1381efa4ce69b4b",
+      "metadata_prefix_bytes": 376594,
+      "initial_tensor_count": 145,
+      "reset_call_write_count": 145,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 142,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 139,
+        "vram_to_dram": 3
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 104720,
+        "vram_to_dram": 768
+      }
+    },
+    {
+      "case_id": "h64-q1-history128-attention-ffn-cut64",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-attention-ffn-cut64--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "8e1698848985730fc28077db8bb3827482f3b8b2179963d016b1e2ae3d13b6b5",
+      "metadata_prefix_sha256": "b4295d36c55e886d3d3a6dbb4106a5a9936b64f9ff0df5db4038ad4180f781d6",
+      "metadata_prefix_bytes": 359258,
+      "initial_tensor_count": 145,
+      "reset_call_write_count": 145,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 142,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 139,
+        "vram_to_dram": 3
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 101648,
+        "vram_to_dram": 768
+      }
+    },
+    {
+      "case_id": "h64-q1-history128-attention-ffn-cut68",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h64-q1-history128-attention-ffn-cut68--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "340d03b2257b8874455b7eed292c80be85b5eebfad4df9839cb534a60754bbe7",
+      "metadata_prefix_sha256": "038676d2a86eedfb0e63488681bd397e4a1e220eb97e845a1ba91f1934730ae7",
+      "metadata_prefix_bytes": 376594,
+      "initial_tensor_count": 145,
+      "reset_call_write_count": 145,
+      "reset_bytes": 197508,
+      "reset_dram_bytes": 197508,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 164480,
+      "reset_other_bytes": 33028,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 142,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 139,
+        "vram_to_dram": 3
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 98576,
+        "vram_to_dram": 768
+      }
+    },
+    {
+      "case_id": "h128-q16-history0-hybrid-macros",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h128-q16-history0-hybrid-macros--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "36386e817757e9a0985873311cd5155d4af89b49da9c17b30a0452ac83919478",
+      "metadata_prefix_sha256": "5f9dc2b6d1532b81d0c5eed33e2bb819f26eef78593298ca7ffbce4dff43cf84",
+      "metadata_prefix_bytes": 61860,
+      "initial_tensor_count": 14,
+      "reset_call_write_count": 14,
+      "reset_bytes": 664896,
+      "reset_dram_bytes": 664896,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 656640,
+      "reset_other_bytes": 8256,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 23,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 6,
+        "vram_to_dram": 17
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 98304,
+        "vram_to_dram": 16384
+      }
+    },
+    {
+      "case_id": "h128-q16-history0-attention-ffn-cut124",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h128-q16-history0-attention-ffn-cut124--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "aaa5b2d726fcf9d23910385774642f00a0b9d181abf1d21607c97b7a48cd245f",
+      "metadata_prefix_sha256": "ae0875fc85934dbefbd6c14eac11d41e9a0f21d80eeb4a77aa85b4712b9b09f8",
+      "metadata_prefix_bytes": 195528,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 664896,
+      "reset_dram_bytes": 664896,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 656640,
+      "reset_other_bytes": 8256,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 29,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 18
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 305664,
+        "vram_to_dram": 24576
+      }
+    },
+    {
+      "case_id": "h128-q16-history0-attention-ffn-cut128",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h128-q16-history0-attention-ffn-cut128--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "033c656fd90c8be20221c9b92ef023937a3da499cc25dd3e903e483907c98516",
+      "metadata_prefix_sha256": "36212060a7e50609133b5c262ccda5afe15a4fb13331f2fde8d88fae722b33a9",
+      "metadata_prefix_bytes": 178120,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 664896,
+      "reset_dram_bytes": 664896,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 656640,
+      "reset_other_bytes": 8256,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 29,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 18
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 299520,
+        "vram_to_dram": 24576
+      }
+    },
+    {
+      "case_id": "h128-q16-history0-attention-ffn-cut132",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h128-q16-history0-attention-ffn-cut132--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "9d36f1bdd78945373a23314d9c1d3f7dbf92d1029ba3d21e1cb4cdda30578f6b",
+      "metadata_prefix_sha256": "fff5e3b5b8d0bf094a03cf5f19e41be7ee393b89491281d4df248a0883c3211a",
+      "metadata_prefix_bytes": 195528,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 664896,
+      "reset_dram_bytes": 664896,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 656640,
+      "reset_other_bytes": 8256,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 29,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 18
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 293376,
+        "vram_to_dram": 24576
+      }
+    },
+    {
+      "case_id": "h256-q32-history0-hybrid-macros",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h256-q32-history0-hybrid-macros--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "c06dea1fde336111540033b2560f194e61e3a1538a33088ddf506754d6d01583",
+      "metadata_prefix_sha256": "b41a4cc8104e6754d110c3dd9e3b177be55251fe32a5e07f376f5bad18055135",
+      "metadata_prefix_bytes": 83234,
+      "initial_tensor_count": 14,
+      "reset_call_write_count": 14,
+      "reset_bytes": 2525568,
+      "reset_dram_bytes": 2525568,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 2492672,
+      "reset_other_bytes": 32896,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 39,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 6,
+        "vram_to_dram": 33
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 376832,
+        "vram_to_dram": 49152
+      }
+    },
+    {
+      "case_id": "h256-q32-history0-attention-ffn-cut252",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h256-q32-history0-attention-ffn-cut252--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "09ce90ae8035f7ccd3617874a66c7b4e889929c0b371241f3101a6a2316d80e0",
+      "metadata_prefix_sha256": "9af2fcc5b6e81282b25fe92b2fa4e02ba04f0cee209a78e25c306215ed3d6ca9",
+      "metadata_prefix_bytes": 225878,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 2525568,
+      "reset_dram_bytes": 2525568,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 2492672,
+      "reset_other_bytes": 32896,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 45,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 34
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 1209344,
+        "vram_to_dram": 81920
+      }
+    },
+    {
+      "case_id": "h256-q32-history0-attention-ffn-cut256",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h256-q32-history0-attention-ffn-cut256--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "c8e5cae60ee41a1f9b845e28bb810240c7742046970a8813a7b792f0581e9296",
+      "metadata_prefix_sha256": "d6a8f6edbbf189434ed8c1864317da30ccdf50ea0a298c04b9d12c4f086fcc65",
+      "metadata_prefix_bytes": 208438,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 2525568,
+      "reset_dram_bytes": 2525568,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 2492672,
+      "reset_other_bytes": 32896,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 45,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 34
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 1197056,
+        "vram_to_dram": 81920
+      }
+    },
+    {
+      "case_id": "h256-q32-history0-attention-ffn-cut260",
+      "profile_program": "profiling/single_layer_calibration/results/formal-v1/programs/h256-q32-history0-attention-ffn-cut260--profile-0.json",
+      "full_program_sha256_from_frozen_manifest": "831f8f4546c17e74cd715604067d22ba35ce3af6f60559159d2796d8c81ff0d8",
+      "metadata_prefix_sha256": "8d13078125055554c1c32d6b8b70892505df8127cf83f544a17da8adf8707b77",
+      "metadata_prefix_bytes": 225878,
+      "initial_tensor_count": 17,
+      "reset_call_write_count": 17,
+      "reset_bytes": 2525568,
+      "reset_dram_bytes": 2525568,
+      "reset_vram_bytes": 0,
+      "reset_locations": [
+        "dram"
+      ],
+      "reset_weights_bytes": 2492672,
+      "reset_other_bytes": 32896,
+      "initial_tensor_ids_that_are_compute_outputs": [],
+      "timed_COPY_count": 45,
+      "timed_COPY_count_by_route": {
+        "dram_to_vram": 11,
+        "vram_to_dram": 34
+      },
+      "timed_COPY_payload_bytes_by_route": {
+        "dram_to_vram": 1184768,
+        "vram_to_dram": 81920
+      }
+    }
+  ]
+}
