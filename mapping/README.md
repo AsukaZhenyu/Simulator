@@ -20,11 +20,10 @@ modeling.tensor.runtime：执行动作、推进时间、更新状态
 
 ## 推荐阅读和运行
 
-The [strategy expression and IR guide](../docs/STRATEGY_REPRESENTATION.md)
-documents `inspect()/explain()`, physical weight scopes, transfer precedence and
-the current whole-invocation transform boundary. The
-[standalone public example](../examples/library/strategy_ir.py) needs no saved
-profile or repository fixture.
+`inspect()/explain()`、物理权重作用域、传输优先级和当前整次调用的变换边界写在
+`tensor_mapping/python_frontend.py` 与
+[执行变换指南](docs/EXECUTION_TRANSFORMS_GUIDE.md) 里。下面的
+[独立公开示例](../examples/library/strategy_ir.py)不需要已有 profile 或仓库夹具。
 
 1. [Python 策略入门](examples/python/README.md)：先理解模块放置，再看因果回调。
 2. [执行变换指南](docs/EXECUTION_TRANSFORMS_GUIDE.md)：Attention 细化、FFN 分片、P/D 放置和数据准备。
@@ -38,7 +37,7 @@ python mapping/examples/python/execution_combined_demo.py --out mapping/outputs/
 python mapping/examples/python/modular_moe.py --variant swiglu_staged --out mapping/outputs/moe-demo
 ```
 
-`--out` 必须是新目录或空目录。示例使用合成成本，证明表达和执行规则，不证明实机加速。当前完整性能质量门尚未通过；需要实机成本时，按[执行变换校准工具](../profiling/execution_calibration/README.md)在目标硬件重新采集、独立验证。运行示例不要求已有 profile 或本机实验结果。
+`--out` 必须是新目录或空目录。示例使用合成成本，证明表达和执行规则，不证明实机加速。当前完整性能质量门尚未通过；需要实机成本时，要在目标硬件重新采集并独立验证——测量装置随论文保留，不在本仓库。运行示例不要求已有 profile 或本机实验结果。
 
 ## 代码位置
 

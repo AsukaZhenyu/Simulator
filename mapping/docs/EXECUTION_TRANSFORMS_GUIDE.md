@@ -237,4 +237,4 @@ Attention 当前物化完整 score/probability 矩阵（包括最终被 mask 的
 [独立夹具](../examples/python/fixtures/execution-phase-transforms/README.md) 中分别声明，没有按 decode 时间乘 token 数。
 新传输条目对应真实物化的 144/288/1536 bytes，已有 route/bytes 键值保持不变。
 
-该组合由 `test_execution_phase_composition.py` 持续回归，命令见第10节。它检查一次运行中的机制组合与账本一致性；当前完整性能质量门尚未通过，不能由这些测试推导真实加速。真实执行的采集边界与独立核验命令见[执行变换校准工具](../../profiling/execution_calibration/README.md)，本机历史实验结果不随仓库分发。
+该组合由 `test_execution_phase_composition.py` 持续回归，命令见第10节。它检查一次运行中的机制组合与账本一致性；当前完整性能质量门尚未通过，不能由这些测试推导真实加速。真实执行的采集边界与独立核验属于测量装置，随论文保留，不在本仓库；本机历史实验结果不随仓库分发。

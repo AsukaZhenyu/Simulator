@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 
-SOURCE = Path(__file__).resolve().parents[1] / "experiments/strategy_fidelity.py"
+SOURCE = Path(__file__).resolve().parent / "strategy_fidelity_reference.py"
 SPEC = importlib.util.spec_from_file_location("strategy_fidelity_reference", SOURCE)
 reference = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reference)
@@ -81,7 +81,7 @@ class StrategyFidelityTests(unittest.TestCase):
     def test_source_drift_and_unbound_import_hash_rejected(self):
         before = reference.source_snapshot()
         changed = dict(before)
-        changed["experiments/strategy_fidelity.py"] = "0" * 64
+        changed["tests/strategy_fidelity_reference.py"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "source bytes changed"):
             reference.verify_source_integrity(before, changed, [])
         modules = reference.imported_sources()

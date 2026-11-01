@@ -49,14 +49,7 @@ class DistributionTests(unittest.TestCase):
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
                 )
             source_assets = [
-                "CITATION.cff", "docs/LIBRARY_GUIDE.md", "docs/DEVICE_STATE_RUNTIME.md",
-                "docs/OPEN_SOURCE_AND_PREPRINT.md", "docs/RELEASE_0_1.md",
-                "docs/PERFORMANCE_BOUNDARIES.md", "tests/test_performance_boundaries.py",
-                "docs/AVAILABLE_RESOURCE_MODEL_20261022.md",
-                "docs/STRATEGY_REPRESENTATION.md", "tests/test_strategy_ir.py",
-                "docs/SINGLE_CPU_GPU_REQUEST_FLOW_20261023.md",
-                "docs/PERFORMANCE_BOUNDARY_REFACTOR_20261018.md",
-                "docs/data/performance-boundary-refactor-20261018.json",
+                "CITATION.cff", "docs/CODE_LAYOUT.md", "docs/REPRODUCTION.md",
                 "tests/test_distribution.py", "tests/test_library.py",
                 "tests/test_analytical_inputs.py",
             ]

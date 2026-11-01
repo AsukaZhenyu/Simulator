@@ -20,7 +20,7 @@
 
 额外测量 `block` 保留相同的物化阶段输出，用于核对三个孤立阶段中位数之和。联合图不作为第四个调度任务，也不覆盖独立 workspace。端口摘要核对相同 seed 的阶段输入来源和对应输出；独立数值参考及全量 KV 检查另保存证据。
 
-完整用法见 [DENSE_BLOCK_MEASUREMENT.md](../../../profiling/DENSE_BLOCK_MEASUREMENT.md)，描述符为 `mapping/examples/m2/dense-block.cpu.layer.json` 和 `qwen35-geometry.declared-block.cpu.layer.json`。0.3 只接受 CPU/B=1/Full Causal/Dense FFN；`complete_declared_decoder_block` 不等于复现原模型融合实现。
+完整用法见测量文档 `DENSE_BLOCK_MEASUREMENT.md`（测量装置，随论文保留，不在本仓库），描述符为 `mapping/examples/m2/dense-block.cpu.layer.json` 和 `qwen35-geometry.declared-block.cpu.layer.json`。0.3 只接受 CPU/B=1/Full Causal/Dense FFN；`complete_declared_decoder_block` 不等于复现原模型融合实现。
 
 ## 0.4 单 CUDA 设备合同
 
@@ -64,13 +64,11 @@ GPU 宏任务的完整 workspace 必须同时覆盖内部张量 allocator 和后
 
 ## 可复用入口
 
-从 Simulator 根目录运行；测量导出脚本自行定位 modeling。默认拒绝不稳定数据；`--phase prefill` 是显式选择，遗漏条目会写入报告。
-
-```powershell
-python profiling/export_m2_macros.py --measurements "<matched-macro-profile>/measurements.json" --layer mapping/examples/m2/qwen35-geometry.cpu-core.layer.json --phase prefill --output "<new-prefill-export-directory>"
-```
-
-需要显式允许不稳定数据进行诊断时，加 `--allow-unstable`；结果保持 validation-only，并选择新的空输出目录。不会覆写合成 fixture 或运行硬件测量。也可调用 `export_cost_table(...)`。
+本仓库提供的是**表的读取方**：`M2CostTable`（`m2/costs.py`）保存
+`(kind, device, shape) -> MacroCost`、`physical_signature`、`contract_hash` 与
+`validation_only`，缺条目时直接拒绝并列出已有形状。把原始测量转换成这张表的
+那一步（`profiling/export_m2_macros.py` 的 `export_cost_table(...)`）属于测量
+装置，随论文保留，不在本仓库。
 
 安装 modeling 后，通过模块入口保存确定性回放：
 
@@ -82,7 +80,7 @@ python -m llm_infer_model.m2 --invocation "<matched-invocation.json>" --output "
 
 ## 与当前策略和测量的关系
 
-合成 fixture 只验证格式、状态和容量规则；缺少质量标记或匹配物理签名的记录不能进入实测成本表。独立原生实验、组件模型与策略编译链的实测绑定是三层不同证据。当前完整性能质量门尚未通过；可复用测量入口、计时合同与独立核验步骤见[执行变换校准工具](../../../profiling/execution_calibration/README.md)。本机历史结果不随库分发。
+合成 fixture 只验证格式、状态和容量规则；缺少质量标记或匹配物理签名的记录不能进入实测成本表。独立原生实验、组件模型与策略编译链的实测绑定是三层不同证据。当前完整性能质量门尚未通过；可复用的测量入口、计时合同与独立核验步骤属于测量装置，随论文保留，不在本仓库。本机历史结果不随库分发。
 
 ## CPU 执行与线程配置
 
@@ -181,7 +179,7 @@ python -m tensor_mapping.m2_moe mapping/examples/m2/moe-interface-synthetic-deco
 
 可执行成本只取各宏任务的原始样本中位数向上取整；joint 样本保留为独立验证目标，不进入价格。硬件容量、对齐和运行时预留必须全部显式给出。容量账只证明声明端口加有出处的内部工作区，尚未证明完整进程物理容量。缺价格、未知工作区、数值/端口不一致和错误签名均拒绝。CV > 0.1 的阶段默认拒绝；显式 `allow_unstable=True` 只能做标记为 validation_only 的诊断。
 
-`profiling/validate_moe_prediction.py` 从独立 profile/holdout 目录核验原始 JSON SHA256、统计、同 seed 的所有物化端口、runtime 与签名；随后导出 workload/scenario/mapping/bindings/replay，并用指纹重新加载映射验证。`--max-relative-error` 必须由调用方显式指定，不隐式给出“已校准”。证据对应源码与二进制可选用 `--verify-live-sources` 核验；复制到另一台机器的历史证据仍可按 portable 模式读取。
+独立核验器 `validate_moe_prediction.py`（测量装置，随论文保留，不在本仓库）从独立 profile/holdout 目录核验原始 JSON SHA256、统计、同 seed 的所有物化端口、runtime 与签名；随后导出 workload/scenario/mapping/bindings/replay，并用指纹重新加载映射验证。`--max-relative-error` 必须由调用方显式指定，不隐式给出“已校准”。证据对应源码与二进制可选用 `--verify-live-sources` 核验；复制到另一台机器的历史证据仍可按 portable 模式读取。
 
 注意缓存访问顺序也是测量合同的一部分。逐个专家反复执行的孤立测量会使其权重热驻留，不能直接相加预测轮换访问大量专家的整图。采样必须记录阶段与 joint 是否共用驻留张量、执行顺序与内部分配；不同口径的记录不能混用，禁止用 joint 时间拟合后冒充独立阶段测量。
 

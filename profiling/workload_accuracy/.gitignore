@@ -1,9 +1,0 @@
-__pycache__/
-_test_tmp/
-debug-public*/
-debug-smoke*/
-results*/
-capacity*/
-archive-protocol-*/
-formal-*/
-formal-suite*.json

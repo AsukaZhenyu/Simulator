@@ -17,22 +17,24 @@ fictional hardware, declared geometry, analytical costs, and explicitly labeled
 synthetic MoE routes. These demonstrate semantics, not measured speedups.
 
 Each output contains a persistent `project/` and detailed `result/`. Use new
-directories. See the [API guide](../../docs/LIBRARY_GUIDE.md) to replace the
-example model, hardware or workload with your own declarations.
+directories. To replace the example model, hardware or workload with your own
+declarations, start from the snippet in the
+[top-level README](../../README.md#declare-your-own-experiment) and the docstrings
+in `llm_simulator`.
 
 `strategy_ir.py` adds readable module placement, layer-scoped weight preparation
 and CE/SM transport, declarations-only inspection and the compiled IR. It writes
 `declaration.json`, `inspection.json`, `explanation.txt` and detailed execution
 evidence. The service rates are explicit analytical inputs; CE and SM share one
-link and all modules share the runtime capacity ledger. See the
-[strategy expression guide](../../docs/STRATEGY_REPRESENTATION.md) for scope
-restrictions and checks that inspection intentionally leaves unproved.
+link and all modules share the runtime capacity ledger. Scope restrictions and
+the checks that inspection intentionally leaves unproved are stated in
+`tensor_mapping.python_frontend`.
 
 `request_pipeline.py` adds independent arrivals, unequal Decode lengths,
 request priorities and a charged all-layer P/D handoff. The MoE variant also
 selects revealed experts by Token count and current CPU/GPU costs. It retains
 one shared runtime and explicitly prices independent B1 kernels, with no fused
-batching claim. See the [request-flow design](../../docs/SINGLE_CPU_GPU_REQUEST_FLOW_20261023.md).
+batching claim.
 
 `shared_memory.py` declares one physical memory pool with
 `Hardware.shared_memory(cpu=..., gpu=..., capacity_bytes=...)`. DRAM and VRAM

@@ -1,10 +1,10 @@
 """Independent request-region target, preservation and conflict checks."""
 from copy import deepcopy
+import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
 
-from experiments import strategy_fidelity as ref
 from llm_simulator import InvalidInput, ModelPlan, Scheduling, Simulator, Unsupported, Workload
 from dataclasses import replace
 from unittest.mock import patch
@@ -12,6 +12,14 @@ from llm_infer_model.m2.execution_pipeline import (
     ExecutionRegionSpec, apply_execution_transform, parse_transform, transform_document,
 )
 from llm_infer_model.m2.expand import load_and_compile
+
+# The independent oracle lives with the `strategy-fidelity` suite at
+# tests/strategy_fidelity_reference.py; load it by path so this directory does
+# not need to be a package on sys.path.
+_ORACLE = Path(__file__).resolve().parents[2] / "tests" / "strategy_fidelity_reference.py"
+_SPEC = importlib.util.spec_from_file_location("strategy_fidelity_reference", _ORACLE)
+ref = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(ref)
 
 
 class ExecutionRegionTests(unittest.TestCase):
