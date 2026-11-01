@@ -1,6 +1,7 @@
 """Export the actual compiled Python strategy, including full operands and actions.
 
-This adapter deliberately supports one complete F32 Dense invocation. Both the
+This adapter supports complete F32 Dense invocations and homogeneous layers in
+one inference round. Both the
 original three macros and the public AttentionStages / FFNPartition transforms
 are executable. Other transforms, overlapping launches, services, disturbances,
 and opaque/non-F32 models are rejected, rather than assigned surrogate kernels.
@@ -41,7 +42,17 @@ class BridgeError(ValueError):
 
 
 def canonical(value):
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    def array_identity(item):
+        if isinstance(item, np.ndarray):
+            array = np.ascontiguousarray(item)
+            _require(array.dtype in (np.dtype("float32"), np.dtype("int32")),
+                     "numeric initializer arrays require F32 or I32")
+            _require(np.isfinite(array).all(), "numeric initializer arrays must be finite")
+            return {"__numeric_array__": dict(dtype=array.dtype.str, shape=list(array.shape),
+                sha256=hashlib.sha256(memoryview(array).cast("B")).hexdigest())}
+        raise TypeError(f"Object of type {type(item).__name__} is not JSON serializable")
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False,
+                      default=array_identity)
 
 
 def sha(value):
@@ -62,7 +73,140 @@ def _values(tensor, seed, gamma=False):
             if tensor["role"] == "weight" else values).astype(np.float32)
 
 
-def export_plan(plan, *, seed=1234):
+def _invocation_contexts(compiled):
+    """Read exact source-bound leaf metadata without inventing global seams.
+
+    The native executor has one physical configuration. Multiple invocations are
+    consequently admitted only for one round of homogeneous Dense layers. Trace
+    token gates still require a separate numeric token-input implementation.
+    """
+    from llm_infer_model.m2.expand import load_and_compile
+    from llm_infer_model.m2.global_execution import verify_global_sources
+    scopes = compiled.model.invocation_scopes
+    if len(scopes) == 1:
+        return {scopes[0].id: compiled.model.aggregate}
+    verify_global_sources(compiled.model)
+    doc = compiled.model.document
+    _require(doc.get("format_version") == "global-execution-0.1" and len(doc.get("rounds", [])) == 1,
+             "multi-round trace token gates have no numeric native implementation")
+    _require(not compiled.model.gate_operations,
+             "multi-round trace token gates have no numeric native implementation")
+    root = Path(compiled.model.sources[0]["path"]).parent
+    rows = doc["rounds"][0]["invocations"]
+    _require([r["id"] for r in rows] == [s.id for s in scopes], "global invocation order changed")
+    contexts = {r["id"]: load_and_compile(root / r["invocation_file"]) for r in rows}
+    from llm_infer_model.m2.hybrid_physical import HybridDensePhysical
+    from llm_infer_model.m2.full_physical import FullDensePhysical
+    _require(all(isinstance(leaf.layer.physical, (HybridDensePhysical, FullDensePhysical))
+                 for leaf in contexts.values()), "a complete Dense physical boundary is required")
+    base = next(iter(contexts.values())).layer.physical
+    for scope in scopes:
+        leaf = contexts[scope.id]
+        _require(leaf.layer.id == scope.layer_id, "scope layer differs from source-bound invocation")
+        _require(type(leaf.layer.physical) is type(base) and leaf.layer.physical.config == base.config
+                 and leaf.layer.physical.threads == base.threads
+                 and getattr(leaf.layer.physical, "cuda_device", None) == getattr(base, "cuda_device", None),
+                 "native multilayer boundary requires homogeneous physical configuration, threads and CUDA device")
+    return contexts
+
+
+class _InitialDiagnosticSnapshotSink:
+    """Keep one initial diagnostic, releasing each computed later snapshot.
+
+    SimulationSession computes ``_snapshot(...)`` before calling ``append``.
+    Its state transitions, event log and peak counters therefore still execute
+    unchanged. Only the historical ``EvaluationResult.states`` output shrinks.
+    """
+    __slots__ = ("initial", "append_count")
+
+    def __init__(self, initial):
+        from llm_infer_model.tensor.engine import StateSnapshot
+        _require(type(initial) is StateSnapshot, "explicit initial StateSnapshot required")
+        self.initial = initial
+        self.append_count = 0
+
+    def append(self, snapshot):
+        _require(type(snapshot) is type(self.initial), "diagnostic snapshot computation changed type")
+        self.append_count += 1
+        # The supplied snapshot and its tensor ledgers are intentionally not retained.
+
+    def __iter__(self):
+        return iter((self.initial,))
+
+    def __len__(self):
+        return 1
+
+
+def _install_profiling_snapshot_sink(session):
+    """Omit diagnostic history only for an unstarted ordinary causal runtime.
+
+    This private profiling helper does not change Modeling's default recorder.
+    Known adapters are unwrapped explicitly; service subclasses are rejected.
+    """
+    from tensor_mapping.composition_observation import CompositionSession
+    from llm_infer_model.m2.causal import CausalM2Session
+    from llm_infer_model.tensor.environment import SimulationSession
+
+    while isinstance(session, CompositionSession):
+        session = session._session
+    _require(isinstance(session, CausalM2Session), "known causal profiling adapter required")
+    runtime = session._runtime
+    _require(type(runtime) is SimulationSession,
+             "profiling diagnostic sink requires ordinary SimulationSession without services")
+    snapshots = runtime._snapshots
+    _require(not runtime._actions and not runtime._events
+             and isinstance(snapshots, list) and len(snapshots) == 1,
+             "install profiling diagnostic sink before any action with one initial snapshot")
+    sink = _InitialDiagnosticSnapshotSink(snapshots[0])
+    runtime._snapshots = sink
+    return sink
+
+
+def _lightweight_actions(plan):
+    """Run the identical causal driver without retaining full observations.
+
+    This profiling-only export does not implement a new policy or scheduler.
+    Observation objects still reach the original policy and command validator;
+    only their debug hashes, long-lived DecisionRecords and historical runtime
+    diagnostics are omitted. The original snapshot computation still runs.
+    """
+    from tensor_mapping.causal import compile_command
+    from tensor_mapping.causal_cli import verify_sources
+    from tensor_mapping.python_frontend import _PlanPolicy
+    from tensor_mapping.unified_strategy import create_session
+    from llm_infer_model.tensor.runtime import dispatch_command
+
+    compiled = plan._compiled
+    verify_sources(compiled.sources)
+    session = create_session(compiled)
+    _install_profiling_snapshot_sink(session)
+    policy = _PlanPolicy(compiled, plan._bindings, plan._runtime_spec, plan._preparations)
+    budget = compiled.document["max_decisions"]
+    _require(type(budget) is int and budget >= 1, "positive causal decision budget required")
+    actions = []
+    for index in range(budget):
+        observation = session.observe()
+        if observation.complete or observation.error_code:
+            break
+        decision = policy(observation)
+        _require(decision is not None, "causal policy stopped before completing the graph")
+        command = compile_command(decision, observation)
+        action = asdict(command.action)
+        _require(action["kind"] in {"COMPUTE", "COPY", "EVICT", "ADVANCE"}, "unsupported native action")
+        _require(not (action["kind"] in {"COMPUTE", "COPY"} and observation.running),
+                 "overlapping launch is unsupported; author a serial RuntimePolicy explicitly")
+        step = dispatch_command(session, command, source_index=index)
+        _require(step.ok, "causal command rejected: " + str(step.error_message))
+        actions.append(action)
+    final = session.observe()
+    policy.observe_final(final)
+    evaluation = session.result().evaluation
+    _require(final.complete and not final.error_code and evaluation.status == "valid",
+             "compiled ModelPlan must complete successfully before export")
+    return evaluation, actions
+
+
+def export_plan(plan, *, seed=1234, numeric_arrays=False, element_limit=None, lightweight_actions=False):
     """Freeze a CompiledPlan's real graph and accepted serial action trace.
 
     The original simulation costs remain labelled as their original source.
@@ -78,10 +222,15 @@ def export_plan(plan, *, seed=1234):
     _require(plan._runtime_spec is None or plan._runtime_spec.factory is SerialExecutionPolicy,
              "unsupported runtime policy: this bridge requires static choices plus explicit serial execution")
     _require(type(seed) is int and 0 <= seed < 2**32, "seed must be uint32")
+    _require(type(numeric_arrays) is bool, "numeric_arrays must be a boolean")
+    _require(type(lightweight_actions) is bool, "lightweight_actions must be a boolean")
+    _require(element_limit is None or (type(element_limit) is int
+        and 1 <= element_limit <= 128_000_000), "explicit tensor element limit must be within 1..128000000")
     compiled = plan._compiled
     scopes = getattr(compiled.model, "invocation_scopes", ())
-    _require(compiled.global_model and len(scopes) == 1,
-             "bridge supports exactly one global_m2 invocation; multi-round/trace gates rejected")
+    _require(compiled.global_model and len(scopes) >= 1,
+             "bridge requires explicit global_m2 invocation scopes")
+    contexts = _invocation_contexts(compiled)
     _require(not compiled.environment and compiled.services is None and not compiled.reclaim_requests,
              "disturbances, transport services and reclamation are unsupported")
     aggregate = compiled.model.aggregate
@@ -97,28 +246,45 @@ def export_plan(plan, *, seed=1234):
         for transform in row["pipeline"]["transforms"]:
             _require(transform["format_version"] in {"attention-stages-0.1", "ffn-execution-0.1"},
                      "unsupported transform: no surrogate execution is permitted")
-    result = plan.run()
-    run = result[0]
-    _require(run.evaluation.status == "valid" and run.termination_reason == "goal_reached",
-             "compiled ModelPlan must complete successfully before export")
-    actions = []
-    for record in run.decisions:
-        _require(record.accepted and record.action is not None, "rejected/control decisions cannot be exported")
-        action = asdict(record.action)
-        _require(action["kind"] in {"COMPUTE", "COPY", "EVICT", "ADVANCE"}, "unsupported native action")
-        _require(not (action["kind"] in {"COMPUTE", "COPY"} and record.observation.running),
-                 "overlapping launch is unsupported; author a serial RuntimePolicy explicitly")
-        actions.append(action)
+    if lightweight_actions:
+        evaluation, actions = _lightweight_actions(plan)
+    else:
+        result = plan.run()
+        run = result[0]
+        _require(run.evaluation.status == "valid" and run.termination_reason == "goal_reached",
+                 "compiled ModelPlan must complete successfully before export")
+        evaluation = run.evaluation
+        actions = []
+        for record in run.decisions:
+            _require(record.accepted and record.action is not None, "rejected/control decisions cannot be exported")
+            action = asdict(record.action)
+            _require(action["kind"] in {"COMPUTE", "COPY", "EVICT", "ADVANCE"}, "unsupported native action")
+            _require(not (action["kind"] in {"COMPUTE", "COPY"} and record.observation.running),
+                     "overlapping launch is unsupported; author a serial RuntimePolicy explicitly")
+            actions.append(action)
     tensors = {t["id"]: t for t in graph["workload"]["tensors"]}
-    _require(sum(math.prod(t["ne"]) for t in tensors.values()) <= 4_000_000,
-             "JSON bridge tensor envelope exceeds 4 million elements")
-    weights = {role: f"w:{aggregate.layer.id}:{name}" for group in physical.weight_groups.values()
-               for role, name in group.items()}
+    allowed_elements = element_limit if element_limit is not None else (4_000_000 if len(scopes) == 1 else 16_000_000)
+    _require(sum(math.prod(t["ne"]) for t in tensors.values()) <= allowed_elements,
+             "bridge tensor envelope exceeds declared element limit")
+    scope_for_operation = {oid: scope.id for scope in scopes for oid in scope.operation_ids}
+    _require(len(scope_for_operation) == len(graph["tasks"]), "native scope inventory must cover exact tasks")
+    weights_by_scope = {sid: {role: f"w:{leaf.layer.id}:{name}"
+                       for group in leaf.layer.physical.weight_groups.values() for role, name in group.items()}
+                       for sid, leaf in contexts.items()}
     tasks = {t["operation_id"]: t for t in graph["tasks"]}
     ops = {op["id"]: op for op in graph["workload"]["operations"]}
-    requests = {r.request_id: r for r in aggregate.invocation.requests}
-    states = {r.request_id: r for r in aggregate.state_in.requests}
-    projection = {t["request_id"]: ops[t["operation_id"]] for t in graph["tasks"] if t["kind"] == "projection"}
+    requests = {(sid, r.request_id): r for sid, leaf in contexts.items() for r in leaf.invocation.requests}
+    states = {(sid, r.request_id): r for sid, leaf in contexts.items() for r in leaf.state_in.requests}
+    projection = {(scope_for_operation[t["operation_id"]], t["request_id"]): ops[t["operation_id"]]
+                  for t in graph["tasks"] if t["kind"] == "projection"}
+    position_inputs = {}
+    for key, op in projection.items():
+        positions = [tid for tid in op["inputs"] if tensors[tid]["dtype"] == "GGML_TYPE_I32"]
+        _require(len(positions) == 1, "projection requires one explicit position input")
+        request = requests[key]
+        position_inputs[positions[0]] = list(range(request.position_start, request.position_start + request.tokens))
+    norm_weights = {weights.get(r) for weights in weights_by_scope.values()
+                    for r in ("input_norm", "post_attention_norm", "q_norm", "k_norm")}
     partition = {p["tensor_id"]: p for p in (graph.get("boundary") or {}).get("ffn_execution", {}).get("weight_partitions", [])}
     bindings = []
     initial_values = {}
@@ -126,15 +292,14 @@ def export_plan(plan, *, seed=1234):
         if not tensor.get("initial_locations"):
             continue
         if tensor["dtype"] == "GGML_TYPE_I32":
-            matches = [r for rid, r in requests.items() if tid.endswith(f":{rid}:in.positions")]
-            _require(len(matches) == 1, "unrecognized position input")
-            request = matches[0]
-            initial_values[tid] = list(range(request.position_start, request.position_start + request.tokens))
+            _require(tid in position_inputs, "unrecognized position input")
+            initial_values[tid] = np.asarray(position_inputs[tid], dtype=np.int32) if numeric_arrays else position_inputs[tid]
         elif tid in partition:
             continue
         else:
-            gamma = tid in {weights.get(r) for r in ("input_norm", "post_attention_norm", "q_norm", "k_norm")}
-            initial_values[tid] = _values(tensor, seed, gamma).tolist()
+            gamma = tid in norm_weights
+            values = _values(tensor, seed, gamma)
+            initial_values[tid] = values if numeric_arrays else values.tolist()
     # Immutable partition leaves are exact slices of the SAME full parent weights.
     parents = {}
     for tid, part in partition.items():
@@ -145,18 +310,22 @@ def export_plan(plan, *, seed=1234):
             parents[parent_id] = _values(dict(id=parent_id, ne=ne, role="weight"), seed).reshape(ne[1], ne[0])
         matrix = parents[parent_id]
         leaf = matrix[:, part["start"]:part["end"]] if role == "down" else matrix[part["start"]:part["end"], :]
-        initial_values[tid] = leaf.ravel().tolist()
+        initial_values[tid] = leaf.ravel() if numeric_arrays else leaf.ravel().tolist()
     for oid, op in ops.items():
         task = tasks[oid]
-        request = requests[task["request_id"]]
-        state = states[task["request_id"]]
+        sid = scope_for_operation[oid]
+        leaf = contexts[sid]
+        weights = weights_by_scope[sid]
+        request_key = (sid, task["request_id"])
+        request = requests[request_key]
+        state = states[request_key]
         _require(tuple(b.first_position for b in state.blocks) == tuple(sum(b.tokens for b in state.blocks[:i]) for i in range(len(state.blocks)))
                  and sum(b.tokens for b in state.blocks) == request.position_start,
                  "only complete contiguous history beginning at absolute position zero is supported")
-        qkv = [projection[task["request_id"]]["output"], *projection[task["request_id"]].get("extra_outputs", [])]
+        qkv = [projection[request_key]["output"], *projection[request_key].get("extra_outputs", [])]
         p = dict(zip(("q", "k", "v", "gate"), qkv))
         history = [asdict(b) for b in state.blocks]
-        new = [asdict(b) for b in aggregate.new_blocks[task["request_id"]]]
+        new = [asdict(b) for b in leaf.new_blocks[task["request_id"]]]
         kind = task["kind"]
         operands, outputs = {}, {"result": op["output"]}
         if kind == "projection":
@@ -169,7 +338,9 @@ def export_plan(plan, *, seed=1234):
             operands["hidden"] = next(tid for tid in op["inputs"] if tensors[tid]["role"] != "weight")
         elif kind == "attention":
             operands = {r: p[r] for r in p}
-            operands.update(output=weights["output"], hidden=next(tid for tid in op["inputs"] if tid.endswith(":in.hidden")))
+            hidden_input = next(tid for tid in projection[request_key]["inputs"]
+                                if tensors[tid]["role"] != "weight" and tensors[tid]["dtype"] == "GGML_TYPE_F32")
+            operands.update(output=weights["output"], hidden=hidden_input)
         elif kind == "attention_qk":
             operands = dict(q=op["inputs"][0], k=op["inputs"][1])
         elif kind == "attention_softmax":
@@ -197,11 +368,20 @@ def export_plan(plan, *, seed=1234):
         graph=graph, physical=asdict(physical), layer_id=aggregate.layer.id,
         actions=actions, bindings=bindings, initial_values=initial_values,
         required_runtime_flags=RUNTIME_FLAGS,
-        seed=seed, original_simulation=dict(makespan_ns=run.evaluation.makespan_ns,
+        seed=seed, original_simulation=dict(makespan_ns=evaluation.makespan_ns,
             cost_source=graph["scenario"]["costs"]["source"], measured_accuracy_claimed=False),
-        limitations=["one_invocation", "serial_launches_only", "F32_only", "no_services_or_disturbances",
+        limitations=["one_invocation" if len(scopes) == 1 else "one_round_homogeneous_dense_layers", "serial_launches_only", "F32_only", "no_services_or_disturbances",
                     "native_backing_preallocated_eviction_is_logical_not_memory_measurement"])
+    if len(scopes) > 1:
+        program["invocation_scopes"] = [asdict(scope) for scope in scopes]
+        program["layer_weight_bindings"] = weights_by_scope
+        program["source_bound_leaf_files"] = list(compiled.model.sources)
+    if lightweight_actions:
+        program["export_trace_recording"] = "profiling_actions_only_same_causal_driver"
     program["identity"] = {key: sha(program[key]) for key in ("frontend_ir", "graph", "physical", "actions", "bindings", "initial_values", "simulator_runtime_sha256")}
+    if len(scopes) > 1:
+        for key in ("invocation_scopes", "layer_weight_bindings", "source_bound_leaf_files"):
+            program["identity"][key] = sha(program[key])
     program["program_sha256"] = sha(program)
     validate_program(program)
     return program
@@ -235,6 +415,8 @@ def validate_program(program):
     compute = [a["target_id"] for a in program["actions"] if a["kind"] == "COMPUTE"]
     _require(len(compute) == len(ops) and set(compute) == set(ops), "action trace must execute the exact complete graph")
     tensors = {t["id"]: t for t in program["graph"]["workload"]["tensors"]}
+    _require(set(program["initial_values"]) == {tid for tid, t in tensors.items() if t.get("initial_locations")},
+             "initial data must match exactly the compiler's initial tensor inventory")
     for t in tensors.values():
         _require(t["dtype"] in {"GGML_TYPE_F32", "GGML_TYPE_I32"}, "unsupported tensor dtype")
         stride = 4
@@ -262,17 +444,85 @@ def validate_program(program):
             if "gate" in out:expect(out["gate"],(config["heads"]*config["head_dim"],n))
         elif kind in {"ffn_gate","ffn_up","ffn_down"}:
             w, activation = tensors[x["x0"]]["ne"], tensors[x["x1"]]["ne"]
-            _require(w[0] == activation[0] and w[2:] == [1,1], "FFN matrix reduction dimension mismatch")
-            expect(out["result"],(w[1],n))
+            interval = _ffn_view(b, tensors, config["intermediate"])
+            reduction, outputs = w[:2]
+            if interval:
+                start,end=interval
+                boundary=(program["graph"].get("boundary") or {}).get("ffn_execution") or {}
+                views=boundary.get("weight_views",[])
+                _require(any(
+                    v["source_tensor_id"]==x["x0"] and v["stage"]==kind.removeprefix("ffn_")
+                    and (v["start"],v["end"])==interval and v.get("allocation") is False
+                    and v.get("storage_bytes")==0 and v.get("copy_contract")=="complete_parent_tensor" for v in views),
+                    "full parent slice missing explicit physical view contract")
+                if kind=="ffn_down":reduction=end-start
+                else:outputs=end-start
+            _require(reduction == activation[0] and w[2:] == [1,1], "FFN matrix reduction dimension mismatch")
+            expect(out["result"],(outputs,n))
         elif kind == "dense_ffn":
             expect(x["hidden"],(h,n));expect(out["result"],(h,n))
             for role in ("post_attention_norm","gate","up","down"):expect(x[role],weight_shapes(config)[role])
         elif kind == "ffn_norm":expect(x["x0"],(h,));expect(x["x1"],(h,n));expect(out["result"],(h,n))
+    scopes = program.get("invocation_scopes", [])
+    declared = ((program["graph"].get("boundary") or {}).get("global_execution") or {}).get("invocation_scope_ids", [])
+    if len(declared) > 1:
+        _require([s["id"] for s in scopes] == declared, "multilayer scope order/inventory differs from compiler")
+        _require(len({s["round_id"] for s in scopes}) == 1, "multi-round native gates unsupported")
+        _require(len({s["layer_id"] for s in scopes}) == len(scopes), "each native round needs distinct layer identities")
+        all_ids = [oid for s in scopes for oid in s["operation_ids"]]
+        _require(len(all_ids) == len(ops) and set(all_ids) == set(ops), "multilayer operation scope inventory differs")
+        weight_bindings = program.get("layer_weight_bindings", {})
+        _require(set(weight_bindings) == set(declared), "multilayer weight binding scope inventory differs")
+        bindings = {b["operation_id"]: b for b in program["bindings"]}
+        for index, scope in enumerate(scopes):
+            scoped = [bindings[oid] for oid in scope["operation_ids"]]
+            hidden_inputs = {b["operands"]["hidden"] for b in scoped if b["kind"] == "projection"}
+            _require(hidden_inputs == set(scope["incoming_hidden"]), "scope hidden inputs differ from projection operands")
+            if index:
+                _require(hidden_inputs == set(scopes[index-1]["hidden_outputs"]), "inter-layer hidden value seam changed")
+                _require(all(not tensors[tid].get("initial_locations") for tid in hidden_inputs),
+                         "inter-layer hidden inputs must be produced, not independently initialized")
+            else:
+                _require(all(tensors[tid].get("initial_locations") for tid in hidden_inputs),
+                         "first-layer hidden input requires explicit supplied initial data")
+            layer_prefix = f"w:{scope['layer_id']}:"
+            children = ((program["graph"].get("boundary") or {}).get("ffn_execution") or {}).get("weight_children", {})
+            def owned_weight(tid):
+                if not tid.startswith(layer_prefix):
+                    return False
+                physical_ids = [tid] if tid in tensors else children.get(tid, [])
+                return bool(physical_ids) and all(leaf in tensors and leaf.startswith(layer_prefix)
+                    and tensors[leaf]["role"] == "weight" for leaf in physical_ids)
+            _require(all(owned_weight(tid) for tid in weight_bindings[scope["id"]].values()),
+                     "layer weight ownership mismatch")
+            for b in scoped:
+                _require(all(block["id"].startswith(f"kv:{scope['layer_id']}:") for block in b["history"] + b["new_kv"]),
+                         "KV state cannot be borrowed from another layer")
     return program
 
 
 def _array(values, ne):
     return np.asarray(values, dtype=np.float64).reshape(tuple(reversed(ne)))
+
+
+def _ffn_view(binding, tensors, intermediate):
+    """Recognize a full-parent slice without inventing a smaller allocation.
+
+    Materialized leaves already have the narrowed physical shape. A full
+    parent must have an explicit interval and the exact full matrix shape.
+    """
+    kind = binding["kind"]
+    if kind not in {"ffn_gate", "ffn_up", "ffn_down"}:
+        return None
+    params = binding["op_params"]
+    _require(len(params) == 2 and all(type(v) is int for v in params), "FFN slice needs explicit integer interval")
+    start, end = params
+    _require(0 <= start < end <= intermediate, "FFN slice interval outside parent")
+    weight = tensors[binding["operands"]["x0"]]["ne"]
+    axis = 0 if kind == "ffn_down" else 1
+    width = end-start
+    _require(weight[axis] in (width, intermediate), "FFN weight is neither exact parent nor materialized shard")
+    return (start, end) if weight[axis] == intermediate and width != intermediate else None
 
 
 def reference_ports(program):
@@ -356,7 +606,13 @@ def reference_ports(program):
             gate, up = mm(x["gate"], z), mm(x["up"], z)
             out[b["outputs"]["result"]] = mm(x["down"], gate/(1+np.exp(-gate))*up) + matrix(x["hidden"])
         elif kind == "ffn_norm": out[b["outputs"]["result"]] = norm(matrix(x["x1"]), x["x0"])
-        elif kind in {"ffn_gate", "ffn_up", "ffn_down"}: out[b["outputs"]["result"]] = mm(x["x0"], x["x1"])
+        elif kind in {"ffn_gate", "ffn_up", "ffn_down"}:
+            w=matrix(x["x0"])
+            interval=_ffn_view(b,tensors,c["intermediate"])
+            if interval:
+                start,end=interval
+                w=w[:,start:end] if kind=="ffn_down" else w[start:end,:]
+            out[b["outputs"]["result"]] = mm(w, x["x1"])
         elif kind == "ffn_swiglu": out[b["outputs"]["result"]] = x["x0"]/(1+np.exp(-x["x0"]))*x["x1"]
         elif kind in {"ffn_sum", "ffn_residual"}: out[b["outputs"]["result"]] = sum(x.values())
         else: raise BridgeError(f"no independent reference for {kind}")

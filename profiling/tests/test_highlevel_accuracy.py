@@ -71,7 +71,7 @@ class HighLevelAccuracyTests(unittest.TestCase):
 
     def test_actual_highlevel_frontend_and_entire_graph_exported(self):
         p=self.split
-        self.assertEqual(p["frontend_ir"]["format_version"],"hierarchical-strategy-0.2")
+        self.assertEqual(p["frontend_ir"]["format_version"],"hierarchical-strategy-0.5")
         self.assertEqual(len(p["bindings"]),len(p["graph"]["workload"]["operations"]))
         self.assertFalse(p["original_simulation"]["measured_accuracy_claimed"])
         kinds=[b["kind"] for b in p["bindings"]]

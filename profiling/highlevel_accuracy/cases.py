@@ -21,7 +21,8 @@ def build_case(directory, *, hidden=16, intermediate=32, heads=4, kv_heads=2,
                devices=("cpu", "gpu", "cpu"), attention_stages=False,
                attention_devices=("cpu", "cpu", "gpu", "gpu"), ffn_cut=None,
                ffn_devices=("cpu", "gpu"), norm_device="gpu", merge_device="gpu",
-               attention_gate="sigmoid", qk_norm="rms", reuse=False):
+               attention_gate="sigmoid", qk_norm="rms", reuse=False,
+               ffn_storage_contract="materialized_partition_replaces_parent"):
     directory = Path(directory).resolve()
     directory.mkdir(parents=True, exist_ok=True)
     _require(reuse or not any(directory.iterdir()), "case directory must be new or empty")
@@ -54,6 +55,7 @@ def build_case(directory, *, hidden=16, intermediate=32, heads=4, kv_heads=2,
         4*head_dim*heads*tokens,4*head_dim*kv_heads*tokens,8*kv_heads*head_dim,
         4*(history+tokens)*tokens*heads,4*intermediate*tokens}
     if ffn_cut is not None:
+        _require(ffn_storage_contract in {"materialized_partition_replaces_parent","shared_parent_slice_views"}, "explicit FFN storage contract required")
         _require(type(ffn_cut) is int and 0<ffn_cut<intermediate, "FFN cut must partition intermediate axis")
         for width in (ffn_cut,intermediate-ffn_cut):sizes.update((4*hidden*width,4*width*tokens))
     transfers=[dict(route=route,storage_bytes=size,duration_ns=1,provenance="synthetic_transfer") for route in ("dram_to_vram","vram_to_dram") for size in sorted(sizes)]
@@ -85,7 +87,7 @@ def build_case(directory, *, hidden=16, intermediate=32, heads=4, kv_heads=2,
         from llm_infer_model.m2.ffn_execution import KINDS
         spec=dict(format_version="ffn-execution-0.1",target_kinds=["dense_ffn"],intermediate_size=intermediate,
             shards=[dict(id="left",start=0,end=ffn_cut,device=ffn_devices[0]),dict(id="right",start=ffn_cut,end=intermediate,device=ffn_devices[1])],
-            merge_input_count=2,preprocess_device=norm_device,merge_device=merge_device,provenance="synthetic_execution",weight_storage_contract="materialized_partition_replaces_parent",
+            merge_input_count=2,preprocess_device=norm_device,merge_device=merge_device,provenance="synthetic_execution",weight_storage_contract=ffn_storage_contract,
             entries=[dict(kind=kind,device=device,phase=phase,batch=1,tokens=tokens,visible_history=history,hidden_size=hidden,intermediate_size=width,duration_ns=1,workspace_bytes=0)
                 for kind in sorted(KINDS) for device in ("cpu","gpu") for width in sorted({intermediate,ffn_cut,intermediate-ffn_cut})],
             transfer_entries=[{k:v for k,v in row.items() if k!="provenance"} for row in transfers])

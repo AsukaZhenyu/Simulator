@@ -62,9 +62,27 @@ struct Executor {
         require(str(config,"rope_mode")=="normal","normal RoPE required");
         for(auto &dtype:config.at("weight_dtypes").items()) require(dtype.value()=="f32","only F32 weight execution supported");
         bool use_gpu=false;
+        // Preallocate only locations required by the declared trace. EVICT
+        // remains logical; this is a union-of-trace backing, not a live allocator.
+        std::map<std::string,std::set<std::string>> needed;
+        std::map<std::string,json> declared_operations;
+        for(const auto &op:program.at("graph").at("workload").at("operations"))declared_operations[str(op,"id")]=op;
         for(const auto &t:program.at("graph").at("workload").at("tensors"))
-            for(const auto &location:t.value("initial_locations",json::array()))if(location=="vram")use_gpu=true;
-        for(const auto &a:program.at("actions"))if(a.value("device",json())=="gpu"||a.value("src",json())=="vram"||a.value("dst",json())=="vram")use_gpu=true;
+            for(const auto &location:t.value("initial_locations",json::array())){needed[str(t,"id")].insert(location);if(location=="vram")use_gpu=true;}
+        for(const auto &a:program.at("actions")){
+            const auto kind=str(a,"kind");
+            if(kind=="COMPUTE"){
+                const std::string loc=a.at("device")=="gpu"?"vram":"dram";
+                const auto &op=declared_operations.at(str(a,"target_id"));
+                for(const auto &id:op.at("inputs"))needed[id].insert(loc);
+                needed[str(op,"output")].insert(loc);
+                for(const auto &id:op.value("extra_outputs",json::array()))needed[id].insert(loc);
+                if(loc=="vram")use_gpu=true;
+            }else if(kind=="COPY"){
+                const auto id=str(a,"target_id"),src=str(a,"src"),dst=str(a,"dst");
+                needed[id].insert(src);needed[id].insert(dst);if(src=="vram"||dst=="vram")use_gpu=true;
+            }
+        }
         cpu=ggml_backend_cpu_init();require(cpu,"CPU initialization failed");
         const int threads=program.at("physical").at("threads");require(threads>0,"positive threads required");
         ggml_backend_cpu_set_n_threads(cpu,threads);
@@ -95,8 +113,8 @@ struct Executor {
             require(description.at("ne").size()==4&&description.at("nb").size()==4,"exact four-dimensional layout required");
             for(int i=0;i<4;++i){ne[i]=description.at("ne").at(i);require(ne[i]>0&&static_cast<uint64_t>(ne[i])<=16000000/bytes,"tensor shape overflow/envelope");require(description.at("nb").at(i)==bytes,"non-contiguous tensor rejected");bytes*=ne[i];}
             require(description.at("storage_bytes")==bytes,"storage boundary mismatch");
-            t.dram=ggml_new_tensor(dram_ctx,type,4,ne);ggml_set_input(t.dram);ggml_set_output(t.dram);
-            if(use_gpu){t.vram=ggml_new_tensor(vram_ctx,type,4,ne);ggml_set_input(t.vram);ggml_set_output(t.vram);}
+            if(needed[id].count("dram")){t.dram=ggml_new_tensor(dram_ctx,type,4,ne);ggml_set_input(t.dram);ggml_set_output(t.dram);}
+            if(needed[id].count("vram")){t.vram=ggml_new_tensor(vram_ctx,type,4,ne);ggml_set_input(t.vram);ggml_set_output(t.vram);}
             if(program.at("initial_values").contains(id)){
                 const auto &v=program.at("initial_values").at(id);require(v.size()==bytes/4,"initial value shape mismatch");
                 t.initial.resize(bytes);
@@ -194,7 +212,18 @@ struct Executor {
             auto *nrm=norm(x("hidden"),x("post_attention_norm"));auto *gate=ggml_mul_mat(ctx,x("gate"),nrm),*up=ggml_mul_mat(ctx,x("up"),nrm);
             result(ggml_add(ctx,ggml_mul_mat(ctx,x("down"),ggml_swiglu_split(ctx,gate,up)),x("hidden")));
         }else if(kind=="ffn_norm")result(norm(x("x1"),x("x0")));
-        else if(kind=="ffn_gate"||kind=="ffn_up"||kind=="ffn_down")result(ggml_mul_mat(ctx,x("x0"),x("x1")));
+        else if(kind=="ffn_gate"||kind=="ffn_up"||kind=="ffn_down"){
+            auto *weight=x("x0");const auto &p=b.at("op_params");
+            require(p.size()==2,"explicit FFN slice interval required");
+            const int64_t start=p.at(0),end=p.at(1),width=end-start;
+            require(start>=0&&end<=intermediate&&width>0,"invalid FFN slice interval");
+            const int axis=kind=="ffn_down"?0:1;
+            if(weight->ne[axis]==intermediate&&width!=intermediate){
+                if(kind=="ffn_down")weight=ggml_view_2d(ctx,weight,width,hidden,weight->nb[1],start*sizeof(float));
+                else weight=ggml_view_2d(ctx,weight,hidden,width,weight->nb[1],start*weight->nb[1]);
+            }else require(weight->ne[axis]==width,"FFN weight is neither exact parent nor shard");
+            result(ggml_mul_mat(ctx,weight,x("x1")));
+        }
         else if(kind=="ffn_swiglu")result(ggml_swiglu_split(ctx,x("x0"),x("x1")));
         else if(kind=="ffn_sum"||kind=="ffn_residual"){
             auto *v=x("x0");for(size_t i=1;i<b.at("operands").size();++i)v=ggml_add(ctx,v,x("x"+std::to_string(i)));result(v);
@@ -260,13 +289,22 @@ struct Executor {
             ports[str(op,"output")]=read(str(op,"output"),loc);
             for(const auto &tid:op.value("extra_outputs",json::array()))ports[tid.get<std::string>()]=read(tid,loc);
         }
+        json backing=json::object();size_t gpu_weights=0,host_weights=0;
+        for(const auto &item:tensors){const auto &t=item.second;
+            const auto db=t.dram?ggml_nbytes(t.dram):0,vb=t.vram?ggml_nbytes(t.vram):0;
+            backing[item.first]=json{{"dram_bytes",db},{"vram_bytes",vb}};
+            if(t.descriptor.at("role")=="weight"){gpu_weights+=vb;host_weights+=db;}}
         return json{{"format_version","highlevel-accuracy-native-v1"},{"program_sha256",program.at("program_sha256")},{"boundary_contract",BOUNDARY},
             {"mode",mode},{"warmup",warmup},{"samples",samples},{"actions",program.at("actions")},{"ports",ports},{"copies",copies},{"copy_values_equal",copy_equal},
             {"components",components},{"total_samples_ns",totals},{"timing_scope","prebuilt_graph_compute_and_materialized_ports_plus_synchronized_exact_tensor_copy"},
             {"observed_runtime_flags",json{{"GGML_CUDA_DISABLE_GRAPHS",std::getenv("GGML_CUDA_DISABLE_GRAPHS")?std::getenv("GGML_CUDA_DISABLE_GRAPHS"):""},{"NVIDIA_TF32_OVERRIDE",std::getenv("NVIDIA_TF32_OVERRIDE")?std::getenv("NVIDIA_TF32_OVERRIDE"):""},{"matmul_precision","GGML_PREC_F32"}}},
             {"final_execution_ports_captured_outside_timing",true},
             {"workspace_scope","known_gallocr_capacity_plus_CPU_cplan; CUDA_private_backend_scratch_unknown; not_complete_native_memory"},
-            {"native_memory_claimed",false},{"eviction_semantics","logical_liveness_on_preallocated_independent_backing"}};
+            {"native_memory_claimed",false},{"eviction_semantics","logical_liveness_on_preallocated_independent_backing"},
+            {"allocation_scope","union_of_required_trace_locations; not a dynamic live-memory or capacity certificate"},
+            {"allocation_backing",backing},{"gpu_weight_payload_bytes",gpu_weights},{"host_weight_payload_bytes",host_weights},
+            {"gpu_port_buffer_allocated_bytes",vram_buffer?ggml_backend_buffer_get_size(vram_buffer):0},
+            {"host_port_buffer_allocated_bytes",ggml_backend_buffer_get_size(dram_buffer)}};
     }
 };
 int main(int argc,char **argv){try{

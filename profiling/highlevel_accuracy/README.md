@@ -6,7 +6,8 @@ complete compiled frontend IR, workload graph, operation operands, materialized
 ports, exact accepted action sequence, physical descriptor and real tensor data.
 No compact FFN or hand-authored tensor IR is relabelled as high-level coverage.
 
-Supported execution is bounded explicitly: one complete F32 Dense invocation,
+Supported execution is bounded explicitly: a complete F32 Dense invocation or
+homogeneous connected Dense layers within one inference round,
 CPU/CUDA macro placements, optional public `AttentionStages` and
 `FFNPartition` transforms, normal adjacent-pair RoPE, optional Q/K RMSNorm and
 sigmoid attention gating, causal GQA, both hidden RMSNorms and both residuals.
@@ -17,11 +18,14 @@ including scores, probabilities, shard partials and appended KV, is compared
 against a separate NumPy numerical implementation.
 
 `SerialExecutionPolicy` is an explicit high-level policy. The bridge rejects
-overlapping launches, multiple invocations, other transforms, services,
+overlapping launches, multi-round trace token gates, heterogeneous per-layer
+physical configurations, other transforms, services,
 disturbances, SSD and unsupported dtypes. Export does not change or silently
 serialize a strategy. The native executor checks graph operands and exact
-independent port storage, rejects unavailable operators, checks copy contents,
-and enforces copy/eviction liveness and final output delivery.
+independent port storage, rejects unavailable operators and checks copy contents.
+The compiled ModelPlan runtime checks copy/eviction liveness and final output
+delivery; the native executor replays that accepted trace with preallocated
+backing and does not implement physical eviction.
 
 The native executor reserves independent backing allocations before timing.
 Eviction changes logical validity. It does **not** establish native allocation
@@ -33,6 +37,36 @@ the environment values and requested GGML precision parameter. Those values
 alone do not establish the internal CUDA arithmetic precision. Final timed output ports are read outside the timer and
 independently checked. CUDA private backend scratch is unknown; reported
 workspace covers gallocr capacity and CPU cplan scratch only.
+
+### Connected multilayer extension
+
+`multilayer.build_multilayer_case` uses the public `ModelPlan` compiler to
+connect actual output tensors between layers. Each layer retains distinct
+weights and KV identities; a later layer's hidden input is produced by its
+predecessor and is not independently initialized. `export_plan` verifies the
+source-bound leaf descriptors, global layer order, hidden seams, physical
+configuration and weight/KV ownership. The existing generic native executor
+requires no source or binary change for this extension.
+
+An explicit frozen component profile can evaluate new whole compositions before
+their native timing is measured:
+
+```powershell
+python -m profiling.highlevel_accuracy.multilayer_campaign prepare `
+  --out build/my-multilayer-run `
+  --profile PATH/profile-frozen.json --native-manifest PATH/manifest.json
+python -m profiling.highlevel_accuracy.multilayer_campaign collect --out build/my-multilayer-run
+python -m profiling.highlevel_accuracy.multilayer_campaign evaluate --out build/my-multilayer-run
+```
+
+The fixed extension declares four workloads, three complete macro-placement
+recipes and four fresh processes per program. It checks numerical ports and
+exact action/copy contracts and reports the old mean-error/CV thresholds
+descriptively. It does not rerun the complete original observer-control matrix.
+The Decode workload is one pass from supplied prior KV; the bridge still
+rejects multi-round trace token gates, which have no numeric token-generation
+implementation. Real MoE/cache policies, native allocator accuracy and UMA
+coherence remain outside this extension.
 
 ## Build
 

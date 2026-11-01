@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 
-HELPER_SHA256 = "ceeebc81c00a4fb760923c7b1286a7470558250488f93119c7d628dfed0872eb"
+HELPER_SHA256 = "24b9fec69f56050e92e5219ba6b59a5519b8ac2af839496d1894f1b79707d56d"
 
 
 def sha(path):

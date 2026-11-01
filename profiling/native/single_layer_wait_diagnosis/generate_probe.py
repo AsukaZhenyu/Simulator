@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 PINS = {
-    "highlevel_accuracy/highlevel_probe.cpp": "ceeebc81c00a4fb760923c7b1286a7470558250488f93119c7d628dfed0872eb",
+    "highlevel_accuracy/highlevel_probe.cpp": "24b9fec69f56050e92e5219ba6b59a5519b8ac2af839496d1894f1b79707d56d",
     "single_layer_calibration/probe.cpp": "27f8360fc6e54a090dec777c21a835d1ec29db2810aa4e453e6fb020401cb9a6",
     "single_layer_context_pair/paired.cpp": "b4690ff3828c5a3fb99c34690b9ffcdbc2c91bf7045c36558e89488d6b609a25",
 }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WindowsPerformanceRecorder Version="1.0" Author="LLM Simulator">
+  <Profiles>
+    <SystemCollector Id="OwnedThreadSystem" Name="LLMSim Owned Thread System">
+      <BufferSize Value="256"/>
+      <Buffers Value="128"/>
+      <MaximumFileSize Value="512" FileMode="Sequential"/>
+    </SystemCollector>
+    <EventCollector Id="OwnedThreadMarkers" Name="LLMSim Owned Thread Markers">
+      <BufferSize Value="64"/>
+      <Buffers Value="16"/>
+    </EventCollector>
+    <SystemProvider Id="OwnedThreadKernel">
+      <Keywords>
+        <Keyword Value="CpuConfig"/>
+        <Keyword Value="ProcessThread"/>
+        <Keyword Value="Loader"/>
+        <Keyword Value="CSwitch"/>
+        <Keyword Value="ReadyThread"/>
+        <Keyword Value="SampledProfile"/>
+        <Keyword Value="DPC"/>
+        <Keyword Value="Interrupt"/>
+      </Keywords>
+      <Stacks>
+        <Stack Value="CSwitch"/>
+        <Stack Value="ReadyThread"/>
+        <Stack Value="SampledProfile"/>
+      </Stacks>
+    </SystemProvider>
+    <EventProvider Id="OwnedThreadControl" Name="36B6F488-AAD7-48C2-AFE3-D4EC2C8B46FA" Level="5">
+      <Keywords><Keyword Value="0x10000"/></Keywords>
+    </EventProvider>
+    <Profile Id="OwnedThreads.Verbose.File" Name="OwnedThreads" Description="Bounded scheduler diagnosis; offline owned PID/TID filtering; no timing calibration" LoggingMode="File" DetailLevel="Verbose">
+      <Collectors>
+        <SystemCollectorId Value="OwnedThreadSystem"><SystemProviderId Value="OwnedThreadKernel"/></SystemCollectorId>
+        <EventCollectorId Value="OwnedThreadMarkers"><EventProviders><EventProviderId Value="OwnedThreadControl"/></EventProviders></EventCollectorId>
+      </Collectors>
+    </Profile>
+  </Profiles>
+</WindowsPerformanceRecorder>

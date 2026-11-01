@@ -1,5 +1,10 @@
 # 可复用的 GGML 与 CUDA 测量工具
 
+New physical resource experiments use [available-service calibration](available_service/README.md):
+measure a scoped physical stage against an independently evidenced external
+supply trajectory. Existing inclusive traces remain correlated diagnostic
+observations; they cannot silently become pure CPU/GPU service parameters.
+
 Performance calculation belongs to modeling. The primary integration contract is
 [physical parameter calibration](parameter_calibration/README.md): profiling owns
 raw measurements, medians, uncertainty and parameter evidence; its validation
@@ -7,6 +12,20 @@ calls `llm_infer_model.performance.evaluate` for every prediction. See
 [ownership boundaries](../docs/PERFORMANCE_BOUNDARIES.md). Existing completed-action
 measurements remain useful references; their timing scope must not be silently
 changed into pure kernel throughput or bandwidth.
+
+[Continuous state-response calibration](state_response/README.md) synchronizes
+external CPU/GPU requests, owned-process activity and action timing. It freezes
+profile-only parameters and calls the same modeling evaluator for fresh-process
+validation. Its [current accuracy report](../docs/STATE_RESPONSE_CALIBRATION_20261021.md)
+retains failed quality gates: requested background work is not a measured
+available-service fraction, and the state model is not yet hardware-qualified.
+
+[Shared service-response calibration](service_response/README.md) measures
+parameters for one model-owned CPU/GPU `g`, including cross-resource interference
+and residual history after a request stops. The [independent experiment](../docs/UNIFIED_SERVICE_RESPONSE_20261022.md)
+reports all source stability failures, fresh-process tails and combined-load
+errors. Its normalized reservoir is a declared response proxy, not an identified
+hardware queue; a computable parameter does not imply a qualified parameter.
 
 本目录采集真实执行成本，并验证这些成本能否预测组合路径。模型、精度、线程、端口、初始驻留和计时边界必须明确；程序不会把孤立矩阵乘改称完整 Attention/FFN，也不会把未知 GPU workspace 填成 0。
 

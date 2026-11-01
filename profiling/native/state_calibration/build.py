@@ -16,7 +16,7 @@ import re
 import subprocess
 
 
-HELPER_SHA256 = "ceeebc81c00a4fb760923c7b1286a7470558250488f93119c7d628dfed0872eb"
+HELPER_SHA256 = "24b9fec69f56050e92e5219ba6b59a5519b8ac2af839496d1894f1b79707d56d"
 EVENT_ABI_FILES = {
     "ggml/src/ggml-backend-impl.h": "470f4ede95a1a66edb7259981c1e8c98e2827de765323fe1672badf8f99f4546",
     "ggml/src/ggml-backend.cpp": "20e449bd92cec4c0c16ab91dc103ee6871ac6c45f22fd70f1d43bca33f171500",
