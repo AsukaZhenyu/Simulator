@@ -1,0 +1,61 @@
+{
+  "schema": "ir-acceptance-manifest-1",
+  "version": "v1-20261022",
+  "purpose": "A finite retrospective baseline for strategy expression, compiler fidelity, composition and authoring cost; not universal expressiveness or hardware accuracy.",
+  "freeze_policy": "Requirements and denominators are fixed before writing this campaign's adapters. Known implementation gaps remain in the denominator. This is not a blind held-out study.",
+  "scope": "Declared CPU plus one GPU, Dense and trace-driven MoE, finite layer/request traces, DRAM/VRAM, explicit synthetic prices. No hardware measurements or accuracy refits.",
+  "status_policy": {
+    "expression": ["complete", "partial", "unsupported", "unverified"],
+    "fidelity": ["pass", "fail", "not_tested"],
+    "unsupported": "An unimplemented strategy is a coverage gap, not an invalid strategy and not a passing negative case.",
+    "dead_end": "Policy inability to advance is not proof of global infeasibility.",
+    "oracle": "Expected semantics must be handwritten before each execution; compiler output is only the observed side. Existing handwritten references may be reused transparently."
+  },
+  "basic": [
+    {"id":"B01","name":"Module placement","requirement":"Two layers use CPU for layer0 dense_ffn and GPU for layer1 dense_ffn without changing other task devices.","oracle":"Exact per-layer device bindings, charged cross-device input/output movement, dependencies preserved."},
+    {"id":"B02","name":"Phase placement","requirement":"GPU prefill then CPU decode in a persistent two-layer trace.","oracle":"Phase devices, stable KV identities/bytes, charged GPU-to-CPU KV copies, history growth."},
+    {"id":"B03","name":"Attention stages","requirement":"Refine Attention, place QK/softmax on CPU and PV/output on GPU.","oracle":"Handwritten operand identities and tensor bytes, Q/K and probability transfers, no missing dependencies."},
+    {"id":"B04","name":"FFN tensor partition","requirement":"Partition intermediate dimension 16 into CPU [0,4) and GPU [4,16), then sum partial outputs.","oracle":"Gate/up/down leaf geometry totals 1536 bytes at H=8 F32; one 32-byte CPU partial return; exact SUM inputs."},
+    {"id":"B05","name":"Layer and round ordering","requirement":"Run two Dense layers over prefill and multiple decode rounds without inventing module barriers or resetting persistent state.","oracle":"Every consumer waits for its producer, every intended invocation completes once, persistent KV versions and identities remain valid."},
+    {"id":"B06","name":"Subbatch execution pipeline","requirement":"Declare at least two independently scheduled subbatches with CPU Attention and GPU FFN so one subbatch's CPU stage overlaps another's GPU stage.","oracle":"One high-level declaration names the stage/subbatch schedule; actual positive-duration cross-subbatch compute overlap and correct per-request dependencies. A list of serialized tasks or transform-pass pipeline alone is insufficient."},
+    {"id":"B07","name":"Weight retention and reuse","requirement":"Keep reusable weights across invocations when the cache budget permits.","oracle":"Stable tensor identity, no redundant weight reload for retained copies, every reservation counted against one shared budget."},
+    {"id":"B08","name":"Safe eviction under pressure","requirement":"Use a cache too small for both layer weights but large enough for one; evict safe weights to progress.","oracle":"Recorded EVICT of a non-running weight, no in-flight input eviction, peak cached weight payload including reservations within the budget, completed policy."},
+    {"id":"B09","name":"Cross-layer prefetch","requirement":"Prepare next-layer weights using known layer order while current-layer execution is active.","oracle":"At least one charged cross-layer prefetch COPY starts before current-layer work completes; it is not merely a startup preload."},
+    {"id":"B10","name":"Scoped CE/SM transport","requirement":"Layer0 weight copies use CE and layer1 use SM on one explicitly declared shared link.","oracle":"Actual COPY engine by static weight owner, service contract preserved, same cache budget and physical ledger."},
+    {"id":"B11","name":"Causal MoE scheduling","requirement":"Schedule experts only after route revelation while allowing public static weight catalogues.","oracle":"Two private-future traces with identical public prefix produce identical prefix decisions; unrevealed expert execution is rejected."},
+    {"id":"B12","name":"Resource-aware policy response","requirement":"A causal policy chooses or retains task placement using currently available CPU/memory state, without reading private future restoration.","oracle":"Different currently observed resource states cause the declared placement/release response; identical public prefixes with different private recovery cannot change earlier decisions. Fixed placement that merely waits is insufficient."}
+  ],
+  "combinations": [
+    {"id":"C01","name":"Attention stages + FFN partition","requirement":"Both refinements coexist in one invocation, with both handwritten operand/byte contracts preserved."},
+    {"id":"C02","name":"FFN partition + startup preparation","requirement":"Preload chosen GPU shard weights with charged copies before computation; shard merge stays correct."},
+    {"id":"C03","name":"Layer placement + cross-layer prefetch","requirement":"Layer0 CPU FFN and layer1 GPU FFN coexist with actual charged next-layer prefetch."},
+    {"id":"C04","name":"Phase placement + persistent KV migration","requirement":"Phase devices change while KV identity/history and charged migration remain correct."},
+    {"id":"C05","name":"Scoped transport + constrained shared cache","requirement":"CE/SM owner-specific copies plus safe eviction respect a single undersized global cache budget."},
+    {"id":"C06","name":"MoE routing + expert cache + CPU/GPU placement","requirement":"Revealed expert tasks use declared heterogeneous placement and bounded expert caching without route leakage."},
+    {"id":"C07","name":"Subbatch pipeline + cross-layer prefetch","requirement":"B06's explicit cross-subbatch compute overlap coexists with charged next-layer prefetch and one resource ledger."},
+    {"id":"C08","name":"Local Attention refinement + phase placement","requirement":"Refine only a selected request's Attention within an invocation and place prefill/decode tasks differently; unselected requests remain unchanged."},
+    {"id":"C09","name":"Different FFN partitions in disjoint regions","requirement":"Apply two different FFN partitions to two disjoint requests inside one invocation; preserve shared physical weight ownership without duplicate uncharged copies."},
+    {"id":"C10","name":"Scoped transport + scoped preparation + phase placement","requirement":"Layer-scoped preparation/CE-SM choices and phase-specific execution agree under one cache budget."},
+    {"id":"C11","name":"Attention + FFN partition + startup preparation","requirement":"All three mechanisms coexist, preserve exact operands/bytes, and complete under shared capacity."},
+    {"id":"C12","name":"Memory response + prefetch + cache","requirement":"Under an explicit memory reclaim event, prefetch/cache safely release or defer work and the causal controller acknowledges only after safe release, with decision cost charged."}
+  ],
+  "negative": [
+    {"id":"N01","name":"Overlapping FFN partitions","requirement":"Reject overlapping shard intervals as invalid before execution."},
+    {"id":"N02","name":"Incomplete FFN coverage","requirement":"Reject a gap/incomplete intermediate-dimension partition as invalid."},
+    {"id":"N03","name":"Missing or wrong FFN merge","requirement":"Reject missing/incorrect SUM arity rather than dropping a partial output."},
+    {"id":"N04","name":"Producer dependency violation","requirement":"Reject COMPUTE before its required input is ready with the specific dependency/readiness error."},
+    {"id":"N05","name":"In-flight input eviction","requirement":"Reject evicting an input copy from the domain of an active computation."},
+    {"id":"N06","name":"Capacity overflow","requirement":"Reject a concrete oversized COPY with a capacity error, not Unsupported or a global infeasibility claim."},
+    {"id":"N07","name":"Conflicting scoped choices","requirement":"Reject incomparable equal-priority conflicting rules instead of silently choosing declaration order."},
+    {"id":"N08","name":"Unrevealed expert execution","requirement":"Reject targeting a private future expert task before route revelation for the information-boundary reason."}
+  ],
+  "authoring": [
+    {"id":"U01","name":"Change module placement","requirement":"Change layer0 FFN from GPU to CPU by strategy declaration only; verify device and data movement."},
+    {"id":"U02","name":"Change FFN partition ratio","requirement":"Change CPU/GPU split from 4/12 to 12/4 with explicit matching synthetic prices; verify geometry and merge."},
+    {"id":"U03","name":"Change cache budget","requirement":"Change shared budget so a successful policy must safely evict weights; no compiler/modeling edits."},
+    {"id":"U04","name":"Enable cross-layer prefetch","requirement":"Switch prefetch off/on using only strategy declarations and observe charged earlier next-layer copies."},
+    {"id":"U05","name":"Change transfer engine","requirement":"Change one layer's weight engine CE to SM using the same explicit link contract and verify actual copies."},
+    {"id":"U06","name":"Change resource-response rule","requirement":"Switch the declared causal resource-response rule under the same memory/CPU scenario and verify the expected response change."}
+  ],
+  "authoring_measurement": "Successful task count and unchanged compiler/modeling hashes are measured. Record authored nonblank/noncomment lines including task-specific helpers. Do not fabricate a hand-written low-level baseline, human completion time, readability result or compression percentage if no fair paired baseline exists."
+}
