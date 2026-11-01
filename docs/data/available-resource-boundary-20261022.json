@@ -1,0 +1,315 @@
+{
+  "schema": "available-resource-boundary-delivery-1",
+  "hardware_accuracy_qualified": false,
+  "new_hardware_measurements_collected": false,
+  "old_hardware_results_replaced": false,
+  "os_scheduler_simulated": false,
+  "primary_physical_interface": "llm_simulator.performance.evaluate_available_resources",
+  "source_files_sha256": {
+    "modeling/llm_infer_model/performance/available_resources.py": "745c83a9c2529f0a262eef2fe65bcc5bb3e0c3d7823c2701d8c3e6ce87114478",
+    "modeling/llm_infer_model/performance/evaluator.py": "a985813588ad1a465fd0c236500ca17015fa249e43ac43e9fd92ba612d450a3b",
+    "modeling/llm_infer_model/performance/graph.py": "62e9acd920b9e7e7a6de24c8b4f5c015bf775bf987f04f9f4d2add05b9cd978d",
+    "modeling/llm_infer_model/performance/parameters.py": "3e505310589a6cc436f1c1430efc8b5ced264a7f27ac2e550f45edf53cb319cd",
+    "profiling/available_service/calibration.py": "be81bd8df8fc302f27bb5da7bb713160231a59a1ad1e6fe37ba2445a080a37f1",
+    "profiling/available_service/coherent.py": "0d1cf3348d6ccb3db3284013763fe517c8499964a2a53ac24d377ac80ac23dd2",
+    "profiling/service_response_snapshot.py": "e701d5c2aaa7836e70ed1db05f8932a4ef3b04a74a07f647a2d7da3b20fbb47e",
+    "src/llm_simulator/performance.py": "7dfd806db7eea0b01cd5d8c616843e5eb1c57f8165819d2b830c182ebf2d2b28"
+  },
+  "regression_checks": {
+    "modeling-final.log": {
+      "tests_run": 575,
+      "skipped": 7,
+      "failures": 0,
+      "elapsed_seconds": 26.957,
+      "sha256": "f195746bf8a5fd7d1b252248cc6062f3d3f69071c156278614063e4219d1f71b"
+    },
+    "public.log": {
+      "tests_run": 63,
+      "skipped": 0,
+      "failures": 0,
+      "elapsed_seconds": 114.938,
+      "sha256": "ddc62e77f4ecc25fbbae73b231a9d0725eeddfbc456aea67cab97a18c9cf5479"
+    },
+    "distribution-final.log": {
+      "tests_run": 1,
+      "skipped": 0,
+      "failures": 0,
+      "elapsed_seconds": 55.127,
+      "sha256": "5cdee6dac41a99807b88756e265aac5864f3aad6ea0a76791dc37752e140bf94"
+    },
+    "profiling-final.log": {
+      "tests_run": 33,
+      "skipped": 0,
+      "failures": 0,
+      "elapsed_seconds": 0.764,
+      "sha256": "e76c29ffad3a2409dfd4be95262813b460e377f774fc50aa48af5ff92924a995"
+    },
+    "response.log": {
+      "tests_run": 38,
+      "skipped": 0,
+      "failures": 0,
+      "elapsed_seconds": 2.083,
+      "sha256": "cd0be9606745308b0c95df112be6eef3034044c1d6077b2ca8be29377dae90a4"
+    },
+    "parameter-calibration.log": {
+      "tests_run": 58,
+      "skipped": 0,
+      "failures": 0,
+      "elapsed_seconds": 1.206,
+      "sha256": "39d86e9729ca6b0660d8341c52fd9de647e6a5598537a324872233a1c3b02b9f"
+    }
+  },
+  "declared_example": {
+    "scope": "declared teaching scenario, not measured hardware",
+    "os_scheduler_simulated": false,
+    "hardware_accuracy_claimed": false,
+    "constant_duration_ns": 11500000,
+    "dynamic_duration_ns": 18500000,
+    "tasks": [
+      {
+        "task_id": "submit",
+        "resource": "host",
+        "ready_ns": 0,
+        "start_ns": 0,
+        "end_ns": 3000000,
+        "duration_ns": 3000000,
+        "waiting_ns": 0
+      },
+      {
+        "task_id": "gpu_compute",
+        "resource": "gpu",
+        "ready_ns": 3000000,
+        "start_ns": 3000000,
+        "end_ns": 13000000,
+        "duration_ns": 10000000,
+        "waiting_ns": 0
+      },
+      {
+        "task_id": "host_overlap",
+        "resource": "host",
+        "ready_ns": 3000000,
+        "start_ns": 3000000,
+        "end_ns": 6500000,
+        "duration_ns": 3500000,
+        "waiting_ns": 0
+      },
+      {
+        "task_id": "wait_device",
+        "resource": "blocked_host",
+        "ready_ns": 3000000,
+        "start_ns": 3000000,
+        "end_ns": 13000000,
+        "duration_ns": 10000000,
+        "waiting_ns": 0
+      },
+      {
+        "task_id": "copy",
+        "resource": "link",
+        "ready_ns": 13000000,
+        "start_ns": 13000000,
+        "end_ns": 18000000,
+        "duration_ns": 5000000,
+        "waiting_ns": 0
+      },
+      {
+        "task_id": "resume",
+        "resource": "host",
+        "ready_ns": 18000000,
+        "start_ns": 18000000,
+        "end_ns": 18500000,
+        "duration_ns": 500000,
+        "waiting_ns": 0
+      }
+    ],
+    "timeline_origin_ns": 0,
+    "available_memory_semantics": "budget already excludes background allocations",
+    "prediction_provider": "llm_infer_model.performance.evaluate",
+    "external_background_applied_again": false
+  },
+  "coherent_diagnostic": {
+    "artifact_path": "profiling/available_service/results/external-boundary-20261022/coherent.json",
+    "artifact_file_sha256": "59783d9296c15948b81359ce22c5a5e556e7c5de04de47d9e9bca4f3d54b4459",
+    "source_records_sha256": "3b1fded7f82335b1301dc2097ad47a42f69cdbc4e6f578e33b5217148f21d85d",
+    "source_records_bytes": 166829802,
+    "all_original_invocations_checked": 14515,
+    "eligible_complete_invocations": 4488,
+    "excluded_invocations_without_one_complete_known_calibration_window": 10027,
+    "cohort_count": 12,
+    "selected_sample_count": 24,
+    "all_selected_vectors_exactly_replay": true,
+    "physical_bindings": [],
+    "unmet_physical_requirements": [
+      "independently supplied available-service trajectory on the same clock",
+      "physical stage work and exclusive active-service boundaries",
+      "separate fixed submission/resume overhead and completion waiting",
+      "established other-resource attribution or a multi-resource service model"
+    ],
+    "whole_layer_residual_fitted": false,
+    "new_accuracy_claimed": false,
+    "source_verification_scope": "record file bytes, original record digest and interval consistency only",
+    "comparisons": [
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:1995",
+        "measured_complete_call_ns": 6910700,
+        "replay_duration_ns": 6910700,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:3965",
+        "measured_complete_call_ns": 3087000,
+        "replay_duration_ns": 3087000,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:871",
+        "measured_complete_call_ns": 20826400,
+        "replay_duration_ns": 20826400,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:4110",
+        "measured_complete_call_ns": 17064900,
+        "replay_duration_ns": 17064900,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:1590",
+        "measured_complete_call_ns": 5674700,
+        "replay_duration_ns": 5674700,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:2982",
+        "measured_complete_call_ns": 3556700,
+        "replay_duration_ns": 3556700,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:2134",
+        "measured_complete_call_ns": 14747100,
+        "replay_duration_ns": 14747100,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r0-m0:block:0:iteration:3574",
+        "measured_complete_call_ns": 42913500,
+        "replay_duration_ns": 42913500,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:1433",
+        "measured_complete_call_ns": 2956200,
+        "replay_duration_ns": 2956200,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:3887",
+        "measured_complete_call_ns": 2974400,
+        "replay_duration_ns": 2974400,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:2455",
+        "measured_complete_call_ns": 10409200,
+        "replay_duration_ns": 10409200,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:3519",
+        "measured_complete_call_ns": 20385800,
+        "replay_duration_ns": 20385800,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:1839",
+        "measured_complete_call_ns": 3916800,
+        "replay_duration_ns": 3916800,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:4351",
+        "measured_complete_call_ns": 3613300,
+        "replay_duration_ns": 3613300,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:1001",
+        "measured_complete_call_ns": 40956900,
+        "replay_duration_ns": 40956900,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r1-m0:block:0:iteration:2974",
+        "measured_complete_call_ns": 36537000,
+        "replay_duration_ns": 36537000,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:1461",
+        "measured_complete_call_ns": 2881300,
+        "replay_duration_ns": 2881300,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:4330",
+        "measured_complete_call_ns": 2802200,
+        "replay_duration_ns": 2802200,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:1592",
+        "measured_complete_call_ns": 24281800,
+        "replay_duration_ns": 24281800,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:4519",
+        "measured_complete_call_ns": 8807800,
+        "replay_duration_ns": 8807800,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:2431",
+        "measured_complete_call_ns": 3651800,
+        "replay_duration_ns": 3651800,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:3873",
+        "measured_complete_call_ns": 3811700,
+        "replay_duration_ns": 3811700,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:1021",
+        "measured_complete_call_ns": 27833100,
+        "replay_duration_ns": 27833100,
+        "independently_validated_prediction": false
+      },
+      {
+        "sample_id": "profile-r2-m0:block:0:iteration:3056",
+        "measured_complete_call_ns": 24615900,
+        "replay_duration_ns": 24615900,
+        "independently_validated_prediction": false
+      }
+    ]
+  },
+  "historical_source_preservation": {
+    "summary": {
+      "source_count": 4025,
+      "archived_source_count": 474,
+      "original_source_count": 3551,
+      "failed_source_count": 0,
+      "current_original_status_counts": {
+        "unchanged": 4023,
+        "changed": 2
+      },
+      "source_preservation_verified": true
+    },
+    "manifest_sha256": "1b11a5da51f50ba3726b6e789d43b89129349a619d206ec79024129eb1bad4d8",
+    "audit_sha256": "f52442af6f53b92168fc8cf5de7f41ae3d165e2334c6f09a082d12f41189d9cf",
+    "parameter_rebuild_verified": false,
+    "raw_measurement_files_verified": false,
+    "archived_evaluator_executed": false
+  }
+}

@@ -1,0 +1,581 @@
+{
+  "schema": "steady-costs-independent-review-1",
+  "saved_at_utc": "2026-10-22T12:27:06.865665+00:00",
+  "review_scope": "read-only independent arithmetic and evaluator AST diff; only this new review receipt is written",
+  "method": {
+    "prior_direct_raw_check_completed": true,
+    "prior_direct_raw_check": "Independently parsed every heldout raw trial and the profile/observer raw trials, derived serial prices from the frozen table, and asserted identical predictions, process mean errors, P90 errors, observer effects and final case gates for all 11 cases.",
+    "receipt_materialization": "Compact receipt rechecks all metrics/CV/gates from the already-verified stored trial averages and frozen prices; does not repeat expensive raw-output parsing.",
+    "AST_review": "v1 evaluate versus v2 evaluate_v2: only process launch identity checks changed; metric/key/quality/case/trial loops unchanged; correction provenance and output paths are additive.",
+    "process_identity": "PID plus recorded launch epoch; same numeric PID requires verified earlier normal exit and nonoverlapping intervals; no OS creation-time sample claimed"
+  },
+  "sources": [
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\manifest.json",
+      "sha256": "af3b2d02a9e1ea9a7d2aba89ce16419148e4ecf3cd8a2e00fffaab71be260fb1"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\profile-frozen.json",
+      "sha256": "7b70e760a0805e6bea01d8bc95a7d2b9c3982a5bc8bb5107176debaeb4db3360"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\evaluation-v2.json",
+      "sha256": "b91cf7e7cf856b6ffc29de3acff195bd8e08129f836a0dce162fad2488dd543f"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\frozen-source-capsule-v1.json",
+      "sha256": "2970b7f7414ed58cd13fb82f3b776ba87e0ed109f28a82ae300f678dfe66ab93"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\calibration.py",
+      "sha256": "6f2a0474e2e7803eb4e7e97ecf868e59e8783ce2ed97772b8e2ce76ff36ab46e"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\offline_evaluator_v2.py",
+      "sha256": "050ebdb11c12daa32367f5a8ddd4ac3ad454a2010d14d8f4fa2ad630f1f61b48"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\modeling\\llm_infer_model\\performance\\steady_action_costs.py",
+      "sha256": "9c057eb303c7fe4b473a588fd3de83c87f37d857e42abcef405c646f16467388"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\modeling\\llm_infer_model\\performance\\graph.py",
+      "sha256": "225a7a997c9f66252d39706f31fdc8707fd0da42b2202f14529d8c8c6e8cab26"
+    },
+    {
+      "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\modeling\\llm_infer_model\\performance\\evaluator.py",
+      "sha256": "1e6313c976348b15c5742c7b6c053337a8f49048f4ae9647aef980321920d034"
+    }
+  ],
+  "formulas": {
+    "trial_mean_ns": "Fraction(trial.wall_ns, trial.repeats)",
+    "serial_prediction_ns": "sum(ceil(frozen_exact_action_mean_ns) for each declared serial invocation)",
+    "process_mean_ape": "abs(prediction - arithmetic_mean(all process trial means)) / arithmetic_mean(all process trial means)",
+    "trial_ape": "abs(prediction - trial mean) / trial mean",
+    "p90": "sorted(all 36 case trial APEs)[ceil(0.9*N)-1]",
+    "trial_cv": "sample_stdev(float(trial means), ddof=1) / float(exact arithmetic mean)",
+    "observer_difference": "mean(PROFILE full-stamped trial means) / mean(observer bare-full trial means) - 1",
+    "final_gate": "all 3 process mean gates AND case trial-average P90 gate AND all 3 process CV gates AND layer observer gate (not applicable for compact components)"
+  },
+  "denominator": {
+    "cases": 11,
+    "heldout_processes": 33,
+    "timed_repeat_batches": 396,
+    "represented_fixed_input_calls": 5472,
+    "P90_population": "trial batch-average prediction errors, not individual-call tail errors"
+  },
+  "frozen_quality_thresholds": {
+    "max_process_mean_ape": 0.1,
+    "max_trial_average_p90_ape": 0.2,
+    "max_observer_relative_mean_difference": 0.05,
+    "max_process_trial_cv": 0.1
+  },
+  "cases": [
+    {
+      "case_id": "layer-h128-q16",
+      "predicted_ns": 3324225,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-layer-h128-q16-0",
+          "mean_ape": 0.09599093879496688,
+          "trial_cv": 0.038344915917824345,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-layer-h128-q16-1",
+          "mean_ape": 0.11422917890829941,
+          "trial_cv": 0.2653802621695444,
+          "mean_gate": false,
+          "cv_gate": false
+        },
+        {
+          "job_id": "heldout-layer-h128-q16-2",
+          "mean_ape": 0.12082058244338825,
+          "trial_cv": 0.10565044337401165,
+          "mean_gate": false,
+          "cv_gate": false
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.08293875359155553,
+        "p90_ape": 0.2467647233764137,
+        "worst_ape": 0.5009832546479422,
+        "mean_ape": 0.10608244452506974,
+        "count": 36
+      },
+      "observer": [
+        {
+          "repeat": 0,
+          "relative_difference": -0.007045238601753564,
+          "passed": true
+        },
+        {
+          "repeat": 1,
+          "relative_difference": -0.09788803297281111,
+          "passed": false
+        },
+        {
+          "repeat": 2,
+          "relative_difference": 0.1583399668592339,
+          "passed": false
+        }
+      ],
+      "mean_and_trial_p90_gate": false,
+      "stability_gate": false,
+      "observer_gate": false,
+      "qualified": false,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "layer-h512-q64",
+      "predicted_ns": 21050646,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-layer-h512-q64-0",
+          "mean_ape": 0.00904568917333393,
+          "trial_cv": 0.03984696965293648,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-layer-h512-q64-1",
+          "mean_ape": 0.04123881770465926,
+          "trial_cv": 0.03880695786613714,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-layer-h512-q64-2",
+          "mean_ape": 0.05090050329662592,
+          "trial_cv": 0.031609594168563,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.04133077130017702,
+        "p90_ape": 0.08268229521602835,
+        "worst_ape": 0.11155738667941002,
+        "mean_ape": 0.0442568537327281,
+        "count": 36
+      },
+      "observer": [
+        {
+          "repeat": 0,
+          "relative_difference": 0.03212270603937857,
+          "passed": true
+        },
+        {
+          "repeat": 1,
+          "relative_difference": -0.020367188615866595,
+          "passed": true
+        },
+        {
+          "repeat": 2,
+          "relative_difference": 0.012819095954366448,
+          "passed": true
+        }
+      ],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": true,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "layer-h512-q128",
+      "predicted_ns": 40990861,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-layer-h512-q128-0",
+          "mean_ape": 0.042694631103488416,
+          "trial_cv": 0.017000911084393527,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-layer-h512-q128-1",
+          "mean_ape": 0.04822520918766464,
+          "trial_cv": 0.02159831215928188,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-layer-h512-q128-2",
+          "mean_ape": 0.05459209381273086,
+          "trial_cv": 0.025881902342856665,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.043097414707021664,
+        "p90_ape": 0.0811187590209474,
+        "worst_ape": 0.10856894435974321,
+        "mean_ape": 0.04896441207926403,
+        "count": 36
+      },
+      "observer": [
+        {
+          "repeat": 0,
+          "relative_difference": -0.003800805616940334,
+          "passed": true
+        },
+        {
+          "repeat": 1,
+          "relative_difference": 0.02673615768457925,
+          "passed": true
+        },
+        {
+          "repeat": 2,
+          "relative_difference": 0.1006194490607584,
+          "passed": false
+        }
+      ],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": false,
+      "qualified": false,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "cpu-decode4096",
+      "predicted_ns": 3271958,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-cpu-decode4096-0",
+          "mean_ape": 0.025386127572948773,
+          "trial_cv": 0.025321609435686485,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-cpu-decode4096-1",
+          "mean_ape": 0.015429606182681205,
+          "trial_cv": 0.030395597597720626,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-cpu-decode4096-2",
+          "mean_ape": 0.03176435769945706,
+          "trial_cv": 0.022985223099202427,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.026945352652329786,
+        "p90_ape": 0.054411659261467314,
+        "worst_ape": 0.09218399964950859,
+        "mean_ape": 0.03149095015016986,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "gpu-decode4096",
+      "predicted_ns": 291890,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-gpu-decode4096-0",
+          "mean_ape": 0.05587344906880954,
+          "trial_cv": 0.03363644782896173,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-decode4096-1",
+          "mean_ape": 0.022452777860146763,
+          "trial_cv": 0.05642482536624082,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-decode4096-2",
+          "mean_ape": 0.009099797434166104,
+          "trial_cv": 0.02447746482408786,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.022728843189083223,
+        "p90_ape": 0.09013618032691072,
+        "worst_ape": 0.1279381558800463,
+        "mean_ape": 0.03976566852693098,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "gpu-prefill4096-q64",
+      "predicted_ns": 338762,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-gpu-prefill4096-q64-0",
+          "mean_ape": 0.005015985877356961,
+          "trial_cv": 0.022909479788015753,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-prefill4096-q64-1",
+          "mean_ape": 0.0060665644755383205,
+          "trial_cv": 0.02224213462440497,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-prefill4096-q64-2",
+          "mean_ape": 0.0003580386563714159,
+          "trial_cv": 0.018349886376212557,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.01550221496799985,
+        "p90_ape": 0.03818859353373319,
+        "worst_ape": 0.05218200258804603,
+        "mean_ape": 0.016461725671628756,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "gpu-pv4096-q1-kv4096",
+      "predicted_ns": 114043,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-gpu-pv4096-q1-kv4096-0",
+          "mean_ape": 0.0014339853244982373,
+          "trial_cv": 0.10442164975468392,
+          "mean_gate": true,
+          "cv_gate": false
+        },
+        {
+          "job_id": "heldout-gpu-pv4096-q1-kv4096-1",
+          "mean_ape": 0.049187719831516784,
+          "trial_cv": 0.14972196477410943,
+          "mean_gate": true,
+          "cv_gate": false
+        },
+        {
+          "job_id": "heldout-gpu-pv4096-q1-kv4096-2",
+          "mean_ape": 0.02793474062728907,
+          "trial_cv": 0.1305822466096453,
+          "mean_gate": true,
+          "cv_gate": false
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.05111837673569897,
+        "p90_ape": 0.1957120818089655,
+        "worst_ape": 0.2939880054169085,
+        "mean_ape": 0.07506884780539101,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": false,
+      "observer_gate": null,
+      "qualified": false,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "gpu-pv4096-q16-kv2048",
+      "predicted_ns": 222223,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-gpu-pv4096-q16-kv2048-0",
+          "mean_ape": 0.01241747837744848,
+          "trial_cv": 0.049295616521526094,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-pv4096-q16-kv2048-1",
+          "mean_ape": 0.012751509627435343,
+          "trial_cv": 0.03914982333931605,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-gpu-pv4096-q16-kv2048-2",
+          "mean_ape": 0.0013127386015462433,
+          "trial_cv": 0.026251059966411607,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.026286578563552997,
+        "p90_ape": 0.055500597688936115,
+        "worst_ape": 0.09736366161538224,
+        "mean_ape": 0.03195301986308163,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "copy-dram-vram-16m",
+      "predicted_ns": 1727290,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-copy-dram-vram-16m-0",
+          "mean_ape": 0.03690898022698586,
+          "trial_cv": 0.03982006921201846,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-copy-dram-vram-16m-1",
+          "mean_ape": 0.03624090780840336,
+          "trial_cv": 0.03255536023136644,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-copy-dram-vram-16m-2",
+          "mean_ape": 0.013938085023639418,
+          "trial_cv": 0.0699733965827908,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.04903857545788645,
+        "p90_ape": 0.0993794354453744,
+        "worst_ape": 0.10291565899640032,
+        "mean_ape": 0.050743650753180665,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "copy-vram-dram-16m",
+      "predicted_ns": 2337736,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-copy-vram-dram-16m-0",
+          "mean_ape": 0.00413258343153071,
+          "trial_cv": 0.06396526094187209,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-copy-vram-dram-16m-1",
+          "mean_ape": 0.01728055909514864,
+          "trial_cv": 0.04500657819689451,
+          "mean_gate": true,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-copy-vram-dram-16m-2",
+          "mean_ape": 0.010295310479135051,
+          "trial_cv": 0.07635421863278082,
+          "mean_gate": true,
+          "cv_gate": true
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.03437006254701525,
+        "p90_ape": 0.06553169376517733,
+        "worst_ape": 0.18208250511146828,
+        "mean_ape": 0.04333491510308824,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": true,
+      "stability_gate": true,
+      "observer_gate": null,
+      "qualified": true,
+      "matches_evaluator": true
+    },
+    {
+      "case_id": "copy-dram-dram-16m",
+      "predicted_ns": 758579,
+      "heldout_trial_count": 36,
+      "processes": [
+        {
+          "job_id": "heldout-copy-dram-dram-16m-0",
+          "mean_ape": 0.031607305890794114,
+          "trial_cv": 0.11128423732338233,
+          "mean_gate": true,
+          "cv_gate": false
+        },
+        {
+          "job_id": "heldout-copy-dram-dram-16m-1",
+          "mean_ape": 0.12022668014195198,
+          "trial_cv": 0.03255148641745698,
+          "mean_gate": false,
+          "cv_gate": true
+        },
+        {
+          "job_id": "heldout-copy-dram-dram-16m-2",
+          "mean_ape": 0.042399375908046634,
+          "trial_cv": 0.10368934240304378,
+          "mean_gate": true,
+          "cv_gate": false
+        }
+      ],
+      "trial_average_errors": {
+        "median_ape": 0.10361998281426858,
+        "p90_ape": 0.17583833555151154,
+        "worst_ape": 0.20710862578065797,
+        "mean_ape": 0.10188683152249468,
+        "count": 36
+      },
+      "observer": [],
+      "mean_and_trial_p90_gate": false,
+      "stability_gate": false,
+      "observer_gate": null,
+      "qualified": false,
+      "matches_evaluator": true
+    }
+  ],
+  "all_cases_match": true,
+  "qualified_cases": 7,
+  "hardware_measurement_executed": false,
+  "new_measurements": false,
+  "model_or_price_refit": false,
+  "existing_source_or_evidence_modified": false,
+  "raw_trials_excluded": false
+}

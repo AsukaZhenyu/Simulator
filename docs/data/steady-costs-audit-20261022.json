@@ -1,0 +1,1534 @@
+{
+  "schema": "steady-cost-audit-1",
+  "audited_at_utc": "2026-10-22T12:16:32.783135+00:00",
+  "manifest": {
+    "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\manifest.json",
+    "sha256": "af3b2d02a9e1ea9a7d2aba89ce16419148e4ecf3cd8a2e00fffaab71be260fb1"
+  },
+  "frozen": {
+    "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\profile-frozen.json",
+    "sha256": "7b70e760a0805e6bea01d8bc95a7d2b9c3982a5bc8bb5107176debaeb4db3360"
+  },
+  "source_capsule": {
+    "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\frozen-source-capsule-v1.json",
+    "sha256": "2970b7f7414ed58cd13fb82f3b776ba87e0ed109f28a82ae300f678dfe66ab93"
+  },
+  "jobs": {
+    "profile": 33,
+    "observer": 9,
+    "heldout": 33,
+    "diagnostic": 18
+  },
+  "timed_trials": {
+    "profile": 264,
+    "observer": 72,
+    "heldout": 396,
+    "diagnostic": 144
+  },
+  "represented_repetitions": {
+    "profile": 3648,
+    "observer": 576,
+    "heldout": 5472,
+    "diagnostic": 2112
+  },
+  "individual_repetition_tail_observed": false,
+  "explicit_zero_resolution_entries": 0,
+  "source_inventory_verified": true,
+  "all_raw_native_hashes_verified": true,
+  "all_93_jobs_normal_exit": true,
+  "all_independent_numerical_checks_passed": true,
+  "newline_inventory": {
+    "no_crlf_files": 336,
+    "crlf_files": 15
+  },
+  "records": [
+    {
+      "job_id": "profile-layer-h128-q16-0",
+      "process_id": 16944,
+      "launch_epoch": "2026-10-22T11:55:20.164120+00:00",
+      "completed_at": "2026-10-22T11:55:23.122300+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-0\\execution.json",
+        "sha256": "41e19b6101089382af2b96fdd2f799269f2901878caa39aba8dcbc07b3db3184"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-0\\result.json",
+        "sha256": "8acb3afa7e9fb5a3f3cd867e9fa8401a04b5055d10ce4fe905c29286f2ddbe87"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h128-q16-0",
+      "process_id": 43908,
+      "launch_epoch": "2026-10-22T12:01:53.853879+00:00",
+      "completed_at": "2026-10-22T12:01:56.751645+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-0\\execution.json",
+        "sha256": "7cfef9220222fcb9f0302ac4d11c787e05df4ba7b6ddca207e516f3bdc3995eb"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-0\\result.json",
+        "sha256": "4098fce114937185b7c425f7cf9a80faa6be8a2d964da2fea3a49675de21146e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h128-q16-0",
+      "process_id": 36264,
+      "launch_epoch": "2026-10-22T12:08:32.256701+00:00",
+      "completed_at": "2026-10-22T12:08:35.307803+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-0\\execution.json",
+        "sha256": "6b01487d7356e74aad6b429007c7ff1a091a74c83eae0b2998713225f98bb657"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-0\\result.json",
+        "sha256": "e042df34a010b20f7aee504c8bfab11db23c8b80e4d5e8b9b1359e0b305a616c"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h128-q16-1",
+      "process_id": 28232,
+      "launch_epoch": "2026-10-22T11:55:28.139686+00:00",
+      "completed_at": "2026-10-22T11:55:31.356397+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-1\\execution.json",
+        "sha256": "dda1ce38513a54ff48f18d39b31ea6141c3f42115282ac993905542e85801a33"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-1\\result.json",
+        "sha256": "2c6ecc38c3a1b847be99285ee0945473e825cfe8c786a7c87b969be4da70116e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h128-q16-1",
+      "process_id": 38716,
+      "launch_epoch": "2026-10-22T12:02:01.470683+00:00",
+      "completed_at": "2026-10-22T12:02:04.909975+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-1\\execution.json",
+        "sha256": "fd969d20751b6f66d7103d46750e4a38f56bb9915ac68edfb7e7850471bf5aa7"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-1\\result.json",
+        "sha256": "177638bb9726cb4cc275e4029c5f70de71716c55081fa937ab77ccebe5d46279"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h128-q16-1",
+      "process_id": 7220,
+      "launch_epoch": "2026-10-22T12:08:40.294655+00:00",
+      "completed_at": "2026-10-22T12:08:44.116510+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-1\\execution.json",
+        "sha256": "952ef47d52e53f8db9a4a1f1caae7432107946e52891bafd943617a8529754a7"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-1\\result.json",
+        "sha256": "9fe2826bfb964d8812b67dcefb42eb1934da03a881f5572a2948046631f91da3"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h128-q16-2",
+      "process_id": 3588,
+      "launch_epoch": "2026-10-22T11:55:36.260262+00:00",
+      "completed_at": "2026-10-22T11:55:39.494984+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-2\\execution.json",
+        "sha256": "2fccd3fb2f7c55f0cd3ecf103d6ff2bf6c389e89b04e12cf913895049d1d98e6"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h128-q16-2\\result.json",
+        "sha256": "96b8a37df3e90bef273dc55ae2d795adc75ebf261bbb39f99f1e199b4fee6791"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h128-q16-2",
+      "process_id": 12680,
+      "launch_epoch": "2026-10-22T12:02:09.670373+00:00",
+      "completed_at": "2026-10-22T12:02:12.988819+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-2\\execution.json",
+        "sha256": "493d6d13d3f3d754ca7271a6663e871fe8b1cf9ea1ed3fb27054fb4cccf09502"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h128-q16-2\\result.json",
+        "sha256": "3dd77c80fba2210c444019318695fdbda5a59e22e5d31d9ed20d31f5b2cfb5ca"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h128-q16-2",
+      "process_id": 12092,
+      "launch_epoch": "2026-10-22T12:08:49.105929+00:00",
+      "completed_at": "2026-10-22T12:08:52.841873+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-2\\execution.json",
+        "sha256": "2c5359675f770747247ff1c4086dc8a1632ff63aa78b287e08891b460950b556"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h128-q16-2\\result.json",
+        "sha256": "20f5bb2b8ac44a49847702b7e4b17b743416f97041c170a1545864042bfc6ae6"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q64-0",
+      "process_id": 27148,
+      "launch_epoch": "2026-10-22T11:55:44.419873+00:00",
+      "completed_at": "2026-10-22T11:56:06.493517+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-0\\execution.json",
+        "sha256": "c3aba7a52ebedb9683b149308bbc060096edc50c672c8cce909b3e7917a9c8fa"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-0\\result.json",
+        "sha256": "b3a9416a5ab0a660767561da9cc6a0eeee8c840c11a305228eff0c6ed86b0ee5"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q64-0",
+      "process_id": 46268,
+      "launch_epoch": "2026-10-22T12:02:17.801455+00:00",
+      "completed_at": "2026-10-22T12:02:40.012142+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-0\\execution.json",
+        "sha256": "ec33ea6a5f3d5a20f3c291a5e828441c6f34074f648c579168f77a1cb89d79fe"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-0\\result.json",
+        "sha256": "c43ea1002a665b96c3b5bbfdc05e6fa9b9b769cd6486a0bb0812e60a0508eb59"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q64-0",
+      "process_id": 41888,
+      "launch_epoch": "2026-10-22T12:08:57.742839+00:00",
+      "completed_at": "2026-10-22T12:09:19.428544+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-0\\execution.json",
+        "sha256": "ec387fd7b5a3520369a263739286eb9cc773cc10fe49e85dd2c83519b4ad6905"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-0\\result.json",
+        "sha256": "2163d40a55caf66535454a43ab7cd814f1464fe366f54118dc7639bf07ede3f4"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q64-1",
+      "process_id": 23088,
+      "launch_epoch": "2026-10-22T11:56:11.206940+00:00",
+      "completed_at": "2026-10-22T11:56:32.430811+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-1\\execution.json",
+        "sha256": "955a3686bb311c74990f75df56fa025a94e5ce737a22335582fab0176bd4265b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-1\\result.json",
+        "sha256": "7c16b4daba803c5ac6af466801ac76a3852e6c3b2242d5dac333a98a7f846b14"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q64-1",
+      "process_id": 30272,
+      "launch_epoch": "2026-10-22T12:02:44.776600+00:00",
+      "completed_at": "2026-10-22T12:03:05.582505+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-1\\execution.json",
+        "sha256": "ef13babc6723d85ef4cfcce43e2d18b645b56f0775a95da5ad0441f4fe564232"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-1\\result.json",
+        "sha256": "0d107f2b09a0d8d50555a1680d0fb9bbbca8835c8d04f44e90dd1d67a6ff5ae4"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q64-1",
+      "process_id": 33376,
+      "launch_epoch": "2026-10-22T12:09:24.220420+00:00",
+      "completed_at": "2026-10-22T12:09:45.633991+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-1\\execution.json",
+        "sha256": "8734a309acd74696f96bbac21446d6fa71ecb71a512c4e7145326dda74973c02"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-1\\result.json",
+        "sha256": "e8792b42ca51a75cbe355d7704989251a3518dfabb20b6f2385a2ff21d3b23db"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q64-2",
+      "process_id": 984,
+      "launch_epoch": "2026-10-22T11:56:37.203159+00:00",
+      "completed_at": "2026-10-22T11:56:58.186587+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-2\\execution.json",
+        "sha256": "b0ff9e8548654bbf9ef4326b6e613a418397fe0ccf20c66ceb4f4cfa94642986"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q64-2\\result.json",
+        "sha256": "c845e9662533fafe6a683a0f4d20a631cb57b0873fcd0845a590e108a183d4a5"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q64-2",
+      "process_id": 22836,
+      "launch_epoch": "2026-10-22T12:03:10.234183+00:00",
+      "completed_at": "2026-10-22T12:03:30.907311+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-2\\execution.json",
+        "sha256": "e6af7518c8373f07581c1bf1c6a03aa7e4b5e008b0f18d38e159aacf98031d43"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q64-2\\result.json",
+        "sha256": "7259a805978f277e5ea849dabc98b48656db2432fb40030ffc6a9ae0066204f6"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q64-2",
+      "process_id": 42160,
+      "launch_epoch": "2026-10-22T12:09:50.306769+00:00",
+      "completed_at": "2026-10-22T12:10:11.754489+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-2\\execution.json",
+        "sha256": "ddb71aaef54e4d3c7d7a1c418908161cb812eb135b40b74353b18ee168ca1110"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q64-2\\result.json",
+        "sha256": "de77ef4afed64a967e34138fdf8c65bd59038e470e89d8de3ef4ec6d02911a2f"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q128-0",
+      "process_id": 22276,
+      "launch_epoch": "2026-10-22T11:57:02.837165+00:00",
+      "completed_at": "2026-10-22T11:57:26.911518+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-0\\execution.json",
+        "sha256": "0fe45ecb3d970251f5d523961deaa5898b2380070b2c952e9c92cfa32ccd093f"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-0\\result.json",
+        "sha256": "be67ba1008008ad8f67a01818b32e9f839a9b2828bb3abc2055899cb311568c4"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q128-0",
+      "process_id": 22936,
+      "launch_epoch": "2026-10-22T12:03:35.513524+00:00",
+      "completed_at": "2026-10-22T12:03:59.395024+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-0\\execution.json",
+        "sha256": "f81fa75bb09a4ed4538ecb38f81db84d368638a7134275f456631739855e3ea4"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-0\\result.json",
+        "sha256": "598161ed16b0ceabe3cf52c3e7622be6b224d01db3b9806d0f0e9f98e6f3407e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q128-0",
+      "process_id": 15508,
+      "launch_epoch": "2026-10-22T12:10:16.438383+00:00",
+      "completed_at": "2026-10-22T12:10:41.837223+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-0\\execution.json",
+        "sha256": "115a7939a7f153407bfa05a16eb40c406aa218050f737a05cf3156be7884d4b1"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-0\\result.json",
+        "sha256": "e4c4ad88c8e65cef7d95d5d17bed91a9ae509cecf847f9f86a8c96978ce81268"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q128-1",
+      "process_id": 19832,
+      "launch_epoch": "2026-10-22T11:57:31.622898+00:00",
+      "completed_at": "2026-10-22T11:57:57.111591+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-1\\execution.json",
+        "sha256": "8602689678cff47fc3b17468d06515fd594caa55891b67707bab55c740821df0"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-1\\result.json",
+        "sha256": "f31ed7271611c9c1880bec3e6a118b21fca3dbd392100eac2725a30ba3c6e75c"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q128-1",
+      "process_id": 21644,
+      "launch_epoch": "2026-10-22T12:04:04.102534+00:00",
+      "completed_at": "2026-10-22T12:04:28.248876+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-1\\execution.json",
+        "sha256": "60b1ea6cca42f8f513ec188bb5e5a2a622ec9d59f966b266ba1db9133c6ff359"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-1\\result.json",
+        "sha256": "9bc7ff3a51fe55644e00df8138483d033169880ef9d56add22060b48b0793cbb"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q128-1",
+      "process_id": 44412,
+      "launch_epoch": "2026-10-22T12:10:46.482302+00:00",
+      "completed_at": "2026-10-22T12:11:11.861436+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-1\\execution.json",
+        "sha256": "0b76f813e081a280bdf8e0edb8a258350b4eefa7b86de34aac256dec30f3507d"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-1\\result.json",
+        "sha256": "a67c280ad21c303614a606611c5e77bdac56c3d43a5059d163abbfd5430bdb1f"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-layer-h512-q128-2",
+      "process_id": 36244,
+      "launch_epoch": "2026-10-22T11:58:02.287593+00:00",
+      "completed_at": "2026-10-22T11:58:28.176495+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-2\\execution.json",
+        "sha256": "8875065f26cfda325f295555119a87b8619afbeef07df4929aace927548b693e"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-layer-h512-q128-2\\result.json",
+        "sha256": "1b8a677e5e59699225e56db3a9a08edba8cbf8b18b7863301380b39484a9099d"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "observer-layer-h512-q128-2",
+      "process_id": 33804,
+      "launch_epoch": "2026-10-22T12:04:32.923084+00:00",
+      "completed_at": "2026-10-22T12:04:57.100255+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-2\\execution.json",
+        "sha256": "8f8f1d1f19b0ce9eb4ce71faf5af196c06876144c9e6468fce782ac252a5c75c"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\observer-layer-h512-q128-2\\result.json",
+        "sha256": "9bce6331f7770af6fdd9b0d49a2f3aeb2a472a27ab7e7d06da63109b0ca7eeb0"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-layer-h512-q128-2",
+      "process_id": 26156,
+      "launch_epoch": "2026-10-22T12:11:16.622947+00:00",
+      "completed_at": "2026-10-22T12:11:41.969805+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-2\\execution.json",
+        "sha256": "642e0c3e51a55e06315902de9a39e7357e5c7770109c94f50bba3813ac1856fc"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-layer-h512-q128-2\\result.json",
+        "sha256": "1280d516ed32c40842e65d9b5b6b823779b1ad17eed9dfd2eb27ef33cb4aee2c"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-pv-0",
+      "process_id": 47984,
+      "launch_epoch": "2026-10-22T12:05:23.335172+00:00",
+      "completed_at": "2026-10-22T12:05:46.958620+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-0\\execution.json",
+        "sha256": "e990ab5999fd7b67063d7761037a4b7021856249e5820348e90850b34884c044"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-0\\result.json",
+        "sha256": "e16d51e225ae72059fcbe2e872f35300bdf7c3a4978408d72a9344744606dd7d"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-pv-1",
+      "process_id": 27740,
+      "launch_epoch": "2026-10-22T12:05:51.944845+00:00",
+      "completed_at": "2026-10-22T12:06:16.104820+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-1\\execution.json",
+        "sha256": "14d356b8ac6c77af2bb35e7969d384fb36e2efa87f06b208e8ef470cd20157ae"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-1\\result.json",
+        "sha256": "10356c674faaded120bbc6cf9c02c947a5eb5c86a2bec7d85ee5245ebbfdc16f"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-pv-2",
+      "process_id": 45852,
+      "launch_epoch": "2026-10-22T12:06:21.102310+00:00",
+      "completed_at": "2026-10-22T12:06:44.078003+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-2\\execution.json",
+        "sha256": "7774ca06e13fede400373d3f951a3b5352eedada7f1a62fe578315fd6a00c7d4"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-pv-2\\result.json",
+        "sha256": "6604b47de1c8ffa743e30f1d08925f3a2efbcbe2e3cce40646e7bc586b7322a5"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-cpu-decode4096-0",
+      "process_id": 43820,
+      "launch_epoch": "2026-10-22T11:58:32.961351+00:00",
+      "completed_at": "2026-10-22T11:58:34.606629+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-0\\execution.json",
+        "sha256": "3f21a9caa8da3179caa9449ba39f0ad6ac4856247ee5e458c35b53249fcb04ea"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-0\\result.json",
+        "sha256": "dbf41714d428b803b72bdae43f62293971e58c3e532588a2cb6495b03f583bc7"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-cpu-decode4096-0",
+      "process_id": 33784,
+      "launch_epoch": "2026-10-22T12:11:46.715451+00:00",
+      "completed_at": "2026-10-22T12:11:48.560205+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-0\\execution.json",
+        "sha256": "3b6d745936ec5a43ea2a64b6c1b9d42025ff09ea985346c983627a07283dbb29"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-0\\result.json",
+        "sha256": "6e7fe87d3e0024e268bdc1b19cc159ab32c239cd627052ea22a80c68b46796a9"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-cpu-decode4096-1",
+      "process_id": 888,
+      "launch_epoch": "2026-10-22T11:58:39.272124+00:00",
+      "completed_at": "2026-10-22T11:58:40.837829+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-1\\execution.json",
+        "sha256": "ebad97603fbf5eeeccbbf6b468f0b6137c2693816e7d817b6c3c17f19c302ac1"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-1\\result.json",
+        "sha256": "e3dda553607a642d792c4db879bec1da79ee66d4cd15c981850766d60f7a95fe"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-cpu-decode4096-1",
+      "process_id": 6104,
+      "launch_epoch": "2026-10-22T12:11:53.172378+00:00",
+      "completed_at": "2026-10-22T12:11:54.930221+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-1\\execution.json",
+        "sha256": "902bfece752b844796355bd98fffe57c18783e2e31afb781fcb139b31eefd805"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-1\\result.json",
+        "sha256": "133bac869e2514c35d536fd27f9e9084b5a7f9de99ce57032bd8be0bd6d39671"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-cpu-decode4096-2",
+      "process_id": 40504,
+      "launch_epoch": "2026-10-22T11:58:45.488508+00:00",
+      "completed_at": "2026-10-22T11:58:47.053646+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-2\\execution.json",
+        "sha256": "a26b42274fd178dc3d906044777e86f58a3fb2f7b23766f94a29dd51e11bfd76"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-cpu-decode4096-2\\result.json",
+        "sha256": "174b1939d00a7a8c23739d2a16d2d7da7b66d3e63b370085972027fc2478f37a"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-cpu-decode4096-2",
+      "process_id": 44332,
+      "launch_epoch": "2026-10-22T12:11:59.556046+00:00",
+      "completed_at": "2026-10-22T12:12:01.305689+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-2\\execution.json",
+        "sha256": "aeeb57c7dbfcbc9d31fc74e765c7493592d20bebced49a28376293099ccd0568"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-cpu-decode4096-2\\result.json",
+        "sha256": "9b8f218e4f870ab89e2fc1a16b44ce1f2435623ca063c225291105631d4716e4"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-decode4096-0",
+      "process_id": 37636,
+      "launch_epoch": "2026-10-22T11:58:51.720688+00:00",
+      "completed_at": "2026-10-22T11:58:53.310120+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-0\\execution.json",
+        "sha256": "4ff3e8f955518df1ab8af079799e372dcfd36e42abc78c38d005a63e82268d03"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-0\\result.json",
+        "sha256": "055df16fc736c12c2978bc6bfb877cd0a01e3794a77e3b33b33906c790269415"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-decode4096-0",
+      "process_id": 14312,
+      "launch_epoch": "2026-10-22T12:12:05.906547+00:00",
+      "completed_at": "2026-10-22T12:12:07.429410+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-0\\execution.json",
+        "sha256": "d9be43305fe1c8314628fb23a384d13b03d320951c7245065ffd6a797c4c6566"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-0\\result.json",
+        "sha256": "d4fa859be3deb1f3acc940b9ec781afa75d23479621cbcb42278da3e43423c3b"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-decode4096-1",
+      "process_id": 31628,
+      "launch_epoch": "2026-10-22T11:58:57.936141+00:00",
+      "completed_at": "2026-10-22T11:58:59.518762+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-1\\execution.json",
+        "sha256": "3ce24b9038c0ba96a59ef11821197fb4f209accbf110eeb929847707a9cc4721"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-1\\result.json",
+        "sha256": "8d350d44a7d8c0ffffd23ca54161e79aeab6f9583edc09d3f089c7fafadd8127"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-decode4096-1",
+      "process_id": 29592,
+      "launch_epoch": "2026-10-22T12:12:12.062737+00:00",
+      "completed_at": "2026-10-22T12:12:13.563228+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-1\\execution.json",
+        "sha256": "36f5f846ca4b70e374a62fa004b6d5d05ab9642665e3b0ada1ac0886bc562887"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-1\\result.json",
+        "sha256": "80048ef3ec02f8296378a5552658fb0b9bd31a52fbcf5a6941de141dcc247512"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-decode4096-2",
+      "process_id": 25808,
+      "launch_epoch": "2026-10-22T11:59:04.156788+00:00",
+      "completed_at": "2026-10-22T11:59:05.758976+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-2\\execution.json",
+        "sha256": "ef2bb0da91bca6b380baf2c2d0a34f6369e966e67b7db6e7553bfc0c57ed5d05"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-decode4096-2\\result.json",
+        "sha256": "2f7f356b34abc0dcd3ce662cdde91b35b3890178a75de99334f95134a7d52be2"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-decode4096-2",
+      "process_id": 24324,
+      "launch_epoch": "2026-10-22T12:12:18.257917+00:00",
+      "completed_at": "2026-10-22T12:12:19.780662+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-2\\execution.json",
+        "sha256": "3af6cc957cc67eb6aa945c548543e3cb5f07484b9e3e9927b7efe015cf1c1070"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-decode4096-2\\result.json",
+        "sha256": "5ff0b04e3a846bc0393e4a8e7d9d734a9b5eb43d49808e1366b287c32d4ca7e8"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-idle-sync-0",
+      "process_id": 17800,
+      "launch_epoch": "2026-10-22T12:06:48.834979+00:00",
+      "completed_at": "2026-10-22T12:06:49.971206+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-0\\execution.json",
+        "sha256": "0caa6f030cd9eafff22e0c169b8661a91009163af2bdcb0e6c5a9dc0794b7f92"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-0\\result.json",
+        "sha256": "01f234bc59979080a0705330743e2f21356396569f1e21e329b2438b4ee26066"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-idle-sync-1",
+      "process_id": 47908,
+      "launch_epoch": "2026-10-22T12:06:54.636351+00:00",
+      "completed_at": "2026-10-22T12:06:55.691848+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-1\\execution.json",
+        "sha256": "7041d55258c750c5bf501686bdd65446779bf0947ac522ee28968d358b18ff88"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-1\\result.json",
+        "sha256": "5ce8c595b4ebfb495260415bfe765cfd88afd9248a820aa10f56cfdb31c8d9a5"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-idle-sync-2",
+      "process_id": 35496,
+      "launch_epoch": "2026-10-22T12:07:00.388676+00:00",
+      "completed_at": "2026-10-22T12:07:01.357789+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-2\\execution.json",
+        "sha256": "629672b968299a06b1f1b15f53aea5f1a0facf4b556afac911af00d1cc3dea54"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-idle-sync-2\\result.json",
+        "sha256": "51fa31d89ce8a42ad4f621c9e1b0f1ef2ec6abed56023860d3b72372bcfe8fc6"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-prefill4096-q64-0",
+      "process_id": 38668,
+      "launch_epoch": "2026-10-22T11:59:10.382379+00:00",
+      "completed_at": "2026-10-22T11:59:12.505636+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-0\\execution.json",
+        "sha256": "c37c3f5c24ab9ec0d51b37b5b9b492a3ea956ac40b58130ffb8d192030403706"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-0\\result.json",
+        "sha256": "830ced70cedb47e3cc16b32b3673d98a231c36ea8140ae19fa45a4121c86645e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-prefill4096-q64-0",
+      "process_id": 27080,
+      "launch_epoch": "2026-10-22T12:12:24.442573+00:00",
+      "completed_at": "2026-10-22T12:12:26.811205+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-0\\execution.json",
+        "sha256": "89fa9520fa6e1e54a967050063949274063af2feac5b8007fb46c5e14da1b0d1"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-0\\result.json",
+        "sha256": "78f383dbbcbe40955cd856e8e3719e006f0224db1134338713e54728510e3272"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-prefill4096-q64-1",
+      "process_id": 36264,
+      "launch_epoch": "2026-10-22T11:59:17.157061+00:00",
+      "completed_at": "2026-10-22T11:59:19.433685+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-1\\execution.json",
+        "sha256": "51164ef513c2123a4ffb8e3c70e834f99018b7387c82b9a020d62534b248da1b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-1\\result.json",
+        "sha256": "d5512e697434b9f281dc74fd2c5342e743454b5e83acfdda5ba72b88f4131441"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-prefill4096-q64-1",
+      "process_id": 33660,
+      "launch_epoch": "2026-10-22T12:12:31.469090+00:00",
+      "completed_at": "2026-10-22T12:12:33.750430+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-1\\execution.json",
+        "sha256": "1c7daefb3dba0f1dfcaa3575b5055dc5f0ea1829be321b93a279a915a1af695f"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-1\\result.json",
+        "sha256": "a08a4f2eba667f8d29963ea6856773146549c47df97205076342e269932ff712"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-prefill4096-q64-2",
+      "process_id": 47784,
+      "launch_epoch": "2026-10-22T11:59:24.135799+00:00",
+      "completed_at": "2026-10-22T11:59:26.418552+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-2\\execution.json",
+        "sha256": "8e0ec0a5a6bfd016d54b80e90200982c64b55e1bc254513a3475aa76e5f0aedf"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-prefill4096-q64-2\\result.json",
+        "sha256": "5e76f32bc55332b2b5ea45ca1696a957582454a53fcc919393d313eb6543fad6"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-prefill4096-q64-2",
+      "process_id": 37352,
+      "launch_epoch": "2026-10-22T12:12:38.409872+00:00",
+      "completed_at": "2026-10-22T12:12:40.719207+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-2\\execution.json",
+        "sha256": "aae365fd3214706345addc2e46a596bf900d395d393324398d7a7b9a717bebfc"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-prefill4096-q64-2\\result.json",
+        "sha256": "afb7310bce1f1c8c0d9efdcd9752f16e8f931806ffe9fd222dbbd822f4dbbaee"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-0-bare",
+      "process_id": 41988,
+      "launch_epoch": "2026-10-22T12:07:05.977515+00:00",
+      "completed_at": "2026-10-22T12:07:08.197984+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-0-bare\\execution.json",
+        "sha256": "c275c411d16594492151b0c8b2e5328d7852ea6c6ba518c62d617b338679dd44"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-0-bare\\result.json",
+        "sha256": "711a00b3b8569fcb454b0abd74f2abd520438e8c47393e1a693f86e83c88ff1b"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-0-events",
+      "process_id": 45752,
+      "launch_epoch": "2026-10-22T12:07:12.818157+00:00",
+      "completed_at": "2026-10-22T12:07:15.100783+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-0-events\\execution.json",
+        "sha256": "128560fb34821442f6a1cdbe0f008f158dffda6c109d0ff5fcc60c738365dd46"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-0-events\\result.json",
+        "sha256": "cb0c6d659e1f2b975cea31543d89da5bb2ff3f2e8b82ee13d5d87e2ef2b5019c"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-1-bare",
+      "process_id": 2796,
+      "launch_epoch": "2026-10-22T12:07:19.722192+00:00",
+      "completed_at": "2026-10-22T12:07:21.978065+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-1-bare\\execution.json",
+        "sha256": "fa4396fc167f445714f30b94ad9c36c1767709e96240edf705a9db0639453bb6"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-1-bare\\result.json",
+        "sha256": "2ec54cdc3ee8936299c9979e3df8c5575e119b4a77d9bd209b848536ae05df10"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-1-events",
+      "process_id": 24244,
+      "launch_epoch": "2026-10-22T12:07:26.645804+00:00",
+      "completed_at": "2026-10-22T12:07:28.918833+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-1-events\\execution.json",
+        "sha256": "8b4608f5d44d812e81f0cec7f80cd16c203b57fad25524241914066fc1e20827"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-1-events\\result.json",
+        "sha256": "2d0209fdb91903cc561c1716c7c24a5981917fd4a70f83cddefbbbca983103a9"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-2-bare",
+      "process_id": 15992,
+      "launch_epoch": "2026-10-22T12:07:33.595556+00:00",
+      "completed_at": "2026-10-22T12:07:35.922629+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-2-bare\\execution.json",
+        "sha256": "385b66c5737c39264e1d66cd101566d3aa5e133f6b411d9c9dfc97fb7649d776"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-2-bare\\result.json",
+        "sha256": "a2f9e0dfdcb57e53b06777f1184e8f1dd2044d34ed17b78ad68c3ffaf4846556"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-prefill4096-q64-2-events",
+      "process_id": 13632,
+      "launch_epoch": "2026-10-22T12:07:40.627424+00:00",
+      "completed_at": "2026-10-22T12:07:42.918782+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-2-events\\execution.json",
+        "sha256": "4a29573abf781b947de32bd579a592ddfb3fca9b4c2130e1e111b37682a1c954"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-prefill4096-q64-2-events\\result.json",
+        "sha256": "dbb8f6221a92ca9b0d13e595863449f93236cff8eae1e94889769767195d34ca"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q1-kv4096-0",
+      "process_id": 46340,
+      "launch_epoch": "2026-10-22T11:59:31.023363+00:00",
+      "completed_at": "2026-10-22T11:59:32.466238+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-0\\execution.json",
+        "sha256": "0c21873e5157f9aca3eecd0803dd634a86dd070e2010aba2517e082070e0f44b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-0\\result.json",
+        "sha256": "d90a5194cc43070e48593738bdc117582791e45b2df0892099adc50a95f8a31e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q1-kv4096-0",
+      "process_id": 36904,
+      "launch_epoch": "2026-10-22T12:12:45.387125+00:00",
+      "completed_at": "2026-10-22T12:12:46.731317+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-0\\execution.json",
+        "sha256": "276d289d55aec29e173c4440853d5909028f9db652dc910de65e25364a9f9a4a"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-0\\result.json",
+        "sha256": "8f014446d875f1ca3a4733ffa3be57df8503bcbf7808813adcc8aebbcd1fbd53"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q1-kv4096-1",
+      "process_id": 20452,
+      "launch_epoch": "2026-10-22T11:59:37.215993+00:00",
+      "completed_at": "2026-10-22T11:59:38.647581+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-1\\execution.json",
+        "sha256": "67e0ae4987128301feb6cb30323760a51c1f983f1b8c5fbc26fb68daf13dbabf"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-1\\result.json",
+        "sha256": "7a38ed0054e6add16eb7b876ffe5b7bb60adc1ce7006bd1e5b96b08d431cf252"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q1-kv4096-1",
+      "process_id": 35332,
+      "launch_epoch": "2026-10-22T12:12:51.347420+00:00",
+      "completed_at": "2026-10-22T12:12:52.771864+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-1\\execution.json",
+        "sha256": "68e15109c9e4a9b5eb0bebcc186ce451893da795adb98825b7d82af76bea7a5e"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-1\\result.json",
+        "sha256": "75b75d805c6ddaf3d1660b62929465be9488910a04dc7f66cbeebfa00ae27c8d"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q1-kv4096-2",
+      "process_id": 35816,
+      "launch_epoch": "2026-10-22T11:59:43.306078+00:00",
+      "completed_at": "2026-10-22T11:59:44.735445+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-2\\execution.json",
+        "sha256": "e3c10757b5f768123e8ff4e4525ad4e81c4cc3b04b76bdd441477e5598c26030"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q1-kv4096-2\\result.json",
+        "sha256": "b816c3ada01a8e8892a1f5e2ef955c7cdf7ebf2080f5c638bbab09c15405aa2b"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q1-kv4096-2",
+      "process_id": 38756,
+      "launch_epoch": "2026-10-22T12:12:57.416116+00:00",
+      "completed_at": "2026-10-22T12:12:58.720530+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-2\\execution.json",
+        "sha256": "e99df8ce0cb25aa1ef8f2763dc73c51b6ff8f118533e6e1b61c3006d64f01b65"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q1-kv4096-2\\result.json",
+        "sha256": "66c1ccaf74d77f838fe84d99e950fdd87545c0d8dedc461bb60076fa026a5629"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q16-kv2048-0",
+      "process_id": 33968,
+      "launch_epoch": "2026-10-22T11:59:49.405058+00:00",
+      "completed_at": "2026-10-22T11:59:51.013132+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-0\\execution.json",
+        "sha256": "30168c63f19721ebfb2e70c1aa9ac50ee3369dda5832fb7918241c117bd28660"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-0\\result.json",
+        "sha256": "a657d960b1cf34483edc9d572e2c325a6daebfffaa59b25bcfcda3fed274a33a"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q16-kv2048-0",
+      "process_id": 26460,
+      "launch_epoch": "2026-10-22T12:13:03.399445+00:00",
+      "completed_at": "2026-10-22T12:13:05.125394+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-0\\execution.json",
+        "sha256": "bb0391bf71e2b5417f63ca86a95ff37bb7c9222b22c823f667e18922af3ed093"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-0\\result.json",
+        "sha256": "bcf672e9e6b39589031ed055e7aace237de39fb8093b280443c458a5dc1fd0e5"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q16-kv2048-1",
+      "process_id": 35568,
+      "launch_epoch": "2026-10-22T11:59:55.725006+00:00",
+      "completed_at": "2026-10-22T11:59:57.484009+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-1\\execution.json",
+        "sha256": "4644dbc72c497058f1783ba17a7239d96aefdfd8bafa3974c252f5413fb0dc92"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-1\\result.json",
+        "sha256": "9b7d9a08d06e158c1f2e5649a44338bbb6273d61f9022b0afe02b27d82c209c2"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q16-kv2048-1",
+      "process_id": 8384,
+      "launch_epoch": "2026-10-22T12:13:09.837888+00:00",
+      "completed_at": "2026-10-22T12:13:11.596934+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-1\\execution.json",
+        "sha256": "3ce452036706b8533ec8ecdaf7bef31c1ab3c75bf1a57f73f4486ddfa30a4630"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-1\\result.json",
+        "sha256": "144510954ad42de8dbabf0919082a4c7b3b9b9e8bbf6143211d9c2cd64c3a6d7"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-gpu-pv4096-q16-kv2048-2",
+      "process_id": 22832,
+      "launch_epoch": "2026-10-22T12:00:02.183992+00:00",
+      "completed_at": "2026-10-22T12:00:03.927066+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-2\\execution.json",
+        "sha256": "879fc8d8cefb4467ba8f8fea7ee6d2ac83957d142582fc31ab40f6730501b6d7"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-gpu-pv4096-q16-kv2048-2\\result.json",
+        "sha256": "ee948d2cbe9c7e19d2786586f10f6a1d8052bb089c5dab908b6e7a0e37f41f2d"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-gpu-pv4096-q16-kv2048-2",
+      "process_id": 38192,
+      "launch_epoch": "2026-10-22T12:13:16.259114+00:00",
+      "completed_at": "2026-10-22T12:13:17.992957+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-2\\execution.json",
+        "sha256": "b675bdc7c5f6f780d2de8519b150479807977c74bed6138788b91635aa7cfa5b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-gpu-pv4096-q16-kv2048-2\\result.json",
+        "sha256": "c418e3a3364b2e2a9246b55eb4976516eb5a6cc96ba891354d989e8b1d592e56"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-0-bare",
+      "process_id": 31580,
+      "launch_epoch": "2026-10-22T12:07:47.597122+00:00",
+      "completed_at": "2026-10-22T12:07:49.201546+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-0-bare\\execution.json",
+        "sha256": "45780f8ee6e002c75acfe4dcd774c362d6e01224b27593c835b89e7ab5e62d66"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-0-bare\\result.json",
+        "sha256": "72d7cb1f9d8ce218623557d3bd42b530d861a9478e802c32bc798d849730cf19"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-0-events",
+      "process_id": 31228,
+      "launch_epoch": "2026-10-22T12:07:54.028570+00:00",
+      "completed_at": "2026-10-22T12:07:55.647411+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-0-events\\execution.json",
+        "sha256": "938b5e4fd847f248b3497bc52195161ccf8cf357538513d11271d0e7abcd484a"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-0-events\\result.json",
+        "sha256": "d58b0f872bab253889c3847dae0c3c36629fbb64024ba36b3ab035caee5592f8"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-1-bare",
+      "process_id": 3992,
+      "launch_epoch": "2026-10-22T12:08:00.431980+00:00",
+      "completed_at": "2026-10-22T12:08:02.020534+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-1-bare\\execution.json",
+        "sha256": "bb9f2ed9337dafbf44c43b69aabc7c601965483b7e24d729c89bfba76387c1a9"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-1-bare\\result.json",
+        "sha256": "ffef82e7dd39383232833cd55a1f28a080ab842fcba7c98a12e27e566a09102e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-1-events",
+      "process_id": 32032,
+      "launch_epoch": "2026-10-22T12:08:06.822772+00:00",
+      "completed_at": "2026-10-22T12:08:08.476015+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-1-events\\execution.json",
+        "sha256": "e090a4a788731c48e4d680b7949af029beff4fa23b24f40e609be8e7b574cb6b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-1-events\\result.json",
+        "sha256": "a61dee4b54788794d61665ddf8fdb99b703b0c3f3d0088e046880cd92afc0b68"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-2-bare",
+      "process_id": 1420,
+      "launch_epoch": "2026-10-22T12:08:13.347651+00:00",
+      "completed_at": "2026-10-22T12:08:15.095532+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-2-bare\\execution.json",
+        "sha256": "eed920846affb6361535031c61471ad0f9ac346b6bd87a4d06ed43aa8944de91"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-2-bare\\result.json",
+        "sha256": "7f8b13602dbfe4fd4e1868178d12c4eca1030235b197fc229f5191d726a122cd"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "diagnostic-gpu-pv4096-q16-kv2048-2-events",
+      "process_id": 44252,
+      "launch_epoch": "2026-10-22T12:08:19.816640+00:00",
+      "completed_at": "2026-10-22T12:08:21.441141+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-2-events\\execution.json",
+        "sha256": "93ddc23977682de51be4454df23467c7520bbffe7e88c741f07907e3dd496d19"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\diagnostic-gpu-pv4096-q16-kv2048-2-events\\result.json",
+        "sha256": "2ee32ac113a1b6311745988e54e17e04e832ec8d7c4394375279e1eae7890d1f"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-vram-16m-0",
+      "process_id": 44836,
+      "launch_epoch": "2026-10-22T12:00:08.609226+00:00",
+      "completed_at": "2026-10-22T12:00:10.374621+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-0\\execution.json",
+        "sha256": "bc724805455d96093a37913b3e105983711eadb36a7eec790b91a62c9be76874"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-0\\result.json",
+        "sha256": "678511b6debb518a0eac9de4d83a41bc3b840ffa207dbe2495ee285ae10a320b"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-vram-16m-0",
+      "process_id": 42324,
+      "launch_epoch": "2026-10-22T12:13:22.713466+00:00",
+      "completed_at": "2026-10-22T12:13:24.609455+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-0\\execution.json",
+        "sha256": "9c7ca660c2fcf0463e7e3804d11a015d3fdecbe76e7db01492fb767d1558323d"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-0\\result.json",
+        "sha256": "66d435a61eaa0a232212acb2a45d58690c121b42cba8b00543402bb8e7e2aafa"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-vram-16m-1",
+      "process_id": 36668,
+      "launch_epoch": "2026-10-22T12:00:15.050203+00:00",
+      "completed_at": "2026-10-22T12:00:16.677869+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-1\\execution.json",
+        "sha256": "c45a3c7294bbb79be41948f47af8364e55e24f407fb4559440c5e7c1aae0f681"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-1\\result.json",
+        "sha256": "6fde2dcea6461b3d20592ce66687017e5244f4671eb85d7f3d050857bc7d007f"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-vram-16m-1",
+      "process_id": 16580,
+      "launch_epoch": "2026-10-22T12:13:29.293352+00:00",
+      "completed_at": "2026-10-22T12:13:31.015399+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-1\\execution.json",
+        "sha256": "3ac4219a438b20af6c944171dc36e149c39e2fba89569805fd5e12291c73fd1a"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-1\\result.json",
+        "sha256": "036eb65679ac95ded7d1731b6a6b58609d87b0b7b078880134fb28771bc33a67"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-vram-16m-2",
+      "process_id": 30592,
+      "launch_epoch": "2026-10-22T12:00:21.371311+00:00",
+      "completed_at": "2026-10-22T12:00:23.171019+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-2\\execution.json",
+        "sha256": "2f4645a20dbc05e36c2b61e321f8486c0487d2adfe0dd70ffe45a69d5b08d71b"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-vram-16m-2\\result.json",
+        "sha256": "91b8c2a85fbc5e4477021023eb65667fb6627e5c9048c50bae4c6a905beaf21c"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-vram-16m-2",
+      "process_id": 22796,
+      "launch_epoch": "2026-10-22T12:13:35.713471+00:00",
+      "completed_at": "2026-10-22T12:13:37.581454+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-2\\execution.json",
+        "sha256": "5652c8fe54d495318e45a469a27f34fb2fc278848e192bd60c0fb0e07c109691"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-vram-16m-2\\result.json",
+        "sha256": "c388241b69480472751a168e99c2e201f7fb53353996ee703dca0b43dfb791a0"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-vram-dram-16m-0",
+      "process_id": 26768,
+      "launch_epoch": "2026-10-22T12:00:27.812023+00:00",
+      "completed_at": "2026-10-22T12:00:29.562365+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-0\\execution.json",
+        "sha256": "88c3d9110807de1b987c35e185b60d751a0b1a003ca5287828638d78731439f4"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-0\\result.json",
+        "sha256": "cbf9acb88120dfb2fcba8e50cf9e5da5085a429603c8a9a6ce449824fbce2cd6"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-vram-dram-16m-0",
+      "process_id": 26404,
+      "launch_epoch": "2026-10-22T12:13:42.264991+00:00",
+      "completed_at": "2026-10-22T12:13:44.251817+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-0\\execution.json",
+        "sha256": "c87430abfefcb343927a5d0048ef723dc3743e38f048d508740766f8a9690af2"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-0\\result.json",
+        "sha256": "085afc386196c1d9c3b4c6740648bc1a76d4dffe6ded02da35b9f647058d363b"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-vram-dram-16m-1",
+      "process_id": 38756,
+      "launch_epoch": "2026-10-22T12:00:34.262947+00:00",
+      "completed_at": "2026-10-22T12:00:36.090624+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-1\\execution.json",
+        "sha256": "2aee930108b1d631c111dd1aa528eb42707b2880e22043ae598e1d9dc57e11fd"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-1\\result.json",
+        "sha256": "86cabf8a2aa9d29d587014d2f9e62a25df2ef29d1a287b4d44e3aacde12e7c97"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-vram-dram-16m-1",
+      "process_id": 35748,
+      "launch_epoch": "2026-10-22T12:13:48.860251+00:00",
+      "completed_at": "2026-10-22T12:13:50.721406+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-1\\execution.json",
+        "sha256": "94b0851addf2f47c6e7ba62ba2a57940f561df8eb96be9f35ba2fcbf371472ff"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-1\\result.json",
+        "sha256": "bf4d0c74889c960771d6e02c3b0ced672e7abba45cbe70d430463dcc6ad61eec"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-vram-dram-16m-2",
+      "process_id": 17108,
+      "launch_epoch": "2026-10-22T12:00:40.781468+00:00",
+      "completed_at": "2026-10-22T12:00:42.623853+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-2\\execution.json",
+        "sha256": "bae1520af68abbc1569ad4124c04f566218a747ac6d9f21de08eba2e25b0f1bc"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-vram-dram-16m-2\\result.json",
+        "sha256": "bacd35446215c70dbb9930f6c1da1a98e034dd8f6a72e8c4cb57195d18867422"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-vram-dram-16m-2",
+      "process_id": 13668,
+      "launch_epoch": "2026-10-22T12:13:55.394606+00:00",
+      "completed_at": "2026-10-22T12:13:57.285713+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-2\\execution.json",
+        "sha256": "031e80f66b0229b923dc9235f84094c46c949cd9fff8603f662aa84e92892b73"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-vram-dram-16m-2\\result.json",
+        "sha256": "b35c3ed88cfbd2d45a528e9e3d328e15cc62fa9576258645ac8ba8f52e4835f9"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-dram-16m-0",
+      "process_id": 3588,
+      "launch_epoch": "2026-10-22T12:00:47.327960+00:00",
+      "completed_at": "2026-10-22T12:00:48.558641+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-0\\execution.json",
+        "sha256": "c4b0951beb20c52254fc5fbdcd7f9c560dd971e67342f7a96f3822c1e7e3b066"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-0\\result.json",
+        "sha256": "a75bbac76b2353297e81c849c3168b9d72ab01577ad11a241dc0b43325f33f2e"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-dram-16m-0",
+      "process_id": 16912,
+      "launch_epoch": "2026-10-22T12:14:01.975056+00:00",
+      "completed_at": "2026-10-22T12:14:03.255534+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-0\\execution.json",
+        "sha256": "98a8d810543fdabf3a76d13646bcf4a507471f21ea7f02c5a967eb05191758b6"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-0\\result.json",
+        "sha256": "9bcfb7a88c96b4cd884892737aa22ece72b95baf8dcb6b47e5e1c27cc030025a"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-dram-16m-1",
+      "process_id": 5968,
+      "launch_epoch": "2026-10-22T12:00:53.243823+00:00",
+      "completed_at": "2026-10-22T12:00:54.492936+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-1\\execution.json",
+        "sha256": "b26f7624ed23f6414a2cccb4d760bb3357b263d564f07bc1988024e8abeb4546"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-1\\result.json",
+        "sha256": "eabf4eb30ac1a90fcfbc61f6ac277d844f9987f678ff20c58cbfa8576e711d40"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-dram-16m-1",
+      "process_id": 19692,
+      "launch_epoch": "2026-10-22T12:14:07.852229+00:00",
+      "completed_at": "2026-10-22T12:14:09.109997+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-1\\execution.json",
+        "sha256": "0181371561ec85360caef7b7f15caa2e687f45ed9303a83a0d47a631af0bb7db"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-1\\result.json",
+        "sha256": "566692db1834e90fa6f281b706be568a43e92ea3306854006e0cb216d89175c4"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "profile-copy-dram-dram-16m-2",
+      "process_id": 2124,
+      "launch_epoch": "2026-10-22T12:00:59.196389+00:00",
+      "completed_at": "2026-10-22T12:01:00.431306+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-2\\execution.json",
+        "sha256": "cc6927c5ba78c3913af169a9934c23ebdf88fe8e454f65d8edac17931d4fe455"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\profile-copy-dram-dram-16m-2\\result.json",
+        "sha256": "ae800477b06ad325e7670694b19bac2499f2feb4a3e2b43cf9073b9065edd3ab"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    },
+    {
+      "job_id": "heldout-copy-dram-dram-16m-2",
+      "process_id": 32672,
+      "launch_epoch": "2026-10-22T12:14:13.722629+00:00",
+      "completed_at": "2026-10-22T12:14:14.995723+00:00",
+      "execution": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-2\\execution.json",
+        "sha256": "394c147b1cff593c5a21e5876883b1972ca4cbdef194cfa18fcd79f2b375af12"
+      },
+      "native": {
+        "path": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\steady_costs\\results\\steady-v1-f32\\jobs\\heldout-copy-dram-dram-16m-2\\result.json",
+        "sha256": "7652ce27c83217777541638ad6f2bb43e3e927c2f94ef9569e8acac9c0c9618d"
+      },
+      "normal_exit": true,
+      "independent_numerical_pass": true
+    }
+  ]
+}

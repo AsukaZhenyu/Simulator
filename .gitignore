@@ -51,3 +51,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ==================== 单个生成物（可再生，含工作站路径） ====================
+# 主机停顿诊断的原始转储（2.4 MB，每个 job 都带本机路径）。由
+# `python profiling/host_blackout_diagnosis.py` 重新生成，不随库分发。
+/docs/data/host-blackout-diagnosis-*.json

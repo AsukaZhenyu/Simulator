@@ -147,7 +147,41 @@ These scoped host-completed prices do not establish pure FLOP/s, memory bandwidt
 CUDA kernel durations, physical memory capacity or transfer to arbitrary unseen
 strategies. The new adapter does not automatically recalibrate `AnalyticalCosts`.
 
-## Scope of the first implementation
+## State-conditioned completed actions
+
+`performance.conditioned_response` adds an explicitly scoped response form to
+the **same** event evaluator. Its input is an exact action/state table, not a
+whole-layer fitted correction. The reference work of an inclusive completed
+action is one invocation; the declared approximation integrates its remaining
+progress at `1 / T(state(t))`. Already completed work survives a state change.
+The tagged zero-duration approximation is distinct from an unknown price and
+from an explicit zero service rate that pauses work.
+
+`RequestResponseDelays` describes the gap between a known owned-worker request
+and its effective response. CPU and GPU start/stop delays are independent named
+parameters. Modeling transforms the external request history, cancels a pending
+edge when an opposite request supersedes it, and then calls the existing event
+engine. It does not estimate delays, read measurements, or predict an operating
+system scheduler. Memory-hold and availability changes retain their original
+external timestamps. An unknown required delay is rejected.
+
+The optional `profiling/state_response` collector measures action intervals,
+disjoint gaps and owned-worker intervals on a shared clock. It estimates exact
+per-process medians, then gives independent processes equal weight, freezes the
+parameters, and validates on fresh processes with independent request orders
+and seeds. Worker response parameters use **profile background-worker**
+intervals only; heldout worker activity and internal action durations do not
+become prediction inputs. See the [calibration report](STATE_RESPONSE_CALIBRATION_20261021.md).
+
+This response form requires its exact program, shape, backend, hardware,
+threadpool, affinity and synchronization context. Binary replay controls are
+offered work, not measured utilization. Held allocation bytes do not establish
+physical residency or bandwidth loss. These inclusive action prices cannot be
+overlapped or supplemented with the same internal GPU work a second time.
+Neither this adapter nor a favorable median calibrates the library's analytical
+defaults or establishes arbitrary unseen-policy performance.
+
+## Scope of the physical graph implementation
 
 The first resource graph model is a mechanism-oriented building block, with
 explicit work, parameter units, dependencies, resource timelines and capacity
@@ -174,3 +208,68 @@ In particular, moving performance calculation to modeling fixes the architecture
 boundary. It does **not** by itself explain the previously observed fast/slow PV
 latency groups, calibrate arbitrary external applications, establish full-model
 hardware accuracy, or implement a new optimal strategy searcher.
+
+## Thread service, completion waits and interruptions
+
+`Task.waits_for` is a completion gate, with launch dependencies separate from
+the tasks it awaits. It holds only declared resources and memory reservations.
+A virtual blocked-wait resource can release CPU availability; explicitly
+reserving a CPU resource represents exclusive polling occupancy. Gates add no
+second GPU duration. A subsequent host resume stage must receive CPU service.
+This is not an implementation of a preemptive OS scheduler.
+
+`WorkDemand(unit="thread_cpu_ns")` describes active service for one thread,
+including runtime work where explicitly measured. Its parameter unit is
+`thread_cpu_ns/s`, bounded to 0..1e9. Zero supply pauses remaining work; a fixed
+elapsed `ns` parameter continues with wall time. Neither supply nor useful
+computation is inferred from CPU utilization, raw cycles, or a replay request.
+
+Interrupt/DPC execution can overlap a CSwitch-assigned Running interval without
+an application thread switch. CPU availability must therefore distinguish
+same-core interruption time from thread service and avoid counting nested
+interruptions twice. The [diagnostic investigation](THREAD_RUNTIME_RECOVERY_DIAGNOSIS_20261022.md)
+measures this distinction. A replay of observed heldout interruption times is a
+diagnostic, not a forecast or accepted calibration. Predicting workload-induced
+interruptions and driver service still requires independently qualified source
+parameters and a causal model; the default LLM cost path has not acquired them.
+
+## External available resources are the physical input boundary
+
+New physical experiments should use `AvailableResources`, `ServiceBinding` and
+`evaluate_available_resources`. The external trajectory supplies absolute CPU/GPU
+service, bandwidth and already-available memory budgets. OS scheduling and other
+applications are outside the simulator. Modeling computes LLM work, dependencies,
+own resource locks and waits against that trajectory; profiling supplies scoped
+physical parameters. No background-pressure multiplier is applied to the same
+available service again. See the [interface and executable example](AVAILABLE_RESOURCE_MODEL_20261022.md).
+
+The older request-response and interruption adapters below remain explicit
+diagnostic forms. Their inputs must not be relabeled as independently measured
+available service or accepted as new physical calibration evidence.
+
+## Shared stateful service response (diagnostic hypothesis)
+
+`ServiceResponseModel` and `build_service_response` put the state-to-service law
+in modeling. Named competitors have explicit requested work and finite residual
+interference states. A full target-by-competitor coefficient matrix describes
+same-resource and cross-resource effects with the same equation for CPU, GPU
+and transfer targets. After a request stops, residual interference drains instead
+of resetting at each invocation. The common evaluator integrates the resulting
+rates and resolves actual graph boundaries. A normalized reservoir is an explicit
+response hypothesis; it is not evidence of an actual GPU FIFO or lossless queue.
+
+The optional `profiling/service_response` package owns synchronized measurement,
+source reconstruction, per-process statistics, frozen parameters and independent
+validation. It imports modeling to predict durations; it does not contain a
+second performance calculator. The first hardware adapter prices inclusive
+completed actions in `invocation/s`. Those prices include internal submission,
+work and waiting; adding those internal stages again would double count. Signed
+coefficients are permitted only in this inclusive response scope, with a proven
+positive denominator. Physical service coefficients remain nonnegative.
+
+Baseline-fixed control overhead, declared proxy dynamics, background feedback,
+instrumentation neutrality and arbitrary graph transfer remain qualification
+limits. The [experiment report](UNIFIED_SERVICE_RESPONSE_20261022.md) separates
+numerical integration checks, source stability and hardware prediction error.
+The analytical LLM convenience workflow is not silently recalibrated by this
+optional exact-context experiment.

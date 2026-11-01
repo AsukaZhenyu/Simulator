@@ -1,0 +1,135 @@
+{
+  "schema": "research-direction-1",
+  "recorded_at_utc": "2026-10-22T12:45:32.260711+00:00",
+  "decision_local_date": "2026-10-22",
+  "decision_timezone": "Asia/Shanghai",
+  "source": "Explicit user decision: freeze accuracy experiments and focus on strategy expression / IR.",
+  "accuracy": {
+    "status": "frozen_for_current_research_phase",
+    "preserve_original_data_parameters_thresholds_and_failed_gates": true,
+    "new_native_campaigns_or_refits_authorized_by_this_decision": false,
+    "evidence": [
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/manifest.json",
+        "sha256": "af3b2d02a9e1ea9a7d2aba89ce16419148e4ecf3cd8a2e00fffaab71be260fb1"
+      },
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/profile-frozen.json",
+        "sha256": "7b70e760a0805e6bea01d8bc95a7d2b9c3982a5bc8bb5107176debaeb4db3360"
+      },
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/evaluation-v2.json",
+        "sha256": "b91cf7e7cf856b6ffc29de3acff195bd8e08129f836a0dce162fad2488dd543f"
+      },
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/evaluation-correction-v2.json",
+        "sha256": "754357514fafaae31a8bda18467ff331fdff32f1f83fbca90a147bd18c107adc"
+      },
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/completion.json",
+        "sha256": "2adc2d1c46f0be28dc95af0f00ef4652a0364e99f493fcc485de8819f8f1f2ab"
+      },
+      {
+        "path": "profiling/steady_costs/results/steady-v1-f32/frozen-source-capsule-v1.json",
+        "sha256": "2970b7f7414ed58cd13fb82f3b776ba87e0ed109f28a82ae300f678dfe66ab93"
+      },
+      {
+        "path": "docs/STEADY_COST_CALIBRATION_20261022.md",
+        "sha256": "5bbfdaaa37869f191d86217cf23044d81e48ca5acade896d51bd40dfc39d16b2"
+      },
+      {
+        "path": "docs/data/steady-costs-audit-20261022.json",
+        "sha256": "c06620756c19ad37872aaa628cf49805cbfb659c835253441dbf832910d73785"
+      },
+      {
+        "path": "docs/data/steady-costs-independent-review-20261022.json",
+        "sha256": "d36d1286afa291fcaec166de4bcc2631124e1d59d7a535ee22c97f952dd05d20"
+      }
+    ],
+    "accepted_scope": "Finite simple graphs and selected warmed F32 hybrid single-layer execution contracts. Functional correctness is distinct from timing qualification.",
+    "accuracy_gate_cases": 9,
+    "all_quality_gate_cases": 7,
+    "total_cases": 11,
+    "complete_hybrid_layer_all_gate_cases": 1,
+    "complete_hybrid_layer_cases": 3,
+    "unqualified": [
+      "arbitrary pretrained full-model end-to-end timing",
+      "dynamic-resource response law",
+      "unseen-policy or unseen-shape performance transfer",
+      "physical total-memory fit",
+      "individual-call tail latency"
+    ],
+    "future_targeted_validation": "If required by a later research claim, separately version cross-layer reuse, prefetch, shared-resource contention and multi-round state tests. Do not infer them by multiplying one-layer latency."
+  },
+  "mainline": {
+    "topic": "Strategy expression and intermediate representation",
+    "pipeline": [
+      "human-readable modular Python strategy",
+      "coupled constrained strategy IR",
+      "compiler legality checks and actions",
+      "shared modeling runtime"
+    ],
+    "high_level_spaces": {
+      "execution": [
+        "decomposition",
+        "placement and collaboration",
+        "ordering and overlap",
+        "phase/module scope"
+      ],
+      "storage_and_scheduling": [
+        "residency and release",
+        "cache selection",
+        "prefetch",
+        "transport choice",
+        "resource-response rules"
+      ]
+    },
+    "coupling": "A strategy is a legal configuration under shared dependence, capacity, resource and causal constraints; dimensions are not an unconstrained Cartesian product.",
+    "next_deliverables": [
+      "Inventory existing dimensions, supported combinations and explicit exclusions using current code.",
+      "Specify semantics and composition legality, separating strategy choices from model, profile and external scenario inputs.",
+      "Extend independent small-graph references, then compare execution/storage choices and conditional hardware sensitivity."
+    ],
+    "evaluation_focus": [
+      "IR fidelity and compiler preservation",
+      "feasibility and byte/lifetime accounting",
+      "mechanism ablations with a common declared candidate set",
+      "conditional strategy and hardware design analysis"
+    ],
+    "not_current_mainline": [
+      "new global search algorithm",
+      "complete reproduction of every published system",
+      "further broad performance-calibration campaigns"
+    ],
+    "code_audit_priorities": [
+      {
+        "priority": 1,
+        "gap": "Separate strategy semantic validity from cost coverage and runtime feasibility.",
+        "reason": "Frozen profiling must not prevent IR expressiveness analysis. Missing prices remain unknown and must still block performance execution.",
+        "evidence": [
+          "mapping/docs/COMPOSABLE_IR_GUIDE.md:16",
+          "mapping/tensor_mapping/composition_ir.py:169",
+          "modeling/llm_infer_model/m2/ffn_execution.py:59"
+        ]
+      },
+      {
+        "priority": 2,
+        "gap": "Scoped storage rules with explicit shared-budget ownership and conflict precedence.",
+        "reason": "Placement has module selectors, while cache/prefetch/reconfiguration are primarily global; different module rules must share one physical capacity ledger.",
+        "evidence": [
+          "mapping/tensor_mapping/python_frontend.py:124",
+          "mapping/tensor_mapping/composition_policy.py:25"
+        ]
+      },
+      {
+        "priority": 3,
+        "gap": "Explicit region targets and legality for transformations on nonoverlapping regions.",
+        "reason": "Existing transforms compose across families, but invocation-wide targeting and family uniqueness constrain distinct transformations within one invocation.",
+        "evidence": [
+          "mapping/tensor_mapping/python_frontend.py:348",
+          "modeling/llm_infer_model/m2/execution_pipeline.py:70"
+        ]
+      }
+    ]
+  }
+}

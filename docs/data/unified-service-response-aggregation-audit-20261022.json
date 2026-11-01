@@ -1,0 +1,531 @@
+{
+  "schema": "service-response-aggregation-audit-1",
+  "inputs": {
+    "profile_records": {
+      "path": "profiling\\service_response\\results\\unified-g-v1b-m0-core2\\profile-records.json",
+      "sha256": "3b1fded7f82335b1301dc2097ad47a42f69cdbc4e6f578e33b5217148f21d85d"
+    },
+    "frozen": {
+      "path": "profiling\\service_response\\results\\unified-g-v1b-m0-core2\\frozen.json",
+      "sha256": "ab01c6325125eb8a658ca644b91469fbe4d14f468bf08f44319012e691009005"
+    },
+    "manifest": {
+      "path": "profiling\\service_response\\results\\unified-g-v1b-m0-core2\\manifest.json",
+      "sha256": "1b11a5da51f50ba3726b6e789d43b89129349a619d206ec79024129eb1bad4d8"
+    }
+  },
+  "read_only_offline_diagnostic": true,
+  "parameters_fitted_or_changed": false,
+  "heldout_used": false,
+  "exact_context": "same stamped profile processes and complete original action/gap/tail intervals; no stamped-versus-bare comparison in this audit",
+  "whole_cohort_matching_rule": "invocation begin and end both inside one original calibration_segments interval; that predeclared segment already applies settling exclusions",
+  "token_coverage": "117 action durations + 117 disjoint preceding gaps + final tail = 235 tokens; COMPUTE/COPY occurrences45, all other tokens190",
+  "telescoping_checks": [
+    {
+      "run_id": "profile-r0-m0",
+      "process_id": 5348,
+      "all_invocations_checked": 4594,
+      "maximum_absolute_residual_ns": 0
+    },
+    {
+      "run_id": "profile-r1-m0",
+      "process_id": 3996,
+      "all_invocations_checked": 4919,
+      "maximum_absolute_residual_ns": 0
+    },
+    {
+      "run_id": "profile-r2-m0",
+      "process_id": 17304,
+      "all_invocations_checked": 5002,
+      "maximum_absolute_residual_ns": 0
+    }
+  ],
+  "matched_cohort_summaries": [
+    {
+      "run_id": "profile-r0-m0",
+      "process_id": 5348,
+      "state": {
+        "cpu": 0,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 812,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 2950950,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 2740600,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 2704950,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 35650,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.07128212948372557,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 2742050,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 2657000,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.09961198935935885
+    },
+    {
+      "run_id": "profile-r0-m0",
+      "process_id": 5348,
+      "state": {
+        "cpu": 0,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 103,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 18127600,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 14239900,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 14185200,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 54700,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.21446302875173767,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 14180850,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 14847400,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.18095059467331584
+    },
+    {
+      "run_id": "profile-r0-m0",
+      "process_id": 5348,
+      "state": {
+        "cpu": 1,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 471,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 3832600,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 3545100,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 3506900,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 38200,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.07501435057141366,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 3542350,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 3490800,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.08918227834890152
+    },
+    {
+      "run_id": "profile-r0-m0",
+      "process_id": 5348,
+      "state": {
+        "cpu": 1,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 55,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 31843500,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 30726400,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 30661600,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 64800,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.035080942735566126,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 14981150,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 15681200,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.5075541319264528
+    },
+    {
+      "run_id": "profile-r1-m0",
+      "process_id": 3996,
+      "state": {
+        "cpu": 0,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 877,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 2877600,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 2684700,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 2637800,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 46900,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.0670350291909925,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 2685100,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 2657000,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.07666110647762024
+    },
+    {
+      "run_id": "profile-r1-m0",
+      "process_id": 3996,
+      "state": {
+        "cpu": 0,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 96,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 18955100,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 15771100,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 15712100,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 59000,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.16797590094486445,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 15847350,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 14847400,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.21670684934397602
+    },
+    {
+      "run_id": "profile-r1-m0",
+      "process_id": 3996,
+      "state": {
+        "cpu": 1,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 492,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 3689600,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 3443500,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 3394100,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 49400,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.06670099739809193,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 3441350,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 3490800,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.053881179531656546
+    },
+    {
+      "run_id": "profile-r1-m0",
+      "process_id": 3996,
+      "state": {
+        "cpu": 1,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 53,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 32869700,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 31257800,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 31183900,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 73900,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.04903908462809213,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 16603600,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 15681200,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.5229284112723876
+    },
+    {
+      "run_id": "profile-r2-m0",
+      "process_id": 17304,
+      "state": {
+        "cpu": 0,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 886,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 2836550,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 2627250,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 2594000,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 33250,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.07378681849429765,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 2627600,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 2657000,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.06329872556450618
+    },
+    {
+      "run_id": "profile-r2-m0",
+      "process_id": 17304,
+      "state": {
+        "cpu": 0,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 116,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 15499100,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 13379900,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 13339250,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 40650,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.13673051983663567,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 13419500,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 14847400,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.04204760276403146
+    },
+    {
+      "run_id": "profile-r2-m0",
+      "process_id": 17304,
+      "state": {
+        "cpu": 1,
+        "gpu": 0
+      },
+      "whole_cohort_invocation_count": 461,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 3797000,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 3550000,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 3515400,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 34600,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.06505135633394786,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 3548150,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 3490800,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.08064261258888596
+    },
+    {
+      "run_id": "profile-r2-m0",
+      "process_id": 17304,
+      "state": {
+        "cpu": 1,
+        "gpu": 1
+      },
+      "whole_cohort_invocation_count": 66,
+      "whole_cohort_token_count": 235,
+      "whole_invocation_median_ns": {
+        "numerator": 27189150,
+        "denominator": 1
+      },
+      "sum_same_cohort_token_medians_ns": {
+        "numerator": 25782800,
+        "denominator": 1
+      },
+      "sum_transformed_token_medians_ns": {
+        "numerator": 25731350,
+        "denominator": 1
+      },
+      "sum_other_token_medians_ns": {
+        "numerator": 51450,
+        "denominator": 1
+      },
+      "aggregation_relative_bias": -0.05172467693914668,
+      "implied_process_saturated_price_from_actual_source_cells_ns": {
+        "numerator": 14340050,
+        "denominator": 1
+      },
+      "global_frozen_saturated_price_ns": {
+        "numerator": 15681200,
+        "denominator": 1
+      },
+      "frozen_vs_profile_whole_median_relative_bias": -0.4232552323261301
+    }
+  ],
+  "global_frozen_saturated_prices": [
+    {
+      "state": {
+        "cpu": 0,
+        "gpu": 0
+      },
+      "saturated_serial_duration_ns": {
+        "numerator": 2657000,
+        "denominator": 1
+      },
+      "saturated_serial_duration_ms": 2.657
+    },
+    {
+      "state": {
+        "cpu": 1,
+        "gpu": 0
+      },
+      "saturated_serial_duration_ns": {
+        "numerator": 3490800,
+        "denominator": 1
+      },
+      "saturated_serial_duration_ms": 3.4908
+    },
+    {
+      "state": {
+        "cpu": 0,
+        "gpu": 1
+      },
+      "saturated_serial_duration_ns": {
+        "numerator": 14847400,
+        "denominator": 1
+      },
+      "saturated_serial_duration_ms": 14.8474
+    },
+    {
+      "state": {
+        "cpu": 1,
+        "gpu": 1
+      },
+      "saturated_serial_duration_ns": {
+        "numerator": 15681200,
+        "denominator": 1
+      },
+      "saturated_serial_duration_ms": 15.6812
+    }
+  ],
+  "interpretation": [
+    "The sum of marginal token medians need not equal the median of an invocation sum. A synthetic all-median sequence need not be a representative jointly realized call.",
+    "The SAME-cohort aggregation comparison includes all control/gap/tail tokens at their own same-state medians; its bias cannot be explained by missing disjoint timestamps or by fixed-baseline control assumptions.",
+    "The actual frozen price is a sum of per-token median-of-processmedians; each source token may have a slightly different eligible calibration cohort. Other tokens remain baseline00 even during requests. Combined transformed prices use duration10+duration01-duration00, and combined profile data is validation-only.",
+    "Within-cell CV describes individual raw interval dispersion, not uncertainty of the median estimator. All134 failed transformed cells have a within-CV failure, only6 also have between-process-CV failure, and none lacks minimum sample count. High CV alone does not prove the median is wrong.",
+    "Whole-call profile medians are diagnostic checks here, never fitted whole-layer correction parameters. These comparisons do not identify the driver, scheduler, wait, device or instrumentation contribution to each discrepancy.",
+    "Matching stamped-versus-bare instrumentation neutrality remains unestablished for this cohort. This same-stamped comparison isolates an aggregation mismatch without claiming instrumentation neutrality."
+  ]
+}
