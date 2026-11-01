@@ -69,6 +69,15 @@ the remaining seven suites finish in under 16 s. The heavy suites are
 combinatorial search and simulation rather than floating point, so a slower CPU
 stretches them roughly proportionally.
 
+A fresh clone reports a few **skips**, and they are not failures:
+
+| Skips | Cause |
+|---|---|
+| 4 in `mapping` | the compiled `ggml-export-workload` binary is not built; those tests say explicitly that the export side of the GGML chain was **not** regenerated in this run. Build it per `mapping/ggml/README.md`, or point `TENSOR_MAPPING_GGML_EXPORTER` at a binary |
+| 2 in `modeling` | the Nsight artifact used by the nsys analysis tests is not present |
+
+A skip is not a pass: it marks a step the run did not perform.
+
 | Command | Effect |
 |---|---|
 | `python tools/run_tests.py --list` | print the suites with their directories |
