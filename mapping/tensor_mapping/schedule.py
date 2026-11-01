@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
 from llm_infer_model.tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT, ACTION_READ_SSD,
     ACTION_WRITE_SSD, CODE_CAPACITY_EXCEEDED, CODE_ILLEGAL_ACTION,
     Action, MappingError, State, initial_state, is_goal, transition,
 )
@@ -163,7 +163,7 @@ def _over_quota(context: ScheduleContext, state: State) -> tuple[str, ...]:
 def _destination(action: Action) -> str | None:
     if action.kind == ACTION_COMPUTE:
         return "dram" if action.device == "cpu" else "vram"
-    if action.kind == ACTION_COPY:
+    if action.kind in (ACTION_COPY, ACTION_SHARE):
         return action.dst
     if action.kind == ACTION_READ_SSD:
         return "dram"
@@ -172,11 +172,16 @@ def _destination(action: Action) -> str | None:
     return None
 
 
-def _transfer_demands(state: State, tensor: str, destination: str) -> tuple[Action, ...]:
+def _transfer_demands(state: State, tensor: str, destination: str, scenario=None) -> tuple[Action, ...]:
     # A reservation already owns destination bytes. A second transfer cannot
     # replace it or treat the not-yet-arrived value as READY.
     if state.copy_at(tensor, destination) != COPY_ABSENT:
         return ()
+    if scenario is not None:
+        from llm_infer_model.tensor.engine import shared_source
+        source = shared_source(scenario, state, tensor, destination)
+        if source is not None:
+            return (Action(ACTION_SHARE, tensor, src=source, dst=destination),)
     if destination == "vram":
         if state.copy_at(tensor, "dram") == COPY_READY:
             return (Action(ACTION_COPY, tensor, src="dram", dst="vram"),)
@@ -193,7 +198,7 @@ def _transfer_demands(state: State, tensor: str, destination: str) -> tuple[Acti
     if destination == "ssd":
         if state.copy_at(tensor, "dram") == COPY_READY:
             return (Action(ACTION_WRITE_SSD, tensor),)
-        return _transfer_demands(state, tensor, "dram")
+        return _transfer_demands(state, tensor, "dram", scenario)
     raise InvalidInput("schedule transfer destination must be dram/vram/ssd")
 
 
@@ -211,10 +216,10 @@ def _demands(context: ScheduleContext, state: State) -> tuple[tuple[Action, tupl
         for device_index, device in enumerate(context.devices_for(task)):
             domain = "dram" if device == "cpu" else "vram"
             for port, tensor in enumerate(op.inputs):
-                for route_index, action in enumerate(_transfer_demands(state, tensor, domain)):
+                for route_index, action in enumerate(_transfer_demands(state, tensor, domain, context.scenario)):
                     add(action, (1 if distance == 0 else 2, distance, port, device_index, route_index))
     for port, (tensor, domain) in enumerate(context.scenario.goal.output_locations.items()):
-        for route_index, action in enumerate(_transfer_demands(state, tensor, domain)):
+        for route_index, action in enumerate(_transfer_demands(state, tensor, domain, context.scenario)):
             add(action, (2, len(context.facts.operation_order) + 1, port, route_index))
     return tuple(sorted(demands.items(), key=lambda item: (item[1], str(item[0]))))
 
@@ -331,8 +336,8 @@ class _Observer:
         if action.kind == ACTION_EVICT:
             self.stamps.pop((action.target_id, action.location), None)
             self.evictions += 1
-        elif action.kind in {ACTION_COPY, ACTION_READ_SSD, ACTION_WRITE_SSD} and action.target_id in self.context.facts.managed_reusable_tensors:
-            if action.kind in {ACTION_COPY, ACTION_WRITE_SSD}:
+        elif action.kind in {ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD, ACTION_WRITE_SSD} and action.target_id in self.context.facts.managed_reusable_tensors:
+            if action.kind in {ACTION_COPY, ACTION_SHARE, ACTION_WRITE_SSD}:
                 source = "dram" if action.kind == ACTION_WRITE_SSD else action.src
                 self.touch((action.target_id, source))
             destination = _destination(action)

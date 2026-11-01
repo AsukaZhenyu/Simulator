@@ -11,8 +11,9 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from llm_infer_model.m2.causal import CausalObservation, compute_service_available
+from llm_infer_model.m2.causal import current_compute_duration_ns
 from llm_infer_model.tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT,
 )
 from llm_infer_model.tensor.spec import (
     COPY_ABSENT, COPY_READY, OP_DONE, OP_NOT_STARTED, InvalidInput, Unsupported,
@@ -23,6 +24,10 @@ from .policy_executor import DeclarativePolicy
 from .policy_ir import EXPERT_COMPUTE_KINDS, parse_policy
 from .unified_policy import UnifiedPolicy
 from .reconfiguration import ReconfigurationSpec, reconfiguration_document
+from .storage_rules import (ScopedTransportRule, normalize_scoped_transport,
+                            resolve_scoped_transport)
+from .expert_scheduling import ExpertSchedulingSpec, order_expert_operations, rank_expert_devices
+from .request_scheduling import RequestPipeline, order_request_operations
 
 
 @dataclass(frozen=True)
@@ -50,6 +55,8 @@ class CompositionSpec:
     execution_bound_requests: tuple[tuple[str, str], ...] = ()
     reconfiguration: ReconfigurationSpec | None = None
     scoped_bound_kinds: tuple[str, ...] = ()
+    scoped_transport: tuple[ScopedTransportRule, ...] = ()
+    request_pipeline: RequestPipeline | None = None
 
 
 def _object(value, fields, label):
@@ -74,7 +81,12 @@ def parse_composition_policy(document) -> CompositionSpec:
     """Parse the seven inline mechanism objects of unified-strategy-0.2."""
     _object(document, {"placements", "request_placements", "experts", "release",
                        "cache", "prefetch", "transport"}, "composition")
-    experts = _object(document["experts"], {"device_rule", "selection_unit"}, "experts")
+    expert_fields={"device_rule", "selection_unit"}
+    if isinstance(document["experts"],dict) and "order_rule" in document["experts"]:
+        expert_fields.add("order_rule")
+    experts = _object(document["experts"], expert_fields, "experts")
+    if experts["device_rule"]=="hybrimoe_queues" and experts.get("order_rule","graph_order")!="graph_order":
+        raise Unsupported("hybrimoe_queues owns its explicit expert order; choose graph_order or a composable device rule")
     _choice(experts["selection_unit"], {"expert_region"}, "experts.selection_unit")
     cache = _object(document["cache"], {"rule", "unit", "budget_bytes", "alpha", "top_p"}, "cache")
     _choice(cache["unit"], {"tensor", "expert_group"}, "cache.unit")
@@ -147,9 +159,12 @@ def parse_composition_policy(document) -> CompositionSpec:
                     raise Unsupported("execution_binding requires an explicitly bound execution stage")
                 bindings[kind] = "cpu"
                 bound_requests.append((request, kind))
-    legacy = parse_policy({"format_version": "causal-policy-0.2",
+    expert_config={"device_rule":experts["device_rule"]}
+    if "order_rule" in experts:
+        expert_config["order_rule"]=experts["order_rule"]
+    legacy = parse_policy({"format_version": "causal-policy-0.3" if "order_rule" in experts else "causal-policy-0.2",
         "placements": placements, "request_placements": overrides,
-        "experts": {"device_rule": experts["device_rule"]}, "cache": legacy_cache,
+        "experts": expert_config, "cache": legacy_cache,
         "release": document["release"], "prefetch": {"enabled": prefetch["enabled"],
              "max_count": count, "cache_budget_bytes": budget if prefetch["enabled"] else 0}})
     return CompositionSpec(legacy, cache["unit"], budget, scope, lookahead, ranking,
@@ -178,6 +193,8 @@ def composition_policy_document(spec: CompositionSpec) -> dict:
         result["placements"][kind] = "scoped_binding"
     for request, kind in spec.execution_bound_requests:
         result["request_placements"][request][kind] = "execution_binding"
+    if policy.format_version=="causal-policy-0.3":
+        result["experts"]["order_rule"]=policy.expert_order_rule
     return result
 
 
@@ -191,7 +208,13 @@ class CompositionPolicy(UnifiedPolicy):
     def __init__(self, spec: CompositionSpec, *, history=()):
         if not isinstance(spec, CompositionSpec):
             raise InvalidInput("CompositionPolicy requires parsed CompositionSpec")
-        spec = replace(parse_composition_policy(composition_policy_document(spec)), reconfiguration=spec.reconfiguration)
+        if (spec.policy.expert_device_rule=="hybrimoe_queues" and spec.request_pipeline is not None
+                and spec.request_pipeline.ready_rule!="graph_order"):
+            raise Unsupported("hybrimoe_queues owns its queue order; nondefault request ordering requires a composable expert device rule")
+        spec = replace(parse_composition_policy(composition_policy_document(spec)),
+                       reconfiguration=spec.reconfiguration,
+                       request_pipeline=spec.request_pipeline,
+                       scoped_transport=normalize_scoped_transport(spec.scoped_transport))
         # The role-only binding exists only to reuse the lifetime/slot guard.
         # All estimation/loading below uses the explicit direction/stage rules.
         super().__init__(spec.policy, history=history, transport={
@@ -210,8 +233,13 @@ class CompositionPolicy(UnifiedPolicy):
         self._composition_records = []
         self._tensor_stages = {}
         self._operation_devices = {}
+        # A demand copy has an intended consumer even before compute starts.
+        # Keep that consumer's operands intact while other inputs arrive.
+        # This is tentative intent and participates in slot-guard rollback.
+        self._preparing_operations = {}
         self._reclaim_decisions = set()
         self._observed_cpu = None
+        self._last_request = None
 
     def _placement(self, operation):
         override = self._request_placements.get(operation.request_id, {})
@@ -260,7 +288,7 @@ class CompositionPolicy(UnifiedPolicy):
         self._regions = {}
         for operation in observation.operations:
             if operation.kind in EXPERT_COMPUTE_KINDS and isinstance(operation.expert_id, int):
-                if not operation.region_id and self.policy.expert_device_rule != "fixed":
+                if not operation.region_id and operation.kind!="expert_ffn" and self.policy.expert_device_rule != "fixed":
                     raise Unsupported("dynamic expert selection requires a revealed expert region")
                 key = self._region_key(operation)
                 self._regions.setdefault(key, []).append(operation)
@@ -272,11 +300,27 @@ class CompositionPolicy(UnifiedPolicy):
 
     def _engine(self, tensor, src, dst):
         stage = self._tensor_stages.get(tensor.id, "")
+        layer, _, expert = self._catalogue.get(tensor.id, (None, None, None))
+        scoped = resolve_scoped_transport(self.spec.scoped_transport, tensor_id=tensor.id,
+            role=tensor.role, src=src, dst=dst, layer_id=layer, stage=stage, expert_id=expert)
+        if scoped is not None:
+            return scoped.engine
         matches = [rule for rule in self.spec.transport_rules if rule.role == tensor.role
                    and rule.src == src and rule.dst == dst and rule.stage in (None, stage)]
         if not matches:
             raise Unsupported(f"no explicit engine rule for {tensor.id}/{tensor.role}/{stage}/{src}->{dst}")
         return max(matches, key=lambda rule: rule.stage is not None).engine
+
+    def _record(self, observation, decision, reason, **evidence):
+        if decision.kind == ACTION_COPY and self.spec.scoped_transport:
+            tensor = next(item for item in observation.tensors if item.id == decision.target_id)
+            layer, _, expert = self._catalogue.get(tensor.id, (None, None, None))
+            selected = resolve_scoped_transport(self.spec.scoped_transport, tensor_id=tensor.id,
+                role=tensor.role, src=decision.src, dst=decision.dst, layer_id=layer,
+                stage=self._tensor_stages.get(tensor.id, ""), expert_id=expert)
+            if selected is not None:
+                evidence["scoped_transport_rule"] = selected.document()
+        return super()._record(observation, decision, reason, **evidence)
 
     def _estimate_observation(self, observation):
         self._public_catalogue(observation)
@@ -285,6 +329,9 @@ class CompositionPolicy(UnifiedPolicy):
         for tensor in observation.tensors:
             prices = []
             for price in tensor.transfers:
+                if price.timing_scope == "shared_access_only":
+                    prices.append(price)
+                    continue
                 if {price.src, price.dst} == {"dram", "vram"}:
                     engine = self._engine(tensor, price.src, price.dst)
                     if self._services_enabled:
@@ -338,8 +385,24 @@ class CompositionPolicy(UnifiedPolicy):
         weights = tuple(tid for tid in inputs if tensors[tid].role == "weight")
         activation = tuple(tid for tid in inputs if tensors[tid].role != "weight")
         outputs = tuple(sorted(tid for tid in internal if not any(tid in op.inputs for op in operations)))
+        if kinds == {"expert_ffn"} and operation.execution_variant == "host_expert_response_v1":
+            # Explicit scoped profiling contract: the opaque macro owns gather,
+            # host activation input/output and (for GPU) both activation copies.
+            # Only persistent expert weights are separately schedulable ports.
+            # Do not silently apply this boundary to ordinary M2 expert tasks.
+            if not weights or activation or outputs:
+                raise Unsupported("host expert response requires weight-only ports and internal activation I/O")
+            return operations, weights, activation, outputs
         producers = [op for op in observation.operations if set(op.outputs) & set(activation)]
         consumers = [op for op in observation.operations if set(op.inputs) & set(outputs)]
+        if kinds=={"expert_ffn"} and not operation.region_id:
+            # Native opaque groups really consume full request tensors. No
+            # compact gather/scatter or proportional transfer is invented.
+            if not producers or any(op.kind not in {"attention","attention_output","router"} for op in producers):
+                raise Unsupported("opaque expert path requires its declared Attention/router input producers")
+            if not consumers or any(op.kind!="combine" for op in consumers):
+                raise Unsupported("opaque expert output requires declared combine consumers")
+            return operations,weights,activation,outputs
         if not producers or any(op.kind != "gather_rows" or self._placement(op) != "gpu" for op in producers):
             raise Unsupported("complete expert path requires an explicit GPU gather boundary")
         if not consumers or any(op.kind != "scatter_rows" or self._placement(op) != "gpu" for op in consumers):
@@ -361,16 +424,42 @@ class CompositionPolicy(UnifiedPolicy):
                 continue
             returns = []
             for tid in outputs:
-                if device == "gpu":
-                    returns.append(0)
-                else:
-                    price = next((price for price in tensors[tid].transfers
-                                  if price.src == "dram" and price.dst == "vram"), None)
-                    if price is None:
-                        raise Unsupported("CPU expert output has no exact GPU return boundary price")
-                    returns.append(price.duration_ns)
+                destinations={self._placement(op) for op in observation.operations if tid in op.inputs}
+                for consumer_device in sorted(destinations):
+                    destination="dram" if consumer_device=="cpu" else "vram"
+                    if destination==location or tensors[tid].same_pool(location, destination):
+                        returns.append(0)
+                    else:
+                        price=next((p for p in tensors[tid].transfers if p.src==location and p.dst==destination),None)
+                        if price is None or price.duration_ns is None:
+                            raise Unsupported("expert output has no exact consumer return boundary price")
+                        returns.append(price.duration_ns)
             footprint = self._budget_for_additions(tensors, weights) if device == "gpu" else 0
-            feasible = self.spec.cache_budget_bytes is None or footprint <= self.spec.cache_budget_bytes
+            # Full residency is not infeasibility: demand preparation may evict
+            # recoverable, unprotected cache groups before loading this region.
+            # Inspect the same safety conditions as _eviction without committing
+            # a victim or mutating replacement history merely to rank devices.
+            reclaimable = 0
+            if device == "gpu" and self.policy.cache_rule != "none" and observation.allow_eviction:
+                protected = self._protected(observation, tensors, weights)
+                for tids in self._cache_units().values():
+                    resident = [tid for tid in tids if tensors[tid].status_at("vram") != COPY_ABSENT]
+                    if not resident or any(tid in protected for tid in tids):
+                        continue
+                    safe = True
+                    for tid in resident:
+                        tensor = tensors[tid]
+                        routes = {(p.src, p.dst) for p in tensor.transfers}
+                        ready = {other for other, status in tensor.copies if other != "vram" and status == COPY_READY}
+                        recoverable = any((source, "vram") in routes or
+                            (source == "ssd" and ("ssd", "dram") in routes and ("dram", "vram") in routes)
+                            for source in ready)
+                        if tensor.status_at("vram") != COPY_READY or tensor.goal_location == "vram" or not recoverable:
+                            safe = False
+                            break
+                    if safe:
+                        reclaimable += sum(tensors[tid].storage_bytes for tid in tids)
+            feasible = self.spec.cache_budget_bytes is None or footprint - reclaimable <= self.spec.cache_budget_bytes
             if any(price.allocated_workspace_bytes is None for price in stages):
                 raise Unsupported(f"complete expert region has unknown aligned {device} workspace")
             all_ports = {tid for op in operations for tid in op.inputs + op.outputs}
@@ -379,6 +468,13 @@ class CompositionPolicy(UnifiedPolicy):
             memory = next((entry for entry in observation.memory if entry.domain == location), None)
             if memory is None:
                 raise Unsupported(f"complete expert path has no public {location} capacity ledger")
+            if any(tensors[tid].pool_at(location) == "shared" for tid in all_ports):
+                # The shared pool already includes all resident host/device
+                # allocations. Add only genuinely new buffers, not aliases.
+                physical_bytes = memory.used_bytes - memory.runtime_reserved_bytes - memory.external_bytes
+                physical_bytes += sum(self._allocation(tensors[tid], location) for tid in all_ports
+                                      if tensors[tid].status_at(location) == COPY_ABSENT)
+                physical_bytes += max(price.allocated_workspace_bytes for price in stages)
             physical_feasible = memory.capacity_bytes is None or physical_bytes <= (
                 memory.capacity_bytes - memory.runtime_reserved_bytes - memory.external_bytes)
             paths.append({"device": device, "weight_transfer_ns": sum(movements[:len(weights)]),
@@ -388,12 +484,16 @@ class CompositionPolicy(UnifiedPolicy):
                 "stage_operations": [op.id for op in operations], "unique_weights": list(weights),
                 "price_scope": "sum_of_declared_stages_and_isolated_boundary_transfers",
                 "weight_budget_footprint_bytes": footprint, "budget_feasible": feasible,
+                "safely_reclaimable_weight_bytes": reclaimable,
                 "conservative_region_allocation_bytes": physical_bytes,
                 "physical_feasible": physical_feasible})
         return paths
 
     def _devices(self, operation, observation, tensors):
         from llm_infer_model.m2.execution_pipeline import TRANSFORM_KINDS
+        if operation.id in self._preparing_operations:
+            device = self._preparing_operations[operation.id]
+            return (device,) if compute_service_available(observation, device) else ()
         if operation.kind in TRANSFORM_KINDS and len(operation.prices)==1:
             device=self._placement(operation)
             return (device,) if compute_service_available(observation, device) else ()
@@ -414,8 +514,14 @@ class CompositionPolicy(UnifiedPolicy):
         if not available:
             return ()
         _, weights, _, _ = self._region_parts(operation, observation, tensors)
-        cached = bool(weights) and all(tensors[tid].status_at("vram") == COPY_READY for tid in weights)
+        cached = bool(weights) and all(tensors[tid].can_access("vram") for tid in weights)
         preferred = self._placement(operation)
+        if rule in {"resident_first","current_cost"}:
+            self._region_estimates[key]=paths
+            # Merely considering a busy device must not lock the region.
+            return rank_expert_devices(observation,ExpertSchedulingSpec(
+                order_rule=self.policy.expert_order_rule,device_rule=rule),paths,
+                preferred_device=preferred,cached_gpu=cached)
         if rule in ("resident_first", "fiddler_paths") and cached:
             chosen = next((path for path in available if path["device"] == "gpu"), None)
         else:
@@ -447,7 +553,9 @@ class CompositionPolicy(UnifiedPolicy):
             available = [path for path in paths if path["budget_feasible"] and path["physical_feasible"]
                          and compute_service_available(observation, path["device"])]
             self._region_estimates[key] = paths
-            return (min(available, key=lambda path: (path["total_ns"], path["device"] != preferred, path["device"]))["device"],) if available else ()
+            return rank_expert_devices(observation,ExpertSchedulingSpec(
+                device_rule="current_cost",order_rule=self.policy.expert_order_rule),available,
+                preferred_device=preferred)
         candidates = []
         for price in operation.prices:
             if not compute_service_available(observation, price.device):
@@ -461,9 +569,16 @@ class CompositionPolicy(UnifiedPolicy):
             memory = next(entry for entry in observation.memory if entry.domain == location)
             minimum = sum(self._allocation(tensors[tid], location)
                           for tid in set(operation.inputs + operation.outputs)) + price.allocated_workspace_bytes
+            if any(tensors[tid].pool_at(location) == "shared" for tid in operation.inputs + operation.outputs):
+                minimum = memory.used_bytes - memory.runtime_reserved_bytes - memory.external_bytes
+                minimum += sum(self._allocation(tensors[tid], location)
+                               for tid in set(operation.inputs + operation.outputs)
+                               if tensors[tid].status_at(location) == COPY_ABSENT)
+                minimum += price.allocated_workspace_bytes
             if memory.capacity_bytes is not None and minimum > memory.capacity_bytes - memory.runtime_reserved_bytes - memory.external_bytes:
                 continue
-            candidates.append((price.duration_ns + sum(movement), price.device != preferred, price.device))
+            candidates.append((current_compute_duration_ns(price.duration_ns,observation,price.device) + sum(movement),
+                               price.device != preferred, price.device))
         return (min(candidates)[2],) if candidates else ()
 
     def _reconfiguration_step(self, observation):
@@ -481,7 +596,8 @@ class CompositionPolicy(UnifiedPolicy):
             if spec.reclaim_response == "decline":
                 return self._record(observation, ControlDecision("DECLINE_RECLAIM", request_id=pending.id,
                     reason="explicit_strategy_decline"), "decline_public_reclaim", request_id=pending.id)
-            memory = next(entry for entry in observation.memory if entry.domain == "vram")
+            location = "vram"
+            memory = next(entry for entry in observation.memory if entry.domain == location)
             if memory.capacity_bytes is None:
                 raise Unsupported("reclaim requires a finite public VRAM capacity")
             shortfall = memory.used_bytes - memory.external_bytes + pending.target_external_bytes - memory.capacity_bytes
@@ -489,24 +605,27 @@ class CompositionPolicy(UnifiedPolicy):
                 return self._record(observation, ControlDecision("ACK_RECLAIM", request_id=pending.id),
                     "accept_safely_reclaimed_budget", request_id=pending.id, physical_shortfall_bytes=shortfall)
             tensors = {tensor.id: tensor for tensor in observation.tensors}
-            candidates = [tid for tid in observation.safe_weight_release_candidates
-                          if tid in tensors and tensors[tid].role == "weight"]
+            candidates = [(tid, loc) for tid in observation.safe_weight_release_candidates
+                          if tid in tensors and tensors[tid].role == "weight"
+                          for loc in (("dram", "vram") if pending.domain == "shared" else (location,))
+                          if tensors[tid].status_at(loc) == COPY_READY and tensors[tid].released_bytes(loc) > 0
+                          and tensors[tid].has_independent_backup(loc)]
             if candidates:
                 if spec.release_order == "largest_first":
-                    rank = lambda tid: (-self._allocation(tensors[tid], "vram"), tid)
+                    rank = lambda item: (-tensors[item[0]].released_bytes(item[1]), item)
                 elif spec.release_order == "history_frequency":
                     frequency = {}
                     for entry in observation.route_history:
                         for expert in entry.expert_ids:
                             owner = (entry.layer_id, expert)
                             frequency[owner] = frequency.get(owner, 0) + 1
-                    rank = lambda tid: (frequency.get((self._catalogue.get(tid, ("", "", None))[0],
-                                                      self._catalogue.get(tid, ("", "", None))[2]), 0),
-                                        self._last_used.get(tid, -1), tid)
+                    rank = lambda item: (frequency.get((self._catalogue.get(item[0], ("", "", None))[0],
+                                                      self._catalogue.get(item[0], ("", "", None))[2]), 0),
+                                        self._last_used.get(item[0], -1), item)
                 else:
-                    rank = lambda tid: (self._last_used.get(tid, -1), tid)
-                chosen = min(candidates, key=rank)
-                return self._record(observation, Decision(ACTION_EVICT, chosen, location="vram"),
+                    rank = lambda item: (self._last_used.get(item[0], -1), item)
+                chosen, release_location = min(candidates, key=rank)
+                return self._record(observation, Decision(ACTION_EVICT, chosen, location=release_location),
                     "reclaim_model_certified_clean_weight", request_id=pending.id, tensor=chosen,
                     release_order=spec.release_order, physical_shortfall_bytes=shortfall)
             if observation.t_ns < pending.deadline_ns:
@@ -525,6 +644,9 @@ class CompositionPolicy(UnifiedPolicy):
 
     def _protected(self, observation, tensors, current_inputs=()):
         protected = super()._protected(observation, tensors, current_inputs)
+        for operation in observation.operations:
+            if operation.id in self._preparing_operations and operation.status == OP_NOT_STARTED:
+                protected.update(operation.inputs)
         # Cache groups remain intact throughout a committed expert execution.
         # Stage-local tensor mode can evict later, but never a current reader.
         if self.spec.cache_unit == "expert_group":
@@ -570,7 +692,7 @@ class CompositionPolicy(UnifiedPolicy):
         return sum(sum(tensors[tid].storage_bytes for tid in tids) for tids in self._cache_units().values()
                    if any(tid in additions or tensors[tid].status_at("vram") != COPY_ABSENT for tid in tids))
 
-    def _eviction(self, observation, tensors, location, protected):
+    def _eviction(self, observation, tensors, location, protected, *, require_physical_release=False):
         if self.policy.cache_rule == "none" or not observation.allow_eviction:
             return None
         units = self._cache_units()
@@ -583,6 +705,10 @@ class CompositionPolicy(UnifiedPolicy):
             valid = True
             for tid in resident:
                 tensor = tensors[tid]
+                if require_physical_release and (tensor.released_bytes(location) <= 0 or
+                                                 not tensor.has_independent_backup(location)):
+                    valid = False
+                    break
                 routes = {(price.src, price.dst) for price in tensor.transfers}
                 ready = {other for other, status in tensor.copies if other != location and status == COPY_READY}
                 recoverable = any((source, location) in routes or (source == "ssd" and location == "vram"
@@ -632,15 +758,22 @@ class CompositionPolicy(UnifiedPolicy):
                     raise Unsupported(f"declared GPU cache unit for {operation.id} exceeds its explicit weight budget")
                 return None
         decision = super()._demand(operation, observation, tensors, device, queue=queue)
+        if decision is not None and decision.kind in (ACTION_COPY, ACTION_SHARE, "READ_SSD"):
+            self._preparing_operations[operation.id] = device
+        elif decision is not None and decision.kind == ACTION_COMPUTE:
+            self._preparing_operations.pop(operation.id, None)
+        if decision is not None and decision.kind==ACTION_COMPUTE:
+            self._last_request=operation.request_id
         if decision is not None and decision.kind == ACTION_COMPUTE and self.spec.cache_unit == "expert_group":
             for tid in weights:
                 for member in self._groups[self._tensor_groups[tid]]:
                     self._last_used[member] = self._clock
-        if (decision is not None and decision.kind in (ACTION_COPY, "READ_SSD", ACTION_COMPUTE)
-                and self.spec.reconfiguration is not None and self.spec.reconfiguration.cpu_response == "current_cost"):
-            if operation.kind in EXPERT_COMPUTE_KINDS and isinstance(operation.expert_id, int):
+        if decision is not None and decision.kind in (ACTION_COPY,ACTION_SHARE,"READ_SSD",ACTION_COMPUTE):
+            dynamic_cpu=self.spec.reconfiguration is not None and self.spec.reconfiguration.cpu_response=="current_cost"
+            if operation.kind in EXPERT_COMPUTE_KINDS and isinstance(operation.expert_id,int) and (
+                    self.policy.expert_device_rule!="fixed" or dynamic_cpu):
                 self._region_devices[self._region_key(operation)] = device
-            else:
+            elif dynamic_cpu:
                 self._operation_devices[operation.id] = device
         return decision
 
@@ -668,7 +801,7 @@ class CompositionPolicy(UnifiedPolicy):
                 return decision
         def cached(entry):
             _, weights, _, _ = self._region_parts(entry[1], observation, tensors)
-            return bool(weights) and all(tensors[tid].status_at("vram") == COPY_READY for tid in weights)
+            return bool(weights) and all(tensors[tid].can_access("vram") for tid in weights)
         gpu = sorted((entry for entry in fresh if cached(entry)), key=lambda entry: (-entry[1].token_count, entry[0]))
         uncached = [entry for entry in fresh if not cached(entry)]
         cpu = sorted(uncached, key=lambda entry: (entry[1].token_count, entry[0]))
@@ -809,12 +942,80 @@ class CompositionPolicy(UnifiedPolicy):
                     public_duration_ns=price.duration_ns)
         return None
 
+    def _public_critical_path(self, observation, tensors):
+        """Public decoupling priority: how much work an operation releases elsewhere.
+
+        Only revealed operation inputs/outputs, public prices and the declared
+        placement are used. Each operation contributes its declared duration
+        on its own machine and the transfer estimate of every input it still
+        lacks there to the shared link. Its rank is the largest total load on
+        a machine *other* than its own over its successor closure: ready work
+        that releases a long chain on the other device outranks work that only
+        extends the machine already busy, which is what a summed bottom level
+        gets wrong when CPU and GPU work on different chains compete for one
+        ready slot. Equal ranks keep the declared order. This orders ready
+        work; it is neither a resource schedule nor a claim about future
+        arrivals, routes or operating-system events.
+        """
+        operations = observation.operations
+        own = {}
+        for operation in operations:
+            device = self._placement(operation)
+            location = "dram" if device == "cpu" else "vram"
+            price = next((price for price in operation.prices if price.device == device), None)
+            load = {"cpu": 0, "gpu": 0, "pcie": 0}
+            load[device] = price.duration_ns if price is not None else 0
+            load["pcie"] = sum(self._transfer_estimate(tensors[tid], location) or 0
+                               for tid in operation.inputs)
+            own[operation.id] = (device, load)
+        producer = {}
+        for operation in operations:
+            for tid in operation.outputs:
+                producer.setdefault(tid, operation.id)
+        successors = {}
+        for operation in operations:
+            for tid in operation.inputs:
+                source = producer.get(tid)
+                if source is not None and source != operation.id:
+                    successors.setdefault(source, []).append(operation.id)
+        remaining = {identity: dict(load) for identity, (_, load) in own.items()}
+        for identity in reversed(self._public_topological_order(own, successors)):
+            released = remaining[identity]
+            for child in successors.get(identity, ()):
+                for machine, value in remaining[child].items():
+                    released[machine] += value
+        return {identity: max(value for machine, value in remaining[identity].items()
+                              if machine != device)
+                for identity, (device, _) in own.items()}
+
+    @staticmethod
+    def _public_topological_order(own, successors):
+        indegree = {identity: 0 for identity in own}
+        for children in successors.values():
+            for child in children:
+                indegree[child] += 1
+        ready = [identity for identity in own if indegree[identity] == 0]
+        order = []
+        while ready:
+            identity = ready.pop()
+            order.append(identity)
+            for child in successors.get(identity, ()):
+                indegree[child] -= 1
+                if indegree[child] == 0:
+                    ready.append(child)
+        if len(order) != len(indegree):
+            raise Unsupported("public priority graph is not acyclic")
+        return order
+
     def _propose(self, observation):
         DeclarativePolicy.observe_final(self, self._fragment_catalogue(observation))
         self._clock += 1
         if observation.complete or observation.error_code is not None:
             return None
         tensors = {tensor.id: tensor for tensor in observation.tensors}
+        pending_ids = {op.id for op in observation.operations if op.status == OP_NOT_STARTED}
+        self._preparing_operations = {key: device for key, device in self._preparing_operations.items()
+                                      if key in pending_ids}
         dynamic_cpu = self.spec.reconfiguration is not None and self.spec.reconfiguration.cpu_response == "current_cost"
         use_hybri_queue = self.policy.expert_device_rule == "hybrimoe_queues" and not dynamic_cpu
         resident = self._budget_for_additions(tensors)
@@ -829,7 +1030,12 @@ class CompositionPolicy(UnifiedPolicy):
         release = self._declared_release(observation, tensors) or self._release_last_use(observation, tensors)
         if release:
             return release
-        for operation in observation.operations:
+        expert_order=order_expert_operations(observation,ExpertSchedulingSpec(
+            order_rule=self.policy.expert_order_rule,device_rule=self.policy.expert_device_rule),
+            history=tuple(self._history.values()))
+        work_order=order_request_operations(expert_order,self.spec.request_pipeline,
+            last_request=self._last_request,priority=self._public_critical_path(observation,tensors))
+        for operation in work_order:
             if not self._ready(operation, tensors):
                 continue
             if use_hybri_queue and operation.kind in EXPERT_COMPUTE_KINDS and isinstance(operation.expert_id, int):
@@ -866,6 +1072,8 @@ class CompositionPolicy(UnifiedPolicy):
         if not isinstance(observation, CausalObservation):
             raise InvalidInput("CompositionPolicy requires public CausalObservation")
         self._public_catalogue(observation)
+        self._shared_memory = any(tensor.pool_at("dram") == tensor.pool_at("vram")
+                                  for tensor in observation.tensors)
         control = self._reconfiguration_step(observation)
         if control is not None:
             return control
@@ -886,10 +1094,11 @@ class CompositionPolicy(UnifiedPolicy):
         is copied, while existing immutable values and path lists are shared.
         """
         dictionary_fields = ("_history", "_last_used", "_fiddler_devices", "_fiddler_paths",
-                             "_mrs_scores", "_region_devices", "_region_estimates", "_operation_devices")
+                             "_mrs_scores", "_region_devices", "_region_estimates", "_operation_devices",
+                             "_preparing_operations")
         set_fields = ("_predicted", "_prefetch_hops", "_revealed_demand", "_hybri_transfer_claims",
                       "_mrs_seen", "_prefetch_units")
-        scalar_fields = ("_complete", "_clock", "_pending_eviction_group")
+        scalar_fields = ("_complete", "_clock", "_pending_eviction_group", "_last_request")
         append_fields = ("_records", "_mrs_updates", "_composition_records")
         return ({name: dict(getattr(self, name)) for name in dictionary_fields} |
                 {name: set(getattr(self, name)) for name in set_fields} |
@@ -909,6 +1118,10 @@ class CompositionPolicy(UnifiedPolicy):
         result.pop("policy", None)
         result.update(format_version="composition-policy-audit-0.1",
             authoritative_strategy_field="composition", composition=composition_policy_document(self.spec),
+            authoritative_strategy_fields=["composition", "scoped_transport"],
+            scoped_transport=[rule.document() for rule in self.spec.scoped_transport],
+            transport_rule_precedence="scoped_priority_then_selector_specialization_then_global_stage_fallback",
+            scoped_transport_ownership="static_weight_tensor_owner_not_current_consumer",
             transport_decisions=list(self._transport_records), cache_decisions=list(self._composition_records),
             cache_unit=self.spec.cache_unit, cache_budget_scope="materialized_payload_bytes",
             group_partial_residency_reserves_full_group_budget=self.spec.cache_unit == "expert_group",
@@ -916,10 +1129,17 @@ class CompositionPolicy(UnifiedPolicy):
                               "paths": self._region_estimates.get(key, [])}
                              for key, device in sorted(self._region_devices.items())],
             prefetch_information_scope="public_static_architecture_and_revealed_history_only",
+            expert_order_rule=self.policy.expert_order_rule,
+            request_pipeline=self.spec.request_pipeline.document() if self.spec.request_pipeline else None,
             prefetch_max_count_scope="per_active_source_invocation",
             engine_path_estimates_are_contention_free=True,
             claims={"search": False, "optimality": False, "paper_strategy_reproduced": False,
                     "physical_calibration": False})
+        if getattr(self, "_shared_memory", False):
+            result.update(cache_budget_scope="explicit_gpu_access_view_payload_quota",
+                          cache_budget_is_physical_capacity=False,
+                          shared_weight_without_gpu_view_is_charged_to_gpu_quota=False,
+                          shared_view_eviction_can_release_zero_physical_bytes=True)
         if self.spec.reconfiguration is not None:
             result.update(reconfiguration=reconfiguration_document(self.spec.reconfiguration),
                 operation_bindings=[{"operation_id": oid, "device": device}

@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import sys
 
-from llm_infer_model.tensor.engine import Action, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD
+from llm_infer_model.tensor.engine import Action, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD
 from llm_infer_model.tensor.program import WaitStep, _check_wait, _wait_done
 from llm_infer_model.tensor.services import parse_services, ServiceSession
 from llm_infer_model.tensor.runtime import ExecutionCommand, dispatch_command
@@ -63,6 +63,16 @@ def compile_service_program_file(path):
                 raise InvalidInput("compute references unknown or duplicate operation")
             if raw["device"] not in scenario.mapspace.devices_for(oid): raise Unsupported("compute device lacks exact allowed cost")
             computes.add(oid); steps.append((Action(ACTION_COMPUTE, oid, device=raw["device"]), None))
+        elif kind == "share":
+            if set(raw) != {"kind", "tensor_id", "src", "dst"}:
+                raise InvalidInput("share requires tensor_id/src/dst and no transfer engine")
+            action = Action(ACTION_SHARE, raw["tensor_id"], src=raw["src"], dst=raw["dst"])
+            if (raw["tensor_id"] not in scenario.workload.tensor_by_id or
+                    {raw["src"], raw["dst"]} != {"dram", "vram"} or
+                    scenario.architecture.pool_of(raw["src"]) != scenario.architecture.pool_of(raw["dst"]) or
+                    not scenario.mapspace.allows(action.route, raw["tensor_id"])):
+                raise Unsupported("share requires permitted views of one shared physical pool")
+            steps.append((action, None))
         elif kind == "transfer":
             if set(raw) != {"kind", "tensor_id", "src", "dst", "engine"}: raise InvalidInput("transfer requires explicit engine")
             if raw["engine"] not in ("ce", "sm") or {raw["src"], raw["dst"]} != {"dram", "vram"}:

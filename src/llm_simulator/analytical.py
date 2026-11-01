@@ -99,16 +99,20 @@ class AnalyticalCosts:
         while compiling, running, exporting or resuming the backend plan, whose
         existing reproducibility checks hash these input files.
         """
+        from .request_flow import RequestFlow, build_request_flow_inputs
+        if isinstance(workload,RequestFlow):
+            return build_request_flow_inputs(self,directory,model,hardware,workload)
         if not isinstance(model, Model) or not isinstance(hardware, Hardware) or not isinstance(workload, Workload):
             raise ValueError("build_inputs requires Model, Hardware and Workload objects")
-        if model.kind == "dense" and workload.batch_size != 1:
-            raise Unsupported("the complete Dense backend currently supports batch_size=1 only; no whole-batch timing is duplicated")
         if model.kind == "dense" and (workload.routes or workload.route_source is not None):
             raise ValueError("Dense workloads must not declare MoE routing data")
-        if hardware.gpu is not None and hardware.transfer_bandwidth_bytes_per_second is None:
+        if (hardware.memory_mode == "separate" and hardware.gpu is not None
+                and hardware.transfer_bandwidth_bytes_per_second is None):
             raise Unsupported("GPU execution requires explicit Hardware.transfer_bandwidth_bytes_per_second")
         if model.kind == "moe":
             for route in ("dram_to_vram", "ssd_to_dram", "dram_to_ssd"):
+                if hardware.memory_mode == "shared" and route == "dram_to_vram":
+                    continue
                 self.transfer_duration_ns(hardware, route=route, storage_bytes=4)
             _validate_routes(model, workload)
 
@@ -123,7 +127,8 @@ class AnalyticalCosts:
         parsed_layers = {}
         for layer_index in range(model.layers):
             layer_id = f"layer{layer_index}"
-            layer_document = _layer_document(model, layer_id, version)
+            layer_document = _layer_document(model, layer_id, version,
+                independent_requests=model.kind == "dense" and workload.batch_size > 1)
             documents[f"{layer_id}.layer.json"] = layer_document
             parsed_layers[layer_id] = parse_layer_document(layer_document)
 
@@ -188,6 +193,8 @@ class AnalyticalCosts:
             workspace_semantics="explicit simplified internal scratch declaration; zero is not a measurement or a claim about backend allocator use",
             storage="F32 immutable weights and logical per-token KV blocks; weights/input/KV initially DRAM; no numerical weight values loaded",
             macro_contract=version,
+            batch_accounting=("independent_per_request_kernel_with_exact_invocation_batch_axis; not_fused_batch_kernel"
+                              if model.kind == "dense" else "per_request_macros_and_grouped_expert_kernels"),
             macro_boundaries=("complete declared Dense projection -> materialized attention -> Dense SwiGLU FFN; input and post-attention RMSNorm, normal RoPE, residuals; no QK norm or attention gate"
                               if model.kind == "dense" else
                               "synthetic opaque projection -> attention -> router -> grouped expert FFN -> combine; grouped experts charged once; not a measured complete decoder implementation"),
@@ -197,7 +204,7 @@ class AnalyticalCosts:
                 "declared effective throughput and byte traffic; no cache or operator fusion model",
                 "one compute slot per device, one shared PCIe copy slot and one SSD I/O slot",
                 "fixed F32 model; no numerical weight loading, quantization or output-token generation",
-                "Dense complete-contract batch_size is currently restricted to one",
+                "Dense batch_size>1 runs independent request kernels; no fused batch kernel or measured B>1 throughput claim",
                 "CPU physical envelope threads=1 is a signature identifier, not measured OS scheduling",
                 "prefill/decode rounds share one runtime; decode inputs are trace supplied",
                 "device availability controls computation; runtime retains both explicit storage-domain capacities",
@@ -211,6 +218,14 @@ class AnalyticalCosts:
             transfer_estimates=[dict(route=route, storage_bytes=size, duration_ns=duration)
                                 for (route, size), duration in sorted(transfer_records.items())],
         )
+        if hardware.memory_mode == "shared":
+            metadata["memory_contract"] = _memory_metadata(hardware)
+            metadata["limitations"] = [item for item in metadata["limitations"] if item not in (
+                "device availability controls computation; runtime retains both explicit storage-domain capacities",
+                "MoE backend requires four route bandwidth declarations even when SSD is unused")]
+            metadata["limitations"].append(
+                "shared-buffer visibility is a declared zero-time abstraction, not measured synchronization; "
+                "compute prices retain their declared effective memory bandwidth; no automatic shared-bandwidth contention correction")
         documents["model.global.json"] = model_document
         documents["environment.json"] = environment
         documents["analytical-metadata.json"] = metadata
@@ -267,6 +282,17 @@ class _RecordingCostTable(M2CostTable):
         self.recorded[(route, storage_bytes)] = cost
         return cost
 
+    def optional_transfer(self, route, storage_bytes):
+        """Quote an actual copy only when its bandwidth was declared.
+
+        Shared visibility needs no transfer quote. Missing bandwidth is not
+        an invented zero-duration COPY; an explicit COPY still requires one.
+        """
+        if (route in ("dram_to_vram", "vram_to_dram")
+                and self.hardware.transfer_bandwidth_bytes_per_second is None):
+            return None
+        return self.lookup_transfer(route, storage_bytes)
+
 
 def _validate_routes(model, workload):
     if not workload.routes or workload.route_source is None:
@@ -302,7 +328,7 @@ def _validate_routes(model, workload):
         raise ValueError(f"MoE routes must exactly cover every layer/request/token; missing={expected_count-len(seen)}")
 
 
-def _layer_document(model, layer_id, version):
+def _layer_document(model, layer_id, version, *, independent_requests=False):
     base = dict(format_version=version, id=layer_id, provenance="synthetic_layer",
                 hidden_size=model.hidden_size, hidden_bytes_per_token=model.hidden_bytes_per_token,
                 kv_bytes_per_token=model.kv_bytes_per_token, attention="full_causal", ffn=model.kind)
@@ -343,6 +369,8 @@ def _layer_document(model, layer_id, version):
                        for stage in ("projection", "attention", "dense_ffn")}, excluded_operations=[])
     if version == "m2-layer-0.5":
         physical.update(cuda_device=0, cuda_graphs="disabled")
+    if independent_requests:
+        physical["request_accounting"] = "independent_per_request_kernel"
     base.update(weights=weights, tasks=tasks, physical=physical)
     return base
 
@@ -363,12 +391,31 @@ def _invocation_document(model, hardware, workload, layer, scope, phase, positio
         devices=list(hardware.devices), hardware=dict(dram_capacity_bytes=hardware.dram_capacity_bytes,
             vram_capacity_bytes=hardware.vram_capacity_bytes, dram_alignment_bytes=1, vram_alignment_bytes=1,
             dram_runtime_reserved_bytes=0, vram_runtime_reserved_bytes=0), requests=requests, state_in=state)
+    if hardware.memory_mode == "shared":
+        result["hardware"].update(memory_mode="shared",
+            shared_capacity_bytes=hardware.shared_capacity_bytes,
+            shared_runtime_reserved_bytes=hardware.shared_runtime_reserved_bytes,
+            shared_alignment_bytes=hardware.shared_alignment_bytes)
     if model.kind == "moe":
         state["weight_copies"] = [dict(id=weight.id, version=1, storage_bytes=weight.storage_bytes,
                                         locations=["dram"]) for weight in layer.weights]
         result.update(route_trace=[_route_document(row) for row in routes], route_source=workload.route_source,
                       information_mode="causal_replay")
     return result
+
+
+def _memory_metadata(hardware):
+    """Describe storage semantics, never reinterpret an old timing profile."""
+    return dict(memory_mode=hardware.memory_mode, physical_pools=dict(shared=dict(
+        capacity_bytes=hardware.shared_capacity_bytes,
+        runtime_reserved_bytes=hardware.shared_runtime_reserved_bytes,
+        alignment_bytes=hardware.shared_alignment_bytes)),
+        logical_location_to_physical_pool=dict(dram="shared", vram="shared"),
+        same_buffer_handoff=dict(action="SHARE", payload_bytes=0, duration_ns=0,
+            cost_source="declared_zero_time_visibility_abstraction", measured=False),
+        explicit_copy="new allocation and actual payload transfer; requires explicit route cost",
+        compute_memory_cost="existing declared compute price retained; memory access is not free",
+        automatic_shared_bandwidth_contention=False)
 
 
 def _macro_work(model, layer, kind, tokens, history):

@@ -16,13 +16,13 @@ import hashlib
 import json
 from typing import Iterable
 
-from .engine import (ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
+from .engine import (ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_SHARE,
     Action, CODE_CAPACITY_EXCEEDED, CODE_ILLEGAL_ACTION, CODE_RESOURCE_BUSY,
     MappingError, State, _accumulate_transfer_bytes, _event_for, advance_elapsed, transition)
 from .environment import (CODE_ENVIRONMENT_DEADLOCK, CODE_INFORMATION_NOT_KNOWN,
     CODE_RECLAIM_ADMISSION, CODE_CONTROL_BUSY, EnvironmentEvent, SessionStep, SimulationSession)
 from .spec import (COPY_ABSENT, COPY_READY, DOMAINS, DOMAIN_OF_DEVICE,
-    LOC_DRAM, LOC_SSD, LOC_VRAM, OP_DONE, RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE,
+    LOC_DRAM, LOC_SSD, LOC_VRAM, LOC_SHARED, OP_DONE, RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE,
     RESOURCE_PCIE_COPY, ROUTE_ENDS, Scenario, InvalidInput, Unsupported)
 
 FORMAT_VERSION = "tensor-services-0.1"
@@ -113,8 +113,8 @@ def parse_services(document) -> ServiceContract:
         slot = _object(raw, {"id", "domain", "capacity_bytes", "members"}, "services slot")
         if not isinstance(slot["id"], str) or not slot["id"].strip() or slot["id"] in ids:
             raise InvalidInput("slot ids must be unique nonempty strings")
-        if slot["domain"] not in DOMAINS:
-            raise Unsupported("fixed slots support explicit dram/vram only")
+        if slot["domain"] not in (*DOMAINS, LOC_SHARED):
+            raise Unsupported("fixed slots support explicit dram/vram/shared only")
         _positive(slot["capacity_bytes"], "slot.capacity_bytes")
         if not isinstance(slot["members"], list) or not slot["members"] or any(
                 not isinstance(tid, str) or not tid for tid in slot["members"]):
@@ -150,7 +150,8 @@ class AllocatedScenario(Scenario):
     fixed_slots: tuple[FixedSlot, ...] = ()
 
     def size_alloc(self, tensor_id: str, domain: str = LOC_VRAM) -> int:
-        if any(slot.domain == domain and tensor_id in slot.members for slot in self.fixed_slots):
+        if any(self.architecture.pool_of(slot.domain) == self.architecture.pool_of(domain)
+               and tensor_id in slot.members for slot in self.fixed_slots):
             return 0
         return super().size_alloc(tensor_id, domain)
 
@@ -163,24 +164,35 @@ def allocated_scenario(scenario: Scenario, contract: ServiceContract) -> Allocat
     from .program import validate_device_state
     validate_device_state(scenario, scenario)
     contract = parse_services(services_document(contract))
-    reserves = {domain: scenario.architecture.reserved_of(domain) for domain in DOMAINS}
+    reserves = {domain: scenario.architecture.reserved_of(domain) for domain in scenario.architecture.memory_domains}
+    assignments = set()
     for slot in contract.slots:
+        if slot.domain == LOC_SHARED and not scenario.architecture.is_shared:
+            raise InvalidInput("shared fixed slots require shared memory mode")
+        pool = scenario.architecture.pool_of(slot.domain)
         if slot.capacity_bytes % scenario.architecture.alignment_of(slot.domain):
             raise InvalidInput("fixed slot capacity must satisfy its domain allocation alignment")
         resident = []
         for tid in slot.members:
+            binding = (pool, tid)
+            if binding in assignments:
+                raise InvalidInput("one physical tensor allocation cannot bind multiple fixed slots")
+            assignments.add(binding)
             tensor = scenario.workload.tensor_by_id.get(tid)
             if tensor is None:
                 raise InvalidInput(f"slot references unknown tensor {tid!r}")
             if scenario.size_alloc(tid, slot.domain) > slot.capacity_bytes:
                 raise InvalidInput(f"{tid!r} does not fit its fixed slot capacity")
-            if slot.domain in tensor.initial_locations:
+            if any(scenario.architecture.pool_of(location) == pool
+                   for location in tensor.initial_locations if location in DOMAINS):
                 resident.append(tid)
         if len(resident) > 1:
             raise InvalidInput("fixed slot cannot have multiple initial owners")
-        reserves[slot.domain] += slot.capacity_bytes
-    architecture = replace(scenario.architecture, dram_runtime_reserved_bytes=reserves[LOC_DRAM],
-                           vram_runtime_reserved_bytes=reserves[LOC_VRAM])
+        reserves[pool] += slot.capacity_bytes
+    architecture = (replace(scenario.architecture, shared_runtime_reserved_bytes=reserves[LOC_SHARED])
+                    if scenario.architecture.is_shared else
+                    replace(scenario.architecture, dram_runtime_reserved_bytes=reserves[LOC_DRAM],
+                            vram_runtime_reserved_bytes=reserves[LOC_VRAM]))
     values = {field.name: getattr(scenario, field.name) for field in fields(Scenario)}
     values["architecture"] = architecture
     return AllocatedScenario(**values, fixed_slots=contract.slots)
@@ -236,17 +248,28 @@ class ServiceSession(SimulationSession):
                             for tid in self.scenario.workload.operation_by_id[action.target_id].outputs]
         elif action.route is not None and action.target_id is not None:
             destinations = [(action.target_id, ROUTE_ENDS[action.route][1])]
+        elif action.kind == ACTION_SHARE:
+            destinations = [(action.target_id, action.dst)]
         for slot in self.services.slots:
-            targets = [tid for tid, domain in destinations if domain == slot.domain and tid in slot.members]
+            pool = self.scenario.architecture.pool_of(slot.domain)
+            targets = [tid for tid, domain in destinations
+                       if domain in DOMAINS and self.scenario.architecture.pool_of(domain) == pool
+                       and tid in slot.members]
             if len(targets) > 1:
                 return f"action would produce several simultaneous owners of fixed slot {slot.id!r}"
             for tid in targets:
-                others = [member for member in slot.members if member != tid
-                          and self.state.copy_at(member, slot.domain) != COPY_ABSENT]
+                others = [member for member in slot.members if member != tid and self._slot_present(slot, member)]
                 if others:
                     return (f"fixed slot {slot.id!r} is owned by {others}; explicit EVICT after last reader "
                             f"is required before assigning {tid!r}")
+                if self.scenario.architecture.is_shared and action.kind == ACTION_COPY and self._slot_present(slot, tid):
+                    return "a real COPY needs a second buffer; a fixed shared slot cannot duplicate its owner"
         return None
+
+    def _slot_present(self, slot: FixedSlot, tensor_id: str) -> bool:
+        pool = self.scenario.architecture.pool_of(slot.domain)
+        return any(self.scenario.architecture.pool_of(domain) == pool and
+                   self.state.copy_at(tensor_id, domain) != COPY_ABSENT for domain in DOMAINS)
 
     def _reject(self, action, source_index, code, message):
         self._validate_source(source_index)
@@ -322,9 +345,10 @@ class ServiceSession(SimulationSession):
             replace(task, resource=resource, remaining_ns=duration)
             if task.resource == RESOURCE_PCIE_COPY and task.target_id == action.target_id else task
             for task in candidate.running)))
+        before = self.state
         self._state = candidate
         self._flows[(resource, action.target_id)] = Fraction(payload)
-        event = replace(_event_for(self.scenario, self.state, len(self._events), action), resource=resource)
+        event = replace(_event_for(self.scenario, self.state, len(self._events), action, before=before), resource=resource)
         self._nominal_ends.append(self.state.t + duration)
         self._launches[(resource, action.target_id)] = len(self._events)
         self._engine_choices.append({"action_index": index, "event_index": len(self._events),
@@ -412,7 +436,7 @@ class ServiceSession(SimulationSession):
             "contract_sha256": digest, "timing_resolution": "completion_ceil_to_integer_ns_without_extra_service",
             "transfer_engines": list(self._engine_choices), "link_service_intervals": list(self._link_intervals),
             "slots": [{"id": slot.id, "domain": slot.domain, "reserved_bytes": slot.capacity_bytes,
-                "owner": next((tid for tid in slot.members if self.state.copy_at(tid, slot.domain) != COPY_ABSENT), None)}
+                "owner": next((tid for tid in slot.members if self._slot_present(slot, tid)), None)}
                       for slot in self.services.slots],
             "running_byte_progress": [{"resource": resource, "tensor_id": tid, "remaining_bytes": _fraction(remaining)}
                                       for (resource, tid), remaining in sorted(self._flows.items())],
@@ -432,7 +456,7 @@ class ServiceSession(SimulationSession):
         slots = tuple(PublicFixedSlot(slot.id, slot.domain, slot.capacity_bytes,
             tuple(tid for tid in slot.members if tid in visible),
             next((tid for tid in slot.members if tid in visible and
-                  self.state.copy_at(tid, slot.domain) != COPY_ABSENT), None))
+                  self._slot_present(slot, tid)), None))
             for slot in self.services.slots)
         rates = _rates(self.services, [resource for resource, _ in self._flows])
         engines = {resource: engine for engine, resource in RESOURCE_OF_ENGINE.items()}

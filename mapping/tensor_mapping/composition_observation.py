@@ -13,6 +13,8 @@ class CompositionObservation(CausalObservation):
     release_candidates: tuple[tuple[str, str], ...] = ()
     recoverable_release_candidates: tuple[tuple[str, str], ...] = ()
     completed_invocations: tuple[str, ...] = ()
+    arrived_requests: tuple[str, ...] = ()
+    retired_requests: tuple[str, ...] = ()
 
 
 class CompositionSession:
@@ -99,7 +101,9 @@ class CompositionSession:
             active_invocations=active, weight_catalogue=catalogue,
             release_candidates=getattr(observation, "release_candidates", ()),
             recoverable_release_candidates=getattr(observation, "recoverable_release_candidates", ()),
-            completed_invocations=getattr(observation, "completed_invocations", ()))
+            completed_invocations=getattr(observation, "completed_invocations", ()),
+            arrived_requests=getattr(observation,"arrived_requests",()),
+            retired_requests=getattr(observation,"retired_requests",()))
 
     def __getattr__(self, name):
         return getattr(self._session, name)

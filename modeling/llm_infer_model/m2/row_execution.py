@@ -322,7 +322,8 @@ def transform_moe_execution(compiled: CompiledInvocation, execution_spec: MoEExe
         transfers[(p.route,p.storage_bytes)] = TransferEntry(p.duration_ns,"synthetic_transfer")
     table = replace(compiled.cost_table, transfers=transfers)
     from .costs import expand_transfer_costs
-    _, scenario_doc["costs"]["transfer"] = expand_transfer_costs(table, sizes, allowed)
+    _, scenario_doc["costs"]["transfer"] = expand_transfer_costs(table, sizes, allowed,
+        shared_memory=compiled.scenario.architecture.memory_mode == "shared")
     scenario_doc["costs"]["compute"] = compute
     scenario_doc["costs"]["source"] += ";moe-execution:synthetic_execution"
     scenario_doc["mapspace"]["allowed_devices"] = {t.operation_id:list(compiled.invocation.devices) for t in tasks}

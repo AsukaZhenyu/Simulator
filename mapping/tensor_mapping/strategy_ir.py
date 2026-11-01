@@ -22,12 +22,13 @@ FORMAT_VERSION = "strategy-ir-0.1"
 INFORMATION_MODE = "offline_fixed"
 DEVICES = frozenset({"cpu", "gpu"})
 LOCATIONS = frozenset({"dram", "vram", "ssd"})
-INSTRUCTION_KINDS = frozenset({"compute", "transfer", "release", "wait", "drain", "device_state"})
+INSTRUCTION_KINDS = frozenset({"compute", "transfer", "share", "release", "wait", "drain", "device_state"})
 _TOP_FIELDS = frozenset({"format_version", "id", "scenario_file", "information_mode",
                          "regions", "placements", "program", "device_states"})
 _INSTRUCTION_FIELDS = {
     "compute": frozenset({"kind", "operation_id"}),
     "transfer": frozenset({"kind", "tensor_id", "src", "dst"}),
+    "share": frozenset({"kind", "tensor_id", "src", "dst"}),
     "release": frozenset({"kind", "tensor_id", "location"}),
     "wait": frozenset({"kind", "operations", "copies"}),
     "drain": frozenset({"kind"}),
@@ -133,7 +134,7 @@ def _validate_instruction(instruction: Instruction, where: str) -> None:
         raise InvalidInput(f"{where}.operations/copies are only used by wait")
     if kind == "compute":
         _text(instruction.operation_id, f"{where}.operation_id")
-    elif kind == "transfer":
+    elif kind in {"transfer", "share"}:
         _text(instruction.tensor_id, f"{where}.tensor_id")
         _location(instruction.src, f"{where}.src")
         _location(instruction.dst, f"{where}.dst")

@@ -52,6 +52,9 @@ class DistributionTests(unittest.TestCase):
                 "CITATION.cff", "docs/LIBRARY_GUIDE.md", "docs/DEVICE_STATE_RUNTIME.md",
                 "docs/OPEN_SOURCE_AND_PREPRINT.md", "docs/RELEASE_0_1.md",
                 "docs/PERFORMANCE_BOUNDARIES.md", "tests/test_performance_boundaries.py",
+                "docs/AVAILABLE_RESOURCE_MODEL_20261022.md",
+                "docs/STRATEGY_REPRESENTATION.md", "tests/test_strategy_ir.py",
+                "docs/SINGLE_CPU_GPU_REQUEST_FLOW_20261023.md",
                 "docs/PERFORMANCE_BOUNDARY_REFACTOR_20261018.md",
                 "docs/data/performance-boundary-refactor-20261018.json",
                 "tests/test_distribution.py", "tests/test_library.py",
@@ -171,6 +174,9 @@ class DistributionTests(unittest.TestCase):
                  json.dumps([
                      "llm_simulator", "tensor_mapping", "llm_infer_model",
                      "tensor_mapping.python_frontend", "tensor_mapping.unified_strategy",
+                     "tensor_mapping.strategy_inspection", "tensor_mapping.storage_rules",
+                     "tensor_mapping.request_scheduling", "tensor_mapping.expert_scheduling",
+                     "llm_simulator.request_flow", "llm_infer_model.m2.request_flow",
                      "llm_infer_model.tensor.program", "llm_infer_model.m2.expand",
                      "llm_infer_model.m2.global_execution", "llm_infer_model.components",
                      "llm_infer_model.performance", "llm_simulator.performance",
@@ -188,6 +194,38 @@ class DistributionTests(unittest.TestCase):
             self.assertEqual(physical_result["constant"]["duration_ns"], 16)
             self.assertEqual(physical_result["dynamic"]["duration_ns"], 23)
             self.assertEqual(physical_result["prediction_provider"], "llm_infer_model.performance.evaluate")
+            available = self._run(
+                [str(interpreter), "-I", str(source_roots[0] / "examples/library/available_resources.py")],
+                cwd=temporary,
+            )
+            available_result = json.loads(available.stdout)
+            self.assertEqual(available_result["constant_duration_ns"], 11_500_000)
+            self.assertEqual(available_result["dynamic_duration_ns"], 18_500_000)
+            self.assertIs(available_result["os_scheduler_simulated"], False)
+            self.assertIs(available_result["hardware_accuracy_claimed"], False)
+            self.assertIs(available_result["external_background_applied_again"], False)
+            strategy_output = temporary / "strategy-ir-simulation"
+            self._run(
+                [str(interpreter), "-I", str(source_roots[0] / "examples/library/strategy_ir.py"),
+                 "--out", str(strategy_output)],
+                cwd=temporary,
+            )
+            inspection = json.loads((strategy_output / "inspection.json").read_text(encoding="utf-8"))
+            self.assertIs(inspection["executable"], False)
+            summary = json.loads((strategy_output / "summary.json").read_text(encoding="utf-8"))
+            self.assertIs(summary["success"], True)
+            strategy_ir = json.loads((strategy_output / "execution/plan.json").read_text(encoding="utf-8"))
+            self.assertEqual(strategy_ir["format_version"], "hierarchical-strategy-0.5")
+            self.assertEqual(len(strategy_ir["scoped_transport"]), 2)
+            for kind in ("dense","moe"):
+                request_output=temporary/("requests-"+kind)
+                self._run([str(interpreter),"-I",str(source_roots[0]/"examples/library/request_pipeline.py"),
+                           "--kind",kind,"--out",str(request_output)],cwd=temporary)
+                request_summary=json.loads((request_output/"summary.json").read_text(encoding="utf-8"))
+                self.assertIs(request_summary["success"],True)
+                request_ir=json.loads((request_output/"execution/plan.json").read_text(encoding="utf-8"))
+                self.assertEqual(request_ir["request_pipeline"]["batch_accounting"],"independent_request_kernels")
+                self.assertEqual(request_ir["phase_handoffs"][0]["destination"],"dram")
             executable = scripts_dir / ("llm-sim.exe" if os.name == "nt" else "llm-sim")
             help_result = self._run([str(executable), "--help"], cwd=temporary)
             self.assertIn("usage:", help_result.stdout)

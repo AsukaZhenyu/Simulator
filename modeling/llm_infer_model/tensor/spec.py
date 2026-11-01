@@ -95,6 +95,7 @@ __all__ = [
     "ggml_contiguous_layout",
     "LOC_DRAM",
     "LOC_VRAM",
+    "LOC_SHARED",
     "OP_DONE",
     "OP_NOT_STARTED",
     "OP_RUNNING",
@@ -222,6 +223,7 @@ _SEMANTIC_OPS = frozenset({SEMANTIC_MUL_MAT, SEMANTIC_RELU, SEMANTIC_ADD}) | _M2
 
 LOC_DRAM = "dram"
 LOC_VRAM = "vram"
+LOC_SHARED = "shared"
 # M1.3 makes the SSD a real third location: tensors can start there and, unlike
 # M1.2, the engine can also write immutable snapshots back to it. It is still
 # not an allocation domain -- there is no SSD capacity, no alignment and no SSD
@@ -504,6 +506,23 @@ class Architecture:
     cpu_compute_slots: int = 1
     pcie_copy_slots: int = 1
     ssd_io_slots: int = 1
+    # Optional physical-pool binding. Logical DRAM/VRAM names and all compute
+    # prices remain unchanged; only allocation identity/capacity is shared.
+    memory_mode: str = "separate"
+    shared_capacity_bytes: int | None = None
+    shared_runtime_reserved_bytes: int = 0
+    shared_alignment_bytes: int = 1
+
+    @property
+    def is_shared(self) -> bool:
+        return self.memory_mode == "shared"
+
+    def pool_of(self, location: str) -> str:
+        return LOC_SHARED if self.is_shared and location in DOMAINS else location
+
+    @property
+    def memory_domains(self) -> tuple[str, ...]:
+        return (LOC_SHARED,) if self.is_shared else DOMAINS
 
     # -- per-domain accessors. Everything downstream goes through these rather
     # than reading a field, so the 0.1/0.2 spelling difference lives in one
@@ -517,6 +536,8 @@ class Architecture:
         either. Neither is ever charged, so neither needs a number
         (``M1_DESIGN.md`` §3, §5).
         """
+        if self.is_shared and domain in (*DOMAINS, LOC_SHARED):
+            return self.shared_capacity_bytes
         if domain == LOC_DRAM:
             return self.dram_capacity_bytes
         if domain == LOC_VRAM:
@@ -525,6 +546,8 @@ class Architecture:
 
     def reserved_of(self, domain: str) -> int:
         """Static runtime reservation charged to ``domain`` from t=0."""
+        if self.is_shared and domain in (*DOMAINS, LOC_SHARED):
+            return self.shared_runtime_reserved_bytes
         if domain == LOC_DRAM:
             return self.dram_runtime_reserved_bytes
         if domain == LOC_VRAM:
@@ -535,6 +558,8 @@ class Architecture:
 
     def alignment_of(self, domain: str) -> int:
         """Allocation granularity in ``domain``."""
+        if self.is_shared and domain in (*DOMAINS, LOC_SHARED):
+            return self.shared_alignment_bytes
         if domain == LOC_DRAM:
             if self.dram_alignment_bytes is None:
                 return self.allocation_alignment_bytes
@@ -549,6 +574,19 @@ class Architecture:
         return 1
 
     def __post_init__(self) -> None:
+        if self.memory_mode not in ("separate", "shared"):
+            raise InvalidInput("architecture.memory_mode must be 'separate' or 'shared'")
+        if self.shared_capacity_bytes is not None:
+            _require_int(self.shared_capacity_bytes, "architecture.shared_capacity_bytes", minimum=1)
+        _require_int(self.shared_runtime_reserved_bytes, "architecture.shared_runtime_reserved_bytes")
+        _require_int(self.shared_alignment_bytes, "architecture.shared_alignment_bytes", minimum=1)
+        if self.is_shared:
+            if self.shared_capacity_bytes is None:
+                raise InvalidInput("shared memory mode requires shared_capacity_bytes")
+            if self.shared_runtime_reserved_bytes > self.shared_capacity_bytes:
+                raise InvalidInput("shared runtime reservation exceeds shared capacity")
+        elif self.shared_capacity_bytes is not None or self.shared_runtime_reserved_bytes or self.shared_alignment_bytes != 1:
+            raise InvalidInput("shared pool parameters require memory_mode='shared'")
         if self.vram_capacity_bytes < 1:
             raise InvalidInput(
                 f"architecture.vram_capacity_bytes must be >= 1, got "
@@ -583,7 +621,8 @@ class Architecture:
                 )
         for name, capacity, reserved in (
             ("dram", self.dram_capacity_bytes, self.dram_runtime_reserved_bytes),
-            ("vram", self.vram_capacity_bytes, self.reserved_of(LOC_VRAM)),
+            ("vram", self.vram_capacity_bytes, self.runtime_reserved_bytes
+             if self.vram_runtime_reserved_bytes is None else self.vram_runtime_reserved_bytes),
         ):
             if capacity is None:
                 continue
@@ -746,7 +785,25 @@ class M1Mapspace:
         return self.allowed_transfers.get(route, ())
 
     def allows(self, route: str, tensor_id: str) -> bool:
-        return tensor_id in self.allowed_transfers.get(route, ())
+        members = self.allowed_transfers.get(route, ())
+        # Only immutable tuples of plain string IDs have equivalent set and
+        # sequence membership. Preserve legacy behavior for mutable/invalid
+        # direct-Python inputs, including unhashable queries and custom equality.
+        if (type(route) is not str or type(tensor_id) is not str
+                or type(members) is not tuple or not members):
+            return tensor_id in members
+        cache = self.__dict__.get("_allowed_transfer_membership_cache")
+        entry = None if cache is None else cache.get(route)
+        if entry is None or entry[0] is not members:
+            if any(type(value) is not str for value in members):
+                return tensor_id in members
+            if cache is None:
+                cache = {}
+                # Not a dataclass field: diagnostics/fingerprints stay unchanged.
+                object.__setattr__(self, "_allowed_transfer_membership_cache", cache)
+            entry = (members, frozenset(members))
+            cache[route] = entry
+        return tensor_id in entry[1]
 
 
 @dataclass(frozen=True)
@@ -795,6 +852,8 @@ class Scenario:
     goal: M1Goal | None = None
 
     def __post_init__(self) -> None:
+        if self.architecture.is_shared and not self.is_m1:
+            raise Unsupported("shared physical storage requires schema_version 0.2")
         if isinstance(self.mapspace, M1Mapspace) and self.mapspace.transfer_dependencies:
             if not self.is_m1 or self.workload.origin.kind not in _M2_ORIGIN_KINDS:
                 raise Unsupported(
@@ -1323,7 +1382,10 @@ def _validate_workload(workload: Workload) -> None:
     for operation in workload.operations:
         # Prefer the operation *name* in messages; the id is only a key.
         label = f"operation {operation.id!r}"
-        if not operation.inputs:
+        trace_input_source = (operation.semantic_op == "state_update"
+                              and operation.ggml_op == "TRACE_SUPPLIED_REQUEST_INPUT"
+                              and workload.origin.kind == ORIGIN_SYNTHETIC_LAYER)
+        if not operation.inputs and not trace_input_source:
             raise InvalidInput(f"{label}: inputs must not be empty")
 
         seen_inputs: set[str] = set()
@@ -1688,7 +1750,7 @@ def _scenario_from(
         # allowed sets, so the sets have to exist before the costs are read.
         mapspace_m1 = _parse_mapspace_m1(raw.get("mapspace"), where, workload)
         mapspace = mapspace_m1
-        costs = _parse_costs_m1(raw.get("costs"), where, workload, mapspace_m1)
+        costs = _parse_costs_m1(raw.get("costs"), where, workload, mapspace_m1, architecture=architecture)
         goal = _parse_goal(raw.get("goal"), where, workload)
     else:
         if raw.get("goal") is not None:
@@ -1795,11 +1857,22 @@ def _parse_architecture_m1(raw: Any, where: str) -> Architecture:
             "gpu_compute_slots",
             "pcie_copy_slots",
             "ssd_io_slots",
+            "memory_mode",
+            "shared_capacity_bytes",
+            "shared_runtime_reserved_bytes",
+            "shared_alignment_bytes",
         },
         f"{where}.architecture",
     )
     label = f"{where}.architecture"
     return Architecture(
+        memory_mode=_require_str(block.get("memory_mode", "separate"), f"{label}.memory_mode"),
+        shared_capacity_bytes=(None if block.get("shared_capacity_bytes") is None else _require_int(
+            block["shared_capacity_bytes"], f"{label}.shared_capacity_bytes", minimum=1)),
+        shared_runtime_reserved_bytes=_require_int(
+            block.get("shared_runtime_reserved_bytes", 0), f"{label}.shared_runtime_reserved_bytes"),
+        shared_alignment_bytes=_require_int(
+            block.get("shared_alignment_bytes", 1), f"{label}.shared_alignment_bytes", minimum=1),
         dram_capacity_bytes=_require_int(
             block.get("dram_capacity_bytes"), f"{label}.dram_capacity_bytes", minimum=1
         ),
@@ -1916,7 +1989,8 @@ def _parse_goal(raw: Any, where: str, workload: Workload) -> M1Goal:
     return M1Goal(output_locations=locations)
 
 
-def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspace) -> M1Costs:
+def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspace,
+                    *, architecture: Architecture | None = None) -> M1Costs:
     """0.2 costs: per (operation, device) and per (route, tensor).
 
     M1_DESIGN.md §4: the allowed sets and the cost tables must agree. Requiring
@@ -1993,7 +2067,9 @@ def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspa
             transfer[route] = {}
             continue
         missing = sorted(set(allowed_tensors) - set(body))
-        if missing:
+        shared_route = (architecture is not None and architecture.is_shared
+                        and set(ROUTE_ENDS[route]) == set(DOMAINS))
+        if missing and not shared_route:
             raise InvalidInput(
                 f"{label} is missing a duration for {', '.join(missing)}; M1 never "
                 "guesses a transfer cost"
@@ -2006,11 +2082,12 @@ def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspa
             )
         transfer[route] = {
             tensor_id: _parse_transfer_cost(body[tensor_id], f"{label}[{tensor_id!r}]")
-            for tensor_id in allowed_tensors
+            for tensor_id in allowed_tensors if tensor_id in body
         }
 
     missing_routes = sorted(
         route for route in ROUTES if mapspace.tensors_for(route) and route not in transfer
+        and not (architecture is not None and architecture.is_shared and set(ROUTE_ENDS[route]) == set(DOMAINS))
     )
     if missing_routes:
         raise InvalidInput(
@@ -2360,6 +2437,18 @@ def check_initial_capacity(scenario: Scenario) -> None:
     (``M1_ACCEPTANCE.md`` §8). SSD is not a domain: it has no capacity.
     """
     architecture = scenario.architecture
+    if architecture.is_shared:
+        # Explicit shared mode means initial DRAM/VRAM references to the SAME
+        # tensor identify one initial physical buffer, never two allocations.
+        resident = [t for t in scenario.workload.tensors if set(t.initial_locations) & set(DOMAINS)]
+        used = architecture.shared_runtime_reserved_bytes + sum(
+            scenario.size_alloc(t.id, LOC_SHARED) for t in resident)
+        assert architecture.shared_capacity_bytes is not None
+        if used > architecture.shared_capacity_bytes:
+            raise InitialCapacityExceeded(
+                f"initial layout needs {used} bytes in shared physical storage but "
+                f"shared_capacity_bytes is {architecture.shared_capacity_bytes}")
+        return
     for domain in DOMAINS:
         capacity = architecture.capacity_of(domain)
         if capacity is None:
@@ -2521,6 +2610,9 @@ def _canonical_scenario_m1(scenario: Scenario) -> dict[str, Any]:
         "id": scenario.id,
         "workload_fingerprint": workload_fingerprint(scenario.workload),
         "architecture": {
+            **({"memory_mode": "shared", "shared_capacity_bytes": architecture.shared_capacity_bytes,
+                "shared_runtime_reserved_bytes": architecture.shared_runtime_reserved_bytes,
+                "shared_alignment_bytes": architecture.shared_alignment_bytes} if architecture.is_shared else {}),
             "dram_capacity_bytes": architecture.dram_capacity_bytes,
             "vram_capacity_bytes": architecture.vram_capacity_bytes,
             "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,

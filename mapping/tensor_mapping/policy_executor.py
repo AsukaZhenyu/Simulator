@@ -6,10 +6,11 @@ deterministic heuristic, not an optimizer and not a paper reproduction.
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 
 from llm_infer_model.m2.causal import CausalObservation, RevealedRoute, compute_service_available
 from llm_infer_model.tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT,
     ACTION_READ_SSD, ACTION_WRITE_SSD,
 )
 from llm_infer_model.tensor.spec import (
@@ -169,6 +170,10 @@ class DeclarativePolicy:
         # outside this runtime's DRAM/VRAM capacity ledger.
         if location == "ssd":
             return 0
+        # A missing device view can reference an already resident allocation.
+        # Logical cache quotas remain separate from physical capacity.
+        if tensor.share_source(location) is not None:
+            return 0
         allocations = dict(getattr(tensor, "allocation_bytes", ()))
         if location not in allocations:
             raise Unsupported(f"public aligned allocation missing for {tensor.id}/{location}")
@@ -185,6 +190,8 @@ class DeclarativePolicy:
 
     @staticmethod
     def _resource_available(observation, resource, compute=False):
+        if resource == "shared_view":
+            return True
         if resource in (RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE) and not compute_service_available(
                 observation, "cpu" if resource == RESOURCE_CPU_COMPUTE else "gpu"):
             return False
@@ -205,6 +212,12 @@ class DeclarativePolicy:
         """Public shortest available route (SSD->VRAM is two explicit actions)."""
         if tensor.status_at(destination) != COPY_ABSENT:
             return None
+        source = tensor.share_source(destination)
+        if source is not None:
+            price = next(price for price in tensor.transfers if price.src == source and price.dst == destination)
+            return (Decision(ACTION_SHARE, tensor.id, src=source, dst=destination),
+                    replace(price, duration_ns=0, engine_durations_ns=(), timing_scope="shared_allocation_access"),
+                    "shared_view")
         paths = {"vram": (("dram", "vram"), ("ssd", "dram")),
                  "dram": (("vram", "dram"), ("ssd", "dram")),
                  "ssd": (("dram", "ssd"), ("vram", "dram"))}
@@ -232,6 +245,8 @@ class DeclarativePolicy:
     @staticmethod
     def _transfer_estimate(tensor, destination):
         if tensor.status_at(destination) == COPY_READY:
+            return 0
+        if tensor.share_source(destination) is not None:
             return 0
         routes = {(price.src, price.dst): price.duration_ns for price in tensor.transfers}
         choices = []
@@ -266,7 +281,7 @@ class DeclarativePolicy:
             if any(value is None for value in movement):
                 return (2, 0, price.device != preferred, price.device)
             cost = price.duration_ns + sum(movement)
-            resident = bool(weights) and all(weight.status_at(location) == COPY_READY for weight in weights)
+            resident = bool(weights) and all(weight.can_access(location) for weight in weights)
             if self.policy.expert_device_rule == "resident_first":
                 return (0 if resident else 1, price.device != preferred, cost, price.device)
             return (0, cost, price.device != preferred, price.device)
@@ -304,7 +319,7 @@ class DeclarativePolicy:
             input_ns = [self._transfer_estimate(tensors[tid], location) for tid in group_inputs]
             output_ns = 0
             for tid in operation.outputs:
-                if location != "vram":
+                if location != "vram" and not tensors[tid].same_pool(location, "vram"):
                     route = next((route for route in tensors[tid].transfers
                                   if route.src == location and route.dst == "vram"), None)
                     if route is None:
@@ -316,7 +331,7 @@ class DeclarativePolicy:
                           "selected_input_transfer_ns": sum(input_ns), "compute_ns": price.duration_ns,
                           "output_return_ns": output_ns,
                           "total_ns": sum(weight_ns) + sum(input_ns) + price.duration_ns + output_ns})
-        cached = bool(weights) and all(weight.status_at("vram") == COPY_READY for weight in weights)
+        cached = bool(weights) and all(weight.can_access("vram") for weight in weights)
         chosen = "gpu" if cached or not observation.cpu_available else min(
             paths, key=lambda path: (path["total_ns"], path["device"] != self._placement(operation)))["device"]
         self._fiddler_devices[operation.id] = chosen
@@ -334,7 +349,7 @@ class DeclarativePolicy:
                              "missing_input_transfer_ns": movement,
                              "local_estimate_ns": None if movement is None else price.duration_ns + movement,
                              "expert_weights_ready": bool(weights) and all(
-                                 weight.status_at(location) == COPY_READY for weight in weights)})
+                                 weight.can_access(location) for weight in weights)})
         return evidence
 
     def _protected(self, observation, tensors, current_inputs=()):
@@ -347,7 +362,7 @@ class DeclarativePolicy:
                 protected.add(running.target_id)
         return protected
 
-    def _eviction(self, observation, tensors, location, protected):
+    def _eviction(self, observation, tensors, location, protected, *, require_physical_release=False):
         if self.policy.cache_rule == "none" or not observation.allow_eviction:
             return None
         expert_ids = {entry.weight_tensor_id: (entry.layer_id, entry.expert_id)
@@ -360,6 +375,9 @@ class DeclarativePolicy:
                 # Shared experts have no routed-gate score and are outside MRS.
                 continue
             if tensor_id in protected or tensor.status_at(location) != COPY_READY:
+                continue
+            if require_physical_release and (tensor.released_bytes(location) <= 0 or
+                                             not tensor.has_independent_backup(location)):
                 continue
             # A cache inherited from a prior call remains evictable. Preserve
             # the declared goal/source and another recoverable READY copy.
@@ -388,7 +406,19 @@ class DeclarativePolicy:
         free = self._free(observation, location)
         if free is None or needed <= free:
             return True, None
-        return False, self._eviction(observation, tensors, location, protected)
+        # Capacity belongs to a physical pool. In shared mode a DRAM-only
+        # cached SSD weight can free space for GPU output, and conversely.
+        # This path is never used to satisfy a logical GPU-view cache quota.
+        locations = [location]
+        if location in ("dram", "vram"):
+            locations.extend(other for other in ("dram", "vram") if other != location
+                             and any(tensor.same_pool(location, other) for tensor in tensors.values()))
+        for candidate_location in locations:
+            eviction = self._eviction(observation, tensors, candidate_location, protected,
+                                      require_physical_release=True)
+            if eviction is not None:
+                return False, eviction
+        return False, None
 
     def _release_last_use(self, observation, tensors):
         if (self.policy.release_rule != "last_use" or not observation.allow_eviction

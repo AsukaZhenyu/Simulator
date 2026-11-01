@@ -107,18 +107,24 @@ class EvictLiveWeight(RuntimePolicy):
 
 
 class SwitchCommittedExpert(RuntimePolicy):
+    def __init__(self):
+        # Force the precondition under test instead of relying on incidental
+        # cache misses making a particular default decode region choose CPU.
+        self.starter = StartOneExpertOnCPU()
+
     def decide(self, observation):
-        tensors = {tensor.id: tensor for tensor in observation.tensors}
+        if not self.starter.finished:
+            return self.starter.decide(observation)
+        gate = next((op for op in observation.operations if op.id == self.starter.target), None)
+        if gate is None or gate.status != "DONE":
+            return DEFER
         for operation in observation.operations:
             if (operation.kind != "expert_up" or operation.status != "NOT_STARTED" or
-                    operation.phase != "decode" or operation.layer_id != "fragmentL0"):
+                    operation.region_id != gate.region_id or
+                    operation.invocation_id != gate.invocation_id or
+                    operation.layer_id != gate.layer_id):
                 continue
-            gates = [gate for gate in observation.operations if gate.kind == "expert_gate" and
-                     gate.region_id == operation.region_id and gate.invocation_id == operation.invocation_id and
-                     gate.status == "DONE"]
-            if any(all(tensors[tid].status_at("dram") == COPY_READY and
-                       tensors[tid].status_at("vram") == COPY_ABSENT for tid in gate.outputs) for gate in gates):
-                return Decision("COMPUTE", operation.id, device="gpu")
+            return Decision("COMPUTE", operation.id, device="gpu")
         return DEFER
 
 

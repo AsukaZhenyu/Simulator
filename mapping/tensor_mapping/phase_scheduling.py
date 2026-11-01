@@ -7,7 +7,7 @@ request queues, extra compute slots, or a network fabric.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Mapping
 
@@ -26,6 +26,21 @@ def _name(value, label, *, optional=False):
     if not isinstance(value, str) or not value or any(c in value for c in "\r\n"):
         raise InvalidInput(f"{label} must be a nonempty single-line string")
     return value
+
+
+def _preparation_selectors(layer_id, stage, tensor_ids, expert_id):
+    """Validate static selector types without needing a graph or cost table."""
+    _name(layer_id, "preparation.layer_id", optional=True)
+    _name(stage, "preparation.stage", optional=True)
+    if not isinstance(tensor_ids, tuple):
+        raise InvalidInput("preparation.tensor_ids must be an immutable tuple")
+    for tensor_id in tensor_ids:
+        _name(tensor_id, "preparation.tensor_ids entry")
+    if len(set(tensor_ids)) != len(tensor_ids):
+        raise InvalidInput("preparation.tensor_ids must be unique")
+    if expert_id is not None and not (
+            type(expert_id) is int and expert_id >= 0 or expert_id == "shared"):
+        raise InvalidInput("preparation.expert_id must be a nonnegative integer, 'shared', or None")
 
 
 @dataclass(frozen=True)
@@ -49,17 +64,7 @@ class DataPreparation:
     max_count: int | None = None
 
     def __post_init__(self):
-        _name(self.layer_id, "preparation.layer_id", optional=True)
-        _name(self.stage, "preparation.stage", optional=True)
-        if not isinstance(self.tensor_ids, tuple):
-            raise InvalidInput("preparation.tensor_ids must be an immutable tuple")
-        for tensor_id in self.tensor_ids:
-            _name(tensor_id, "preparation.tensor_ids entry")
-        if len(set(self.tensor_ids)) != len(self.tensor_ids):
-            raise InvalidInput("preparation.tensor_ids must be unique")
-        if self.expert_id is not None and not (
-                type(self.expert_id) is int and self.expert_id >= 0 or self.expert_id == "shared"):
-            raise InvalidInput("preparation.expert_id must be a nonnegative integer, 'shared', or None")
+        _preparation_selectors(self.layer_id, self.stage, self.tensor_ids, self.expert_id)
         if self.layer_id is None and self.stage is None and not self.tensor_ids and self.expert_id is None:
             raise InvalidInput("preparation requires an explicit layer, stage, tensor, or expert selector")
         if not isinstance(self.destination, str) or self.destination not in {"dram", "vram"}:
@@ -73,6 +78,45 @@ class DataPreparation:
         return dict(layer_id=self.layer_id, stage=self.stage, tensor_ids=list(self.tensor_ids),
                     expert_id=self.expert_id, destination=self.destination, trigger=self.trigger,
                     max_count=self.max_count)
+
+    def with_scope(self, *, layer_id=None, stage=None, tensor_ids=(), expert_id=None,
+                   **unsupported_scope):
+        """Intersect static selectors without changing execution or storage.
+
+        ``None`` and an empty tensor tuple add no restriction. Two explicit
+        scalar labels must agree; two explicit tensor sets must overlap. The
+        resulting declaration still resolves its conjunction against the public
+        weight catalogue, where cross-label contradictions can be diagnosed.
+
+        Phase, request, invocation and task-kind scopes do not describe the
+        static weight catalogue. Unsupported fields are rejected, including an
+        explicitly supplied ``None``. They must never appear to scope a rule
+        whose runtime has no corresponding matching field. This helper creates
+        no new tensor identity, reservation, copy, budget or private resource.
+        """
+        if unsupported_scope:
+            fields = ", ".join(sorted(unsupported_scope))
+            raise Unsupported(f"data preparation cannot inherit scope fields: {fields}")
+        # Validate before equality: e.g. False must not masquerade as expert 0.
+        self.__post_init__()
+        _preparation_selectors(layer_id, stage, tensor_ids, expert_id)
+
+        def intersect(field, current, added):
+            if current is not None and added is not None and current != added:
+                raise InvalidInput(f"contradictory preparation scope {field}: {current!r}/{added!r}")
+            return current if added is None else added
+
+        if self.tensor_ids and tensor_ids:
+            selected = tuple(sorted(set(self.tensor_ids).intersection(tensor_ids)))
+            if not selected:
+                raise InvalidInput("contradictory preparation scope tensor_ids: no shared tensor identity")
+        else:
+            selected = tensor_ids or self.tensor_ids
+        return replace(self,
+            layer_id=intersect("layer_id", self.layer_id, layer_id),
+            stage=intersect("stage", self.stage, stage),
+            tensor_ids=selected,
+            expert_id=intersect("expert_id", self.expert_id, expert_id))
 
     @classmethod
     def from_document(cls, document):

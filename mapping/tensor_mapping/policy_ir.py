@@ -9,6 +9,8 @@ from llm_infer_model.tensor.spec import InvalidInput, Unsupported
 
 POLICY_VERSION = "causal-policy-0.1"
 POLICY_VERSION_2 = "causal-policy-0.2"
+POLICY_VERSION_3 = "causal-policy-0.3"
+EXPERT_ORDER_RULES = frozenset({"graph_order", "token_count_desc", "history_frequency_desc"})
 HISTORY_VERSION = "causal-history-0.1"
 HISTORY_VERSION_2 = "causal-history-0.2"
 OPERATION_KINDS = frozenset((
@@ -38,6 +40,7 @@ class PolicyIR:
     request_placements: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = ()
     mrs_alpha: float | None = None
     mrs_top_p: int | None = None
+    expert_order_rule: str = "graph_order"
 
 
 def _object(value, keys, where):
@@ -75,22 +78,24 @@ def parse_policy(document) -> PolicyIR:
     if "format_version" not in document:
         raise InvalidInput("policy requires format_version")
     version = document.get("format_version")
-    if version not in (POLICY_VERSION, POLICY_VERSION_2):
-        raise Unsupported(f"policy.format_version must be {POLICY_VERSION} or {POLICY_VERSION_2}")
+    if version not in (POLICY_VERSION, POLICY_VERSION_2, POLICY_VERSION_3):
+        raise Unsupported(f"policy.format_version must be {POLICY_VERSION}, {POLICY_VERSION_2} or {POLICY_VERSION_3}")
     fields = {"format_version", "placements", "experts", "cache", "prefetch", "release"}
-    if version == POLICY_VERSION_2:
+    if version in (POLICY_VERSION_2, POLICY_VERSION_3):
         fields.add("request_placements")
     _object(document, fields, "policy")
     placements = document["placements"]
     if not isinstance(placements, dict) or not placements:
         raise InvalidInput("policy.placements must be a nonempty object")
     for kind, device in placements.items():
-        kinds = OPERATION_KINDS if version == POLICY_VERSION_2 else OPERATION_KINDS - {"attention_core", "attention_output"}
+        kinds = OPERATION_KINDS if version in (POLICY_VERSION_2, POLICY_VERSION_3) else OPERATION_KINDS - {"attention_core", "attention_output"}
         _choice(kind, kinds, "policy.placements kind")
         _choice(device, ("cpu", "gpu"), f"policy.placements.{kind}")
-    experts = _object(document["experts"], ("device_rule",), "policy.experts")
+    experts = _object(document["experts"], ("device_rule", "order_rule") if version == POLICY_VERSION_3 else ("device_rule",), "policy.experts")
+    order_rule = (_choice(experts["order_rule"], EXPERT_ORDER_RULES, "policy.experts.order_rule")
+                  if version == POLICY_VERSION_3 else "graph_order")
     rules = {"fixed", "resident_first", "current_cost"}
-    if version == POLICY_VERSION_2:
+    if version in (POLICY_VERSION_2, POLICY_VERSION_3):
         rules.update(("fiddler_paths", "hybrimoe_queues"))
     rule = _choice(experts["device_rule"], rules,
                    "policy.experts.device_rule")
@@ -98,7 +103,7 @@ def parse_policy(document) -> PolicyIR:
     if not isinstance(cache, dict):
         raise InvalidInput("policy.cache must be an object")
     cache_rules = {"none", "lru", "history_frequency"}
-    if version == POLICY_VERSION_2:
+    if version in (POLICY_VERSION_2, POLICY_VERSION_3):
         cache_rules.add("mrs")
     cache_rule = _choice(cache.get("rule"), cache_rules, "policy.cache.rule")
     _object(cache, ("rule", "alpha", "top_p") if cache_rule == "mrs" else ("rule",), "policy.cache")
@@ -123,7 +128,7 @@ def parse_policy(document) -> PolicyIR:
     if not prefetch["enabled"] and (count or budget):
         raise InvalidInput("disabled prefetch requires max_count=0 and cache_budget_bytes=0")
     request_placements = []
-    if version == POLICY_VERSION_2:
+    if version in (POLICY_VERSION_2, POLICY_VERSION_3):
         overrides = document["request_placements"]
         if not isinstance(overrides, dict):
             raise InvalidInput("policy.request_placements must be an explicit object")
@@ -138,7 +143,7 @@ def parse_policy(document) -> PolicyIR:
             request_placements.append((request, tuple(sorted(bindings.items()))))
     return PolicyIR(tuple(sorted(placements.items())), rule, cache_rule,
                     prefetch["enabled"], count, budget, release_rule, version,
-                    tuple(sorted(request_placements)), alpha, top_p)
+                    tuple(sorted(request_placements)), alpha, top_p, order_rule)
 
 
 def policy_document(policy: PolicyIR) -> dict:
@@ -161,7 +166,11 @@ def policy_document(policy: PolicyIR) -> dict:
             "release": {"rule": policy.release_rule},
             "prefetch": {"enabled": policy.prefetch_enabled, "max_count": policy.prefetch_max_count,
                          "cache_budget_bytes": policy.cache_budget_bytes}}
-    if policy.format_version == POLICY_VERSION_2:
+    if policy.format_version == POLICY_VERSION_3:
+        document["experts"]["order_rule"] = policy.expert_order_rule
+    elif policy.expert_order_rule != "graph_order":
+        raise InvalidInput("expert order_rule requires causal-policy-0.3")
+    if policy.format_version in (POLICY_VERSION_2, POLICY_VERSION_3):
         if not isinstance(policy.request_placements, tuple):
             raise InvalidInput("PolicyIR.request_placements must be frozen pairs")
         requests = {}
@@ -176,7 +185,7 @@ def policy_document(policy: PolicyIR) -> dict:
             requests[request] = dict(bindings)
         document["request_placements"] = requests
     elif policy.request_placements:
-        raise InvalidInput("request_placements requires causal-policy-0.2")
+        raise InvalidInput("request_placements requires causal-policy-0.2 or causal-policy-0.3")
     return document
 
 

@@ -13,7 +13,7 @@ from typing import Callable, Any
 
 from llm_infer_model.m2.causal import CausalObservation
 from llm_infer_model.tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT,
     ACTION_READ_SSD, ACTION_WRITE_SSD, Action,
 )
 from llm_infer_model.tensor.spec import COPY_READY, OP_NOT_STARTED, InvalidInput, Unsupported
@@ -83,6 +83,7 @@ def _compile_action(decision: Decision, observation: CausalObservation) -> Actio
     permitted = {
         ACTION_ADVANCE: (), ACTION_COMPUTE: ("target_id", "device"),
         ACTION_COPY: ("target_id", "src", "dst"),
+        ACTION_SHARE: ("target_id", "src", "dst"),
         ACTION_READ_SSD: ("target_id",), ACTION_WRITE_SSD: ("target_id",),
         ACTION_EVICT: ("target_id", "location"),
     }
@@ -113,8 +114,12 @@ def _compile_action(decision: Decision, observation: CausalObservation) -> Actio
         if decision.kind == ACTION_EVICT:
             if decision.location not in ("dram", "vram"):
                 raise Unsupported("release permits explicit dram or vram only")
+        elif decision.kind == ACTION_SHARE and not tensor.same_pool(decision.src, decision.dst):
+            raise Unsupported("SHARE requires a public shared physical memory pool")
         elif action.route not in tuple(price.route for price in tensor.transfers):
             raise Unsupported(f"tensor {decision.target_id!r} has no public exact route {action.route!r}")
+        elif decision.kind == ACTION_COPY and next(price for price in tensor.transfers if price.route == action.route).timing_scope == "shared_access_only":
+            raise Unsupported("physical COPY requires an explicit physical transfer cost; SHARE only grants access")
     return action
 
 
@@ -229,6 +234,9 @@ class SerialDemandPolicy:
     def _load(tensor, destination):
         if tensor.status_at(destination) == COPY_READY:
             return None
+        source = tensor.share_source(destination)
+        if source is not None:
+            return Decision(ACTION_SHARE, tensor.id, src=source, dst=destination)
         if destination == "vram":
             if tensor.status_at("dram") == COPY_READY:
                 return Decision(ACTION_COPY, tensor.id, src="dram", dst="vram")

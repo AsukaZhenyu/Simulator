@@ -172,14 +172,20 @@ def _validate_scenario(scenario: Scenario) -> None:
     optional = {
         "dram_capacity_bytes", "dram_alignment_bytes", "vram_alignment_bytes",
         "vram_runtime_reserved_bytes",
+        "shared_capacity_bytes",
     }
     positive = {
         "dram_capacity_bytes", "vram_capacity_bytes", "allocation_alignment_bytes",
         "dram_alignment_bytes", "vram_alignment_bytes", "cpu_compute_slots",
         "gpu_compute_slots", "h2d_copy_slots", "pcie_copy_slots", "ssd_io_slots",
+        "shared_capacity_bytes", "shared_alignment_bytes",
     }
     for field in fields(Architecture):
         value = getattr(scenario.architecture, field.name)
+        if field.name == "memory_mode":
+            if value not in ("separate", "shared"):
+                raise InvalidInput("device state architecture.memory_mode must be separate/shared")
+            continue
         if value is None and field.name in optional:
             continue
         _require_int(value, f"device state architecture.{field.name}",
@@ -199,6 +205,13 @@ def _validate_scenario(scenario: Scenario) -> None:
             **{name: getattr(arch, name) for name in
                ("cpu_compute_slots", "gpu_compute_slots", "pcie_copy_slots", "ssd_io_slots")},
         }
+        if arch.is_shared:
+            architecture.update(dram_runtime_reserved_bytes=arch.dram_runtime_reserved_bytes,
+                vram_runtime_reserved_bytes=(arch.runtime_reserved_bytes if arch.vram_runtime_reserved_bytes is None
+                                             else arch.vram_runtime_reserved_bytes),
+                memory_mode="shared", shared_capacity_bytes=arch.shared_capacity_bytes,
+                shared_runtime_reserved_bytes=arch.shared_runtime_reserved_bytes,
+                shared_alignment_bytes=arch.shared_alignment_bytes)
     else:
         architecture = {name: getattr(arch, name) for name in (
             "dram_capacity_bytes", "vram_capacity_bytes", "runtime_reserved_bytes",
@@ -229,6 +242,7 @@ def validate_device_state(base: Scenario, candidate: Scenario) -> None:
     mutable = {
         "dram_capacity_bytes", "vram_capacity_bytes", "runtime_reserved_bytes",
         "dram_runtime_reserved_bytes", "vram_runtime_reserved_bytes",
+        "shared_capacity_bytes", "shared_runtime_reserved_bytes",
     }
     for field in fields(Architecture):
         if field.name not in mutable and (
@@ -355,10 +369,11 @@ def execute_program(
             sources.append(source)
             profiles.append(profile)
         try:
+            before = state
             state = transition(current, state, action)
         except MappingError as error:
             return failure(error.code, error.code, str(error), source)
-        event = _event_for(current, state, index, action)
+        event = _event_for(current, state, index, action, before=before)
         events.append(event)
         amounts = _accumulate_transfer_bytes(event, *amounts)
         peak = max(peak, used_vram_bytes(current, state))
@@ -421,4 +436,5 @@ def execute_program(
         actions=tuple(actions), events=tuple(events), states=tuple(snapshots),
         d2h_bytes=amounts[1], ssd_read_bytes=amounts[2],
         ssd_write_bytes=amounts[3], peak_dram_bytes=peak_dram,
+        peak_shared_bytes=peak if current.architecture.is_shared else 0,
     ))

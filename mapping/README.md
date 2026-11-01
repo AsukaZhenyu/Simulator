@@ -20,6 +20,12 @@ modeling.tensor.runtime：执行动作、推进时间、更新状态
 
 ## 推荐阅读和运行
 
+The [strategy expression and IR guide](../docs/STRATEGY_REPRESENTATION.md)
+documents `inspect()/explain()`, physical weight scopes, transfer precedence and
+the current whole-invocation transform boundary. The
+[standalone public example](../examples/library/strategy_ir.py) needs no saved
+profile or repository fixture.
+
 1. [Python 策略入门](examples/python/README.md)：先理解模块放置，再看因果回调。
 2. [执行变换指南](docs/EXECUTION_TRANSFORMS_GUIDE.md)：Attention 细化、FFN 分片、P/D 放置和数据准备。
 3. [组合 IR 指南](docs/COMPOSABLE_IR_GUIDE.md)：缓存、预取、传输与执行变换如何共用一份策略。

@@ -18,6 +18,27 @@ from .physical import DTYPES
 
 FULL_FORMAT_VERSION = "m2-layer-0.3"
 STAGES = ("projection", "attention", "dense_ffn")
+SINGLE_REQUEST_ACCOUNTING = "single_request_kernel"
+INDEPENDENT_REQUEST_ACCOUNTING = "independent_per_request_kernel"
+
+
+def parse_request_accounting(raw: Any) -> str:
+    if raw not in (SINGLE_REQUEST_ACCOUNTING, INDEPENDENT_REQUEST_ACCOUNTING):
+        raise Unsupported("physical.request_accounting must declare single_request_kernel or independent_per_request_kernel")
+    return raw
+
+
+def account_request_signature(signature: dict[str, Any], physical: Any, batch: int) -> dict[str, Any]:
+    """Bind invocation context without calling an independent kernel batched.
+
+    The original signature's batch=1 always describes one actual kernel. The
+    outer exact-table batch axis still describes the invocation request count.
+    Synthetic timings are per-request, not a fused B>1 timing divided/repeated.
+    """
+    if physical.request_accounting == INDEPENDENT_REQUEST_ACCOUNTING:
+        return dict(signature, request_accounting=INDEPENDENT_REQUEST_ACCOUNTING,
+                    invocation_batch=batch, kernel_batch=1)
+    return signature
 
 
 @dataclass(frozen=True)
@@ -33,6 +54,7 @@ class FullDensePhysical:
     activation_dtype: str = "f32"
     kv_dtype: str = "f32"
     excluded_operations: tuple[str, ...] = ()
+    request_accounting: str = SINGLE_REQUEST_ACCOUNTING
 
     def input_ports(self, tokens: int) -> dict[str, tuple[int, ...]]:
         return {"hidden": (self.config["hidden"], tokens, 1, 1),
@@ -54,8 +76,8 @@ def parse_full_physical(raw: Any) -> FullDensePhysical:
     keys = {"contract", "scope", "input_boundary", "port_layout", "kv_allocation",
             "activation_dtype", "kv_dtype", "config", "threads", "weight_groups",
             "excluded_operations"}
-    if set(raw) != keys:
-        raise InvalidInput(f"full physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys)}")
+    if set(raw) - {"request_accounting"} != keys:
+        raise InvalidInput(f"full physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys-{'request_accounting'})}")
     fixed = {"contract": CONTRACT, "scope": "complete_declared_decoder_block",
              "input_boundary": "hidden_activation", "port_layout": "materialized_stage_ports",
              "kv_allocation": "logical_blocks", "activation_dtype": "f32", "kv_dtype": "f32"}
@@ -69,7 +91,8 @@ def parse_full_physical(raw: Any) -> FullDensePhysical:
         raise InvalidInput("physical.threads must be a positive integer")
     config = validate_config(raw["config"])
     groups = parse_weight_groups(raw["weight_groups"], config)
-    return FullDensePhysical(config=config, threads=threads, weight_groups=groups)
+    return FullDensePhysical(config=config, threads=threads, weight_groups=groups,
+        request_accounting=parse_request_accounting(raw.get("request_accounting", SINGLE_REQUEST_ACCOUNTING)))
 
 
 def parse_weight_groups(raw_groups: Any, config: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -105,6 +128,7 @@ def validate_full_physical_layer(layer: Any) -> None:
         "kv_dtype": physical.kv_dtype, "config": physical.config,
         "threads": physical.threads, "weight_groups": physical.weight_groups,
         "excluded_operations": list(physical.excluded_operations),
+        "request_accounting": physical.request_accounting,
     })
     validate_full_geometry_layer(layer, checked)
 
@@ -112,6 +136,9 @@ def validate_full_physical_layer(layer: Any) -> None:
 def validate_full_geometry_layer(layer: Any, physical: Any) -> None:
     """Validate shared Dense DAG, geometry and true GGML weight bytes."""
     config = physical.config
+    if (getattr(physical, "request_accounting", SINGLE_REQUEST_ACCOUNTING) == INDEPENDENT_REQUEST_ACCOUNTING
+            and layer.provenance != "synthetic_layer"):
+        raise Unsupported("independent_per_request_kernel is a synthetic execution contract; measured Dense contracts remain batch=1")
     if layer.attention != "full_causal" or layer.ffn != "dense":
         raise Unsupported("full physical boundary currently supports full_causal + dense only")
     if layer.hidden_size != config["hidden"] or layer.hidden_bytes_per_token != config["hidden"] * 4:
@@ -145,5 +172,7 @@ def signature_for(layer: Any, kind: str, shape: Any) -> dict[str, Any]:
     physical = layer.physical
     if not isinstance(physical, FullDensePhysical):
         raise InvalidInput("full signature requires FullDensePhysical")
-    return signature(physical.config, kind, shape.phase, shape.tokens,
-                     shape.visible_history, physical.threads, batch=shape.batch)
+    kernel_batch = 1 if physical.request_accounting == INDEPENDENT_REQUEST_ACCOUNTING else shape.batch
+    result = signature(physical.config, kind, shape.phase, shape.tokens,
+                       shape.visible_history, physical.threads, batch=kernel_batch)
+    return account_request_signature(result, physical, shape.batch)

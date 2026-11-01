@@ -13,7 +13,11 @@ from typing import Any
 from ..tensor.spec import DEVICE_CPU, DEVICE_GPU, LOC_DRAM, LOC_VRAM, InvalidInput, Unsupported
 from .dense_contract import integer, signature as cpu_signature, validate_config
 from .dense_cuda_contract import signature as cuda_signature
-from .full_physical import FullDensePhysical, parse_weight_groups, validate_full_geometry_layer
+from .full_physical import (
+    FullDensePhysical, parse_weight_groups, validate_full_geometry_layer,
+    SINGLE_REQUEST_ACCOUNTING, INDEPENDENT_REQUEST_ACCOUNTING,
+    parse_request_accounting, account_request_signature,
+)
 
 HYBRID_FORMAT_VERSION = "m2-layer-0.5"
 CONTRACT = "ggml_hybrid_dense_materialized_macros_v1"
@@ -34,6 +38,7 @@ class HybridDensePhysical:
     activation_dtype: str = "f32"
     kv_dtype: str = "f32"
     excluded_operations: tuple[str, ...] = ()
+    request_accounting: str = SINGLE_REQUEST_ACCOUNTING
 
     input_ports = FullDensePhysical.input_ports
     projection_ports = FullDensePhysical.projection_ports
@@ -45,8 +50,8 @@ def parse_hybrid_physical(raw: Any) -> HybridDensePhysical:
     keys = {"contract", "scope", "input_boundary", "port_layout", "kv_allocation",
             "activation_dtype", "kv_dtype", "config", "threads", "cuda_device",
             "cuda_graphs", "weight_groups", "excluded_operations"}
-    if set(raw) != keys:
-        raise InvalidInput(f"hybrid physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys)}")
+    if set(raw) - {"request_accounting"} != keys:
+        raise InvalidInput(f"hybrid physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys-{'request_accounting'})}")
     fixed = {"contract": CONTRACT, "scope": "complete_declared_decoder_block",
              "input_boundary": "hidden_activation", "port_layout": "materialized_stage_ports",
              "kv_allocation": "logical_blocks", "activation_dtype": "f32", "kv_dtype": "f32",
@@ -61,7 +66,8 @@ def parse_hybrid_physical(raw: Any) -> HybridDensePhysical:
         threads=integer(raw["threads"], "physical.threads", 1),
         cuda_device=integer(raw["cuda_device"], "physical.cuda_device", 0),
         cuda_graphs=raw["cuda_graphs"],
-        weight_groups=parse_weight_groups(raw["weight_groups"], config))
+        weight_groups=parse_weight_groups(raw["weight_groups"], config),
+        request_accounting=parse_request_accounting(raw.get("request_accounting", SINGLE_REQUEST_ACCOUNTING)))
 
 
 def validate_hybrid_physical_layer(layer: Any) -> None:
@@ -76,6 +82,7 @@ def validate_hybrid_physical_layer(layer: Any) -> None:
         "threads": physical.threads, "cuda_device": physical.cuda_device,
         "cuda_graphs": physical.cuda_graphs, "weight_groups": physical.weight_groups,
         "excluded_operations": list(physical.excluded_operations),
+        "request_accounting": physical.request_accounting,
     })
     validate_full_geometry_layer(layer, checked)
     if any(weight.initial_location not in (LOC_DRAM, LOC_VRAM) for weight in layer.weights):
@@ -86,11 +93,14 @@ def signature_for(layer: Any, kind: str, shape: Any, device: str) -> dict[str, A
     physical = layer.physical
     if not isinstance(physical, HybridDensePhysical):
         raise InvalidInput("hybrid signature requires HybridDensePhysical")
+    kernel_batch = 1 if physical.request_accounting == INDEPENDENT_REQUEST_ACCOUNTING else shape.batch
     if device == DEVICE_CPU:
-        return cpu_signature(physical.config, kind, shape.phase, shape.tokens,
-                             shape.visible_history, physical.threads, batch=shape.batch)
-    if device == DEVICE_GPU:
-        return cuda_signature(physical.config, kind, shape.phase, shape.tokens,
-                              shape.visible_history, physical.cuda_device, batch=shape.batch,
-                              cuda_graphs=physical.cuda_graphs)
-    raise Unsupported(f"hybrid macro device {device!r} is not cpu/gpu")
+        result = cpu_signature(physical.config, kind, shape.phase, shape.tokens,
+                               shape.visible_history, physical.threads, batch=kernel_batch)
+    elif device == DEVICE_GPU:
+        result = cuda_signature(physical.config, kind, shape.phase, shape.tokens,
+                                shape.visible_history, physical.cuda_device, batch=kernel_batch,
+                                cuda_graphs=physical.cuda_graphs)
+    else:
+        raise Unsupported(f"hybrid macro device {device!r} is not cpu/gpu")
+    return account_request_signature(result, physical, shape.batch)

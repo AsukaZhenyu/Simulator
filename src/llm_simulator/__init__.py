@@ -5,6 +5,7 @@ AnalyticalCosts explicitly, or use ModelPlan with your own exact cost inputs.
 """
 from .config import Device, Hardware, Model, Workload
 from .analytical import AnalyticalCosts
+from .request_flow import Request, RequestFlow
 from .simulation import CompiledSimulation, SimulationResult, Simulator
 from llm_infer_model.m2.moe_spec import RouteTraceEntry as Route
 from llm_infer_model.tensor.environment import EnvironmentEvent
@@ -16,6 +17,11 @@ from tensor_mapping.python_frontend import (
     Scheduling, Select, Transport,
 )
 from tensor_mapping.reconfiguration import ReconfigurationSpec
+from tensor_mapping.storage_rules import ScopedTransportRule, TensorSelect
+from tensor_mapping.strategy_inspection import StrategyInspection
+from tensor_mapping.request_scheduling import RequestPipeline, PhaseHandoff
+from tensor_mapping.expert_scheduling import ExpertSchedulingSpec
+from llm_infer_model.m2.execution_pipeline import ExecutionRegionSpec
 
 __version__ = "0.1.0a2"
 
@@ -25,6 +31,7 @@ __all__ = [
     "Decision", "Device", "EnvironmentEvent", "Hardware", "InvalidInput",
     "Model", "ModelPlan", "PhasePlacement", "PlanModule", "Prefetch",
     "ReconfigurationSpec", "Route", "RuntimePolicy", "Scheduling", "Select",
+    "ScopedTransportRule", "StrategyInspection", "TensorSelect", "ExecutionRegionSpec",
     "SimulationResult", "Simulator", "SpecError", "Transport", "Unsupported",
-    "Workload",
+    "Workload", "Request", "RequestFlow", "RequestPipeline", "PhaseHandoff", "ExpertSchedulingSpec",
 ]

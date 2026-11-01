@@ -44,6 +44,7 @@ from pathlib import Path
 from .physical import DensePhysical, parse_physical, validate_physical_layer
 from .full_physical import (
     FULL_FORMAT_VERSION, FullDensePhysical, parse_full_physical, validate_full_physical_layer,
+    INDEPENDENT_REQUEST_ACCOUNTING,
 )
 from .cuda_physical import (
     CUDA_FORMAT_VERSION, CudaDensePhysical, parse_cuda_physical, validate_cuda_physical_layer,
@@ -997,6 +998,17 @@ class Hardware:
     vram_alignment_bytes: int = 1
     dram_runtime_reserved_bytes: int = 0
     vram_runtime_reserved_bytes: int = 0
+    memory_mode: str = "separate"
+    shared_capacity_bytes: int | None = None
+    shared_runtime_reserved_bytes: int = 0
+    shared_alignment_bytes: int = 1
+
+    def shared_document(self) -> dict:
+        if self.memory_mode == "separate":
+            return {}
+        return dict(memory_mode=self.memory_mode, shared_capacity_bytes=self.shared_capacity_bytes,
+                    shared_runtime_reserved_bytes=self.shared_runtime_reserved_bytes,
+                    shared_alignment_bytes=self.shared_alignment_bytes)
 
 
 @dataclass(frozen=True)
@@ -1066,6 +1078,7 @@ _HARDWARE_KEYS = {
     "vram_alignment_bytes",
     "dram_runtime_reserved_bytes",
     "vram_runtime_reserved_bytes",
+    "memory_mode", "shared_capacity_bytes", "shared_runtime_reserved_bytes", "shared_alignment_bytes",
 }
 _REQUEST_IN_KEYS = {"request_id", "position_start", "tokens", "input_location", "output_location"}
 
@@ -1083,6 +1096,12 @@ def _parse_hardware(raw: Any, where: str) -> Hardware:
     block = _require_mapping(raw, f"{where}.hardware")
     label = f"{where}.hardware"
     _reject_unknown_keys(block, _HARDWARE_KEYS, label)
+    mode = _require_one_of(block.get("memory_mode", "separate"), f"{label}.memory_mode", ("separate", "shared"))
+    shared = block.get("shared_capacity_bytes")
+    if mode == "shared":
+        shared = _require_int(shared, f"{label}.shared_capacity_bytes", minimum=1)
+    elif shared is not None or block.get("shared_runtime_reserved_bytes", 0) or block.get("shared_alignment_bytes", 1) != 1:
+        raise InvalidInput("separate memory cannot declare an active shared pool")
     return Hardware(
         dram_capacity_bytes=_require_int(
             block.get("dram_capacity_bytes"), f"{label}.dram_capacity_bytes", minimum=1
@@ -1104,6 +1123,9 @@ def _parse_hardware(raw: Any, where: str) -> Hardware:
             block.get("vram_runtime_reserved_bytes", 0),
             f"{label}.vram_runtime_reserved_bytes",
         ),
+        memory_mode=mode, shared_capacity_bytes=shared,
+        shared_runtime_reserved_bytes=_require_int(block.get("shared_runtime_reserved_bytes", 0), f"{label}.shared_runtime_reserved_bytes"),
+        shared_alignment_bytes=_require_int(block.get("shared_alignment_bytes", 1), f"{label}.shared_alignment_bytes", minimum=1),
     )
 
 
@@ -1333,7 +1355,10 @@ def validate_invocation(
         (validate_hybrid_physical_layer if layer.format_version == HYBRID_FORMAT_VERSION
          else validate_cuda_physical_layer if layer.format_version == CUDA_FORMAT_VERSION
          else validate_full_physical_layer if layer.format_version == FULL_FORMAT_VERSION else validate_physical_layer)(layer)
-        if invocation.batch != 1:
+        independent = (isinstance(layer.physical, (FullDensePhysical, HybridDensePhysical))
+            and layer.physical.request_accounting == INDEPENDENT_REQUEST_ACCOUNTING
+            and layer.provenance == PROVENANCE_SYNTHETIC)
+        if invocation.batch != 1 and not independent:
             raise Unsupported("physical macro execution currently requires batch=1; per-request graphs are not whole-batch kernels")
     required_kinds = (_REQUIRED_TASK_KINDS if layer.physical is None or layer.format_version in _COMPLETE_VERSIONS
                       else (SEMANTIC_ATTENTION, SEMANTIC_DENSE_FFN))

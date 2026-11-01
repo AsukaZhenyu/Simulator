@@ -4,6 +4,7 @@ Model/profile/trace files remain reusable inputs. All mapping choices are
 inline and source-bound; a legacy model program is never silently overridden.
 """
 import hashlib
+import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +21,8 @@ from .composition_policy import CompositionPolicy, composition_policy_document, 
 from .policy_ir import parse_history
 from .strategy_compiler import _read_object, _resolve_scenario
 from .reconfiguration import parse_environment_trace, parse_reconfiguration
+from .storage_rules import normalize_scoped_transport, validate_scoped_transport_bindings
+from .request_scheduling import RequestPipeline, normalize_handoffs
 from llm_infer_model.m2.execution_pipeline import (
     parse_transform, transform_document, ExecutionPipelineSpec, apply_execution_transform, execution_metadata,
 )
@@ -50,7 +53,8 @@ def compile_composition_file(path):
 
 def compile_composition_document(document, *, base_dir, source_files=(),
                                  visibility_mode="scope_barriers", derive_placements=False,
-                                 placement_resolver=None, default_device=None):
+                                 placement_resolver=None, default_device=None, scoped_transport=(),
+                                 request_pipeline=None, phase_handoffs=()):
     """Compile an in-memory Python frontend through the same strict compiler.
 
     Model, environment and profile paths are resolved against ``base_dir``.
@@ -62,13 +66,20 @@ def compile_composition_document(document, *, base_dir, source_files=(),
     return _compile_composition(document=deepcopy(document), base_dir=base_dir,
                                 source_files=source_files, visibility_mode=visibility_mode,
                                 derive_placements=derive_placements, placement_resolver=placement_resolver,
-                                default_device=default_device)
+                                default_device=default_device, scoped_transport=scoped_transport,
+                                request_pipeline=request_pipeline,phase_handoffs=phase_handoffs)
 
 
 def _compile_composition(*, path=None, document=None, base_dir=None,
                          source_files=(), visibility_mode="scope_barriers", derive_placements=False,
-                         placement_resolver=None, default_device=None):
+                         placement_resolver=None, default_device=None, scoped_transport=(),
+                         request_pipeline=None,phase_handoffs=()):
     from .unified_strategy import CompiledUnifiedStrategy, create_session
+    scoped_transport = normalize_scoped_transport(scoped_transport)
+    if request_pipeline is not None and not isinstance(request_pipeline,RequestPipeline):
+        raise InvalidInput("request_pipeline must be RequestPipeline or None")
+    if request_pipeline is not None:
+        request_pipeline.__post_init__()
     # A synthetic path is only an anchor for relative references, not an input
     # that is written to disk or included in the source manifest.
     path = Path(path).resolve() if path is not None else Path(base_dir).resolve() / "python-strategy.json"
@@ -116,16 +127,33 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
         raise InvalidInput("execution must be an array of inline scope bindings")
     selections, seen = [], set()
     scope_files = {}
+    model_steps=[]
+    handoff_bindings=()
     if kind == "global_m2":
-        if raw_model.get("format_version") != "global-execution-0.1":
-            raise InvalidInput("global_m2 requires a global-execution-0.1 model")
-        _exact(raw_model, {"format_version", "id", "rounds"}, "global model")
-        if not isinstance(raw_model["rounds"], list) or not raw_model["rounds"]:
-            raise InvalidInput("global model rounds must be a nonempty array")
+        model_version=raw_model.get("format_version")
+        if model_version=="global-execution-0.1":
+            _exact(raw_model, {"format_version", "id", "rounds"}, "global model")
+            model_steps=raw_model["rounds"]
+            if phase_handoffs:
+                raise Unsupported("explicit phase handoffs require a request-flow global-execution-0.2 model")
+        elif model_version=="global-execution-0.2":
+            _exact(raw_model,{"format_version","id","requests"},"request-flow model")
+            if not isinstance(raw_model["requests"],list) or not raw_model["requests"]:
+                raise InvalidInput("request-flow requests must be nonempty")
+            for request in raw_model["requests"]:
+                _exact(request,{"request_id","arrival_ns","steps"},"request stream")
+                if not isinstance(request["steps"],list) or not request["steps"]:
+                    raise InvalidInput("request steps must be nonempty")
+                model_steps.extend(request["steps"])
+            handoff_bindings=normalize_handoffs(phase_handoffs,tuple(r["request_id"] for r in raw_model["requests"]))
+        else:
+            raise InvalidInput("global_m2 requires global-execution-0.1 or global-execution-0.2")
+        if not isinstance(model_steps,list) or not model_steps:
+            raise InvalidInput("global model steps must be a nonempty array")
         # Validate the reference structure before resolving overrides. Calling
         # the legacy compiler first would read files that the IR replaces.
-        for round_ in raw_model["rounds"]:
-            _exact(round_, {"id", "input_mode", "gate_cost", "invocations"}, "global round")
+        for round_ in model_steps:
+            _exact(round_, {"id", "input_mode", "gate_cost" if model_version=="global-execution-0.1" else "gate_costs", "invocations"}, "global step")
             if not isinstance(round_["invocations"], list) or not round_["invocations"]:
                 raise InvalidInput("global round invocations must be a nonempty array")
             for entry in round_["invocations"]:
@@ -137,6 +165,8 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
                 scope_files[scope] = (model_path.parent / reference).resolve()
     elif kind == "m2":
         scope_files = {"single": model_path}
+    if kind!="global_m2" and (request_pipeline is not None or phase_handoffs):
+        raise Unsupported("request pipeline/handoff requires a global model")
     for row in document["execution"]:
         _exact(row, {"scope_id", "spec"}, "execution binding")
         scope = row["scope_id"]
@@ -158,10 +188,12 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
     if kind == "global_m2":
         from llm_infer_model.m2.global_execution import compile_global_execution_file
         model = compile_global_execution_file(model_path, execution_overrides=tuple(selections),
-                                              visibility_mode=visibility_mode)
+                                              visibility_mode=visibility_mode,**({"handoffs":handoff_bindings} if model_version=="global-execution-0.2" else {}))
         include(model.sources)
         positions = {}
-        for entry in raw_model["rounds"][0]["invocations"]:
+        first_entries=(model_steps[0]["invocations"] if model_version=="global-execution-0.1" else
+                       [entry for request in raw_model["requests"] for entry in request["steps"][0]["invocations"]])
+        for entry in first_entries:
             raw = read(model_path.parent / entry["invocation_file"])
             positions.update({(raw["layer"], row["request_id"]): row["position_start"] for row in raw["requests"]})
     elif kind == "m2":
@@ -185,10 +217,31 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
     validation_model = model.aggregate if kind=="global_m2" else model
     if execution is not None:
         validation_model=apply_execution_transform(validation_model,execution)
+    first_decode_scopes={}
+    if handoff_bindings:
+        targets=dict(handoff_bindings)
+        for request in raw_model["requests"]:
+            if request["request_id"] in targets and len(request["steps"])>1:
+                for entry in request["steps"][1]["invocations"]:
+                    first_decode_scopes[entry["id"]]=targets[request["request_id"]]
+        for task in validation_model.tasks:
+            context=_task_context(task,validation_model,model)
+            if context.invocation_id not in first_decode_scopes or task.kind not in {
+                    "attention","attention_core","attention_qk","attention_pv"}:
+                continue
+            resolved=placement_resolver(context) if placement_resolver else None
+            preference=(resolved if resolved is not None else
+                document["policy"]["request_placements"].get(task.request_id,{}).get(task.kind,
+                    document["policy"]["placements"].get(task.kind,default_device)))
+            required="cpu" if first_decode_scopes[context.invocation_id]=="dram" else "gpu"
+            if (validation_model.scenario.architecture.memory_mode != "shared"
+                    and preference in {"cpu","gpu"} and preference!=required):
+                raise InvalidInput("first Decode Attention placement conflicts with the phase handoff destination")
     if derive_placements:
         _derive_placements(document,validation_model,model,placement_resolver,default_device)
     spec = parse_composition_policy(dict(document["policy"], cache=document["cache"],
                                        prefetch=document["prefetch"], transport=document["transport"]))
+    spec = replace(spec, scoped_transport=scoped_transport,request_pipeline=request_pipeline)
     if version == "unified-strategy-0.3":
         spec = replace(spec, reconfiguration=parse_reconfiguration(document["reconfiguration"]))
     resolved = {}
@@ -214,10 +267,17 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
         resolved["routing_scores_file"], sources, spec,
         resolved["environment_file"].requests if version == "unified-strategy-0.3" else (),
         resolved["environment_file"].control_costs if version == "unified-strategy-0.3" else None,
-        visibility_mode=visibility_mode)
+        visibility_mode=visibility_mode,
+        frontend_sha256=(hashlib.sha256(json.dumps(
+            {"scoped_transport": [rule.document() for rule in scoped_transport],
+             "request_pipeline":request_pipeline.document() if request_pipeline else None,
+             "phase_handoffs":[rule.document() for rule in phase_handoffs]},
+            sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+            if scoped_transport or request_pipeline is not None or phase_handoffs else None))
     if version == "unified-strategy-0.3" and compiled.control_costs is None:
         raise InvalidInput("unified-strategy-0.3 requires environment-trace-0.2 with explicit control costs")
     session = create_session(compiled)
+    validate_scoped_transport_bindings(scoped_transport, session.observe().weight_catalogue)
     catalogue = {}
     for expert in session.observe().experts:
         catalogue.setdefault(expert.layer_id, set()).add(expert.expert_id)
@@ -257,6 +317,12 @@ def _compile_composition(*, path=None, document=None, base_dir=None,
                 raise Unsupported("execution_binding requires one exact device per transformed stage")
         elif device is None or device not in allowed:
             raise Unsupported(f"explicit placement for {request}/{kind_} is absent or has no allowed exact cost")
+        if context.invocation_id in first_decode_scopes and kind_ in {"attention","attention_core","attention_qk","attention_pv"}:
+            target=first_decode_scopes[context.invocation_id]
+            actual=allowed[0] if device=="execution_binding" and len(allowed)==1 else device
+            if (validation_model.scenario.architecture.memory_mode != "shared"
+                    and target is not None and actual!=("cpu" if target=="dram" else "gpu")):
+                raise InvalidInput("Decode Attention placement conflicts with the declared phase handoff destination")
     if any(request not in requests_and_kinds or set(bindings) - requests_and_kinds[request]
            for request, bindings in overrides.items()):
         raise InvalidInput("request placement references an absent request or kind")

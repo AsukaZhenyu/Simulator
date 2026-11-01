@@ -194,6 +194,10 @@ class M2CostTable:
             + [cost.provenance for cost in self.transfers.values()]
         )
 
+    def optional_transfer(self, route: str, storage_bytes: int) -> TransferEntry | None:
+        """An explicit physical COPY quote, if supplied; never a zero default."""
+        return self.transfers.get((route, storage_bytes))
+
     def lookup_transfer(self, route: str, storage_bytes: int) -> TransferEntry:
         """Reject missing sizes/directions instead of interpolating or using zero."""
         if not isinstance(route, str) or route not in self.allowed_transfer_routes:
@@ -568,6 +572,7 @@ def expand_transfer_costs(
     table: M2CostTable,
     tensor_sizes: Mapping[str, int],
     allowed_routes: Mapping[str, Sequence[str]],
+    *, shared_memory: bool = False,
 ) -> tuple[set[str], dict[str, dict[str, dict[str, int]]]]:
     """Bind allowed tensor copies to exact storage-byte costs for the core.
 
@@ -595,7 +600,12 @@ def expand_transfer_costs(
                 raise InvalidInput(f"allowed_routes[{route!r}] 重复张量 {tensor_id!r}")
             if tensor_id not in tensor_sizes:
                 raise InvalidInput(f"搬运张量 {tensor_id!r} 缺少 storage_bytes")
-            cost = table.lookup_transfer(route, tensor_sizes[tensor_id])
+            if shared_memory and route in ("dram_to_vram", "vram_to_dram"):
+                cost = table.optional_transfer(route, tensor_sizes[tensor_id])
+                if cost is None:
+                    continue  # SHARE has no physical COPY price; COPY remains unavailable.
+            else:
+                cost = table.lookup_transfer(route, tensor_sizes[tensor_id])
             transfer[route][tensor_id] = {"duration_ns": cost.duration_ns}
             provenances.add(cost.provenance)
     return provenances, transfer

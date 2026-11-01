@@ -185,7 +185,8 @@ def edit_scenario(scenario: Any, params: dict[str, Any]) -> Any:
     """
     architecture = scenario.architecture
     m1 = bool(scenario.is_m1)
-    if "vram_capacity_bytes" in params:
+    shared = architecture.memory_mode == "shared"
+    if "vram_capacity_bytes" in params and not shared:
         architecture = replace(
             architecture, vram_capacity_bytes=int(params["vram_capacity_bytes"])
         )
@@ -203,8 +204,14 @@ def edit_scenario(scenario: Any, params: dict[str, Any]) -> Any:
             "dram_runtime_reserved_bytes",
             "vram_runtime_reserved_bytes",
         ):
-            if key in params:
+            if key in params and not shared:
                 architecture = replace(architecture, **{key: int(params[key])})
+        if shared:
+            changes = {key: int(params[key]) for key in (
+                "shared_capacity_bytes", "shared_runtime_reserved_bytes", "shared_alignment_bytes")
+                if key in params}
+            if changes:
+                architecture = replace(architecture, **changes)
     # **槽位数不是旋钮。** ``Architecture.__post_init__`` 对四个资源都要求恰好 1 个槽
     # （「M0 models exactly one resource of each kind」——首版假设，见 ``M1_DESIGN.md`` §4），
     # 所以这里没有一条能把它改成 2 的路：给一个只能撞拒绝的输入框，比不给更糟。

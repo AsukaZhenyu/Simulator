@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from ..tensor.engine import ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_READ_SSD, ACTION_WRITE_SSD, Action
+from ..tensor.engine import ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD, ACTION_WRITE_SSD, Action
 from ..tensor.spec import (ALGORITHM_UNIFORM_COST, DTYPE_I32, ROLE_INPUT, ROLE_INTERMEDIATE, ROLE_OUTPUT,
                           ROLE_WEIGHT, SCHEMA_VERSION_M1, InvalidInput, Unsupported, build_scenario)
 from .costs import MacroShape, expand_costs_document, expand_transfer_costs
@@ -151,7 +151,8 @@ def compile_moe_invocation(layer, invocation, cost_table, *, state_in=None, wher
     transferable=[t["id"] for t in tensors if t["role"]!=ROLE_WEIGHT or t["id"] in read_weights]
     allowed_transfers={route:list(transferable) for route in
         ("dram_to_vram","vram_to_dram","ssd_to_dram","dram_to_ssd")}
-    transfer_sources,transfers=expand_transfer_costs(cost_table,sizes,allowed_transfers)
+    transfer_sources,transfers=expand_transfer_costs(cost_table,sizes,allowed_transfers,
+        shared_memory=invocation.hardware.memory_mode == "shared")
     source,costs=expand_costs_document(cost_table,requirements,transfer_provenances=transfer_sources)
     costs["transfer"]=transfers
     identity=f"m2:{layer.id}:{invocation.id}"
@@ -160,7 +161,7 @@ def compile_moe_invocation(layer, invocation, cost_table, *, state_in=None, wher
         tensors=tensors,operations=operations,outputs=list(goals))
     hardware=invocation.hardware
     scenario_doc=dict(schema_version=SCHEMA_VERSION_M1,id=identity,
-        architecture=dict(dram_capacity_bytes=hardware.dram_capacity_bytes,vram_capacity_bytes=hardware.vram_capacity_bytes,
+        architecture=dict(**hardware.shared_document(),dram_capacity_bytes=hardware.dram_capacity_bytes,vram_capacity_bytes=hardware.vram_capacity_bytes,
             dram_runtime_reserved_bytes=hardware.dram_runtime_reserved_bytes,vram_runtime_reserved_bytes=hardware.vram_runtime_reserved_bytes,
             dram_alignment_bytes=hardware.dram_alignment_bytes,vram_alignment_bytes=hardware.vram_alignment_bytes,
             cpu_compute_slots=1,gpu_compute_slots=1,pcie_copy_slots=1,ssd_io_slots=1),
@@ -195,7 +196,10 @@ def plan_moe(compiled, *, placements: Mapping[str,str] | None=None):
     locations={t.id:set(t.initial_locations) for t in compiled.scenario.workload.tensors}
     actions=[]
     def transfer(kind,tensor,*,src=None,dst=None):
-        actions.extend((Action(kind,tensor,src=src,dst=dst),Action(ACTION_ADVANCE)))
+        if kind == ACTION_COPY and compiled.scenario.architecture.pool_of(src) == compiled.scenario.architecture.pool_of(dst):
+            actions.append(Action(ACTION_SHARE,tensor,src=src,dst=dst))
+        else:
+            actions.extend((Action(kind,tensor,src=src,dst=dst),Action(ACTION_ADVANCE)))
     def materialize(tensor,destination):
         if destination in locations[tensor]: return
         if destination=="ssd":

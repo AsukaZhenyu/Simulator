@@ -230,6 +230,14 @@ def limits_block(
     if scenario.is_m1:
         mapspace = scenario.mapspace
         return {
+            **(dict(memory_mode="shared", shared_capacity_bytes=architecture.shared_capacity_bytes,
+                shared_runtime_reserved_bytes=architecture.shared_runtime_reserved_bytes,
+                shared_alignment_bytes=architecture.shared_alignment_bytes,
+                physical_pools={"shared": dict(capacity_bytes=architecture.shared_capacity_bytes,
+                    reserved_bytes=architecture.shared_runtime_reserved_bytes,
+                    alignment_bytes=architecture.shared_alignment_bytes)},
+                logical_location_to_physical_pool={"dram": "shared", "vram": "shared"})
+                if architecture.memory_mode == "shared" else {}),
             "dram_capacity_bytes": architecture.dram_capacity_bytes,
             "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,
             "dram_alignment_bytes": architecture.alignment_of(LOC_DRAM),
@@ -324,6 +332,13 @@ def assumptions(scenario: Scenario) -> list[str]:
             "every requested output names the location it has to reach, and an "
             "SSD target counts as delivered only once its write has completed"
         )
+        if architecture.memory_mode == "shared":
+            notes.append("DRAM and VRAM are logical views of one shared physical pool; "
+                "their reported usage and peaks must not be added; only peak_shared_bytes "
+                "is physical capacity accounting")
+            notes.append("SHARE exposes the same physical allocation at zero declared time and zero "
+                "payload movement, retaining producer dependencies and allocation locks; "
+                "this is not a measured platform synchronization cost; explicit COPY remains an actual copy")
     else:
         notes = [
             "costs are fixed per-operation durations; M0 has no bandwidth model "
@@ -433,7 +448,7 @@ def m1_metrics(
         ssd_read_bytes = evaluation.ssd_read_bytes
         ssd_write_bytes = evaluation.ssd_write_bytes
         service = service_block(evaluation)
-    return {
+    result = {
         "peak_dram_bytes": peak_dram_bytes,
         "d2h_bytes": d2h_bytes,
         "ssd_read_bytes": ssd_read_bytes,
@@ -441,6 +456,11 @@ def m1_metrics(
         "target_locations": dict(scenario.goal.output_locations),
         "service_ns": service,
     }
+    if scenario.architecture.memory_mode == "shared":
+        peak = None if evaluation is None else evaluation.peak_shared_bytes
+        result.update(memory_mode="shared", peak_shared_bytes=peak,
+                      physical_memory_peaks_bytes={"shared": peak})
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -478,7 +498,7 @@ def action_to_dict(action: Action, *, m1: bool = False) -> dict[str, Any]:
         return document
     document = {"kind": action.kind, "tensor_id": action.target_id}
     if m1:
-        if action.kind == ACTION_COPY:
+        if action.kind in (ACTION_COPY, "SHARE"):
             document["src"] = action.src
             document["dst"] = action.dst
         elif action.kind == ACTION_EVICT:
@@ -522,7 +542,7 @@ def _event_to_dict(event: Event, *, m1: bool) -> dict[str, Any]:
 
 
 def _state_to_dict(
-    snapshot: StateSnapshot, action_index: int | None, *, m1: bool
+    snapshot: StateSnapshot, action_index: int | None, *, m1: bool, shared: bool = False
 ) -> dict[str, Any]:
     """One state summary, plus the action index that produced it.
 
@@ -551,6 +571,10 @@ def _state_to_dict(
         document["used_dram_bytes"] = snapshot.used_dram_bytes
         document["dram_status"] = dict(snapshot.dram_status)
         document["ssd_status"] = dict(snapshot.ssd_status)
+    if shared:
+        document["used_shared_bytes"] = snapshot.used_shared_bytes
+        document["storage_allocations"] = [dict(tensor_id=tensor, location=location, allocation_id=allocation)
+            for tensor, location, allocation in snapshot.storage_allocations]
     return document
 
 
@@ -610,7 +634,8 @@ def states_document(
     """
     snapshots = () if evaluation is None else evaluation.states
     entries = [
-        _state_to_dict(snapshot, None if index == 0 else index - 1, m1=scenario.is_m1)
+        _state_to_dict(snapshot, None if index == 0 else index - 1, m1=scenario.is_m1,
+                       shared=scenario.architecture.memory_mode == "shared")
         for index, snapshot in enumerate(snapshots)
     ]
     return _log_document(
@@ -715,6 +740,10 @@ def stats_document(
         document["service_ns"] = (
             None if m1["service_ns"] is None else dict(m1["service_ns"])
         )
+        if scenario.architecture.memory_mode == "shared":
+            document["memory_mode"] = "shared"
+            document["peak_shared_bytes"] = m1["peak_shared_bytes"]
+            document["physical_memory_peaks_bytes"] = dict(m1["physical_memory_peaks_bytes"])
     document["action_count"] = action_count
     document["declared_action_count"] = declared_action_count
     document["limits"] = dict(limits)

@@ -1,8 +1,9 @@
-"""Deterministic event evaluation of physical work and resource availability.
+"""Deterministic event evaluation of declared work and resource availability.
 
 This is a performance model, not an operating-system or device scheduler. The
 input graph specifies execution order among ready tasks and resource sharing.
-Piecewise rates are available physical service, not utilization percentages.
+Physical rates are available service, not utilization percentages. Invocation
+rates instead have an explicit inclusive completed-response scope.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from fractions import Fraction
 import math
 
 from .graph import Graph, ResourceTimeline
-from .parameters import InvalidModel, ParameterBundle
+from .parameters import InstantaneousRate, InvalidModel, ParameterBundle
 
 
 class CapacityExceeded(InvalidModel):
@@ -78,6 +79,11 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
     work is retained, zero pauses, and fixed latency tasks are never scaled.
     Memory reservations are held throughout execution; live capacity violations
     fail explicitly, rather than silently evicting or preempting allocations.
+    Completion gates hold their declared resources until awaited tasks finish;
+    they add no independently estimated duration or second device-work charge.
+    Thread-CPU work is serviced by explicit per-thread rates, not by fixed wall
+    latency. A zero rate retains work and adds a ``service_unavailable`` audit
+    interval only for this new work unit. Legacy wait inventories are unchanged.
     """
     if not isinstance(graph, Graph) or not isinstance(bundle, ParameterBundle):
         raise InvalidModel("evaluate requires Graph and ParameterBundle")
@@ -96,8 +102,13 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
     external = {d.name: d.external_bytes for d in graph.memory_domains}
     for point in timeline.points:
         for name in point.rates:
-            if bundle.get(name).unit not in {"flop/s", "byte/s"}:
-                raise InvalidModel(f"timeline can only change physical rates: {name}")
+            unit = bundle.get(name).unit
+            if unit not in {"flop/s", "byte/s", "invocation/s", "thread_cpu_ns/s", "cpu_cycle/s"}:
+                raise InvalidModel(f"timeline can only change service rates: {name}")
+            if isinstance(point.rates[name], InstantaneousRate) and unit != "invocation/s":
+                raise InvalidModel("instantaneous rates cannot describe physical throughput")
+            if unit == "thread_cpu_ns/s" and point.rates[name] > 1_000_000_000:
+                raise InvalidModel("one thread cannot receive more than 1e9 active CPU ns per second")
         if not set(point.capacities) <= domains.keys() or not set(point.external_memory) <= domains.keys():
             raise InvalidModel("timeline references an undeclared memory domain")
 
@@ -127,14 +138,29 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
         return tuple(blocked)
 
     def finish():
-        for task_id, item in tuple(active.items()):
-            if all(value <= 0 for value in item["remaining"]):
+        # Finish to closure: a later-inserted device may release an earlier
+        # gate, which may release more gates at exactly this same timestamp.
+        while True:
+            changed = False
+            for task_id, item in tuple(active.items()):
                 task = item["task"]
+                if task.waits_for:
+                    if not set(task.waits_for) <= completed.keys():
+                        continue
+                else:
+                    for index, demand in enumerate(task.demands):
+                        if isinstance(rates[demand.parameter], InstantaneousRate):
+                            item["remaining"][index] = Fraction(0)
+                    if not all(value <= 0 for value in item["remaining"]):
+                        continue
                 completed[task_id] = time
                 locks.difference_update((task.resource,) + task.extra_resources)
                 records[task_id] = TaskExecution(task_id, task.resource, item["ready"], item["start"], time)
                 events.append((time, "finish", task_id))
                 del active[task_id]
+                changed = True
+            if not changed:
+                return
 
     while pending or active or (time == 0 and not events):
         finish()
@@ -146,6 +172,7 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
             external.update(point.external_memory)
             events.append((time, "resource_state", str(point_index)))
             point_index += 1
+            finish()
         check_capacity()
         while True:
             launched = False
@@ -170,10 +197,12 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
             next_times.append(timeline.points[point_index].at_ns)
         for item in active.values():
             task, remaining = item["task"], item["remaining"]
+            if task.waits_for:
+                continue
             if task.fixed_parameter is not None:
                 duration = remaining[0]
             else:
-                durations = [work * 1_000_000_000 / rates[d.parameter]
+                durations = [Fraction(0) if isinstance(rates[d.parameter], InstantaneousRate) else work * 1_000_000_000 / rates[d.parameter]
                              if rates[d.parameter] else None
                              for d, work in zip(task.demands, remaining) if work > 0]
                 if any(value is None for value in durations):
@@ -191,11 +220,21 @@ def evaluate(graph: Graph, bundle: ParameterBundle,
                     waits.append(WaitInterval(task.id, time, next_time, reasons))
         for item in active.values():
             task = item["task"]
-            if task.fixed_parameter is not None:
+            if task.waits_for:
+                reasons = tuple("await_completion:" + name for name in task.waits_for if name not in completed)
+                if reasons:
+                    waits.append(WaitInterval(task.id, time, next_time, reasons))
+            elif task.fixed_parameter is not None:
                 item["remaining"][0] = max(Fraction(0), item["remaining"][0] - elapsed)
             else:
+                unavailable = tuple("service_unavailable:" + demand.parameter
+                    for demand, remaining in zip(task.demands, item["remaining"])
+                    if demand.unit in {"thread_cpu_ns", "cpu_cycle"} and remaining > 0 and rates[demand.parameter] == 0)
+                if unavailable:
+                    waits.append(WaitInterval(task.id, time, next_time, unavailable))
                 for i, demand in enumerate(task.demands):
-                    item["remaining"][i] = max(Fraction(0), item["remaining"][i]
-                        - Fraction(elapsed) * rates[demand.parameter] / 1_000_000_000)
+                    item["remaining"][i] = (Fraction(0) if isinstance(rates[demand.parameter], InstantaneousRate)
+                        else max(Fraction(0), item["remaining"][i]
+                        - Fraction(elapsed) * rates[demand.parameter] / 1_000_000_000))
         time = next_time
     return Evaluation(time, tuple(records[t.id] for t in graph.tasks), tuple(waits), tuple(events))

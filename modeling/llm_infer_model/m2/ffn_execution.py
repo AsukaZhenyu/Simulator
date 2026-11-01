@@ -1,8 +1,10 @@
-"""Materialized F32 SwiGLU stages and intermediate-axis tensor partitions.
+"""F32 SwiGLU stages and explicit intermediate-axis storage contracts.
 
-This is a semantic graph/storage transformation, not a calibrated kernel. A
-partition is an initial immutable weight representation, never a free runtime
-slice. Every new stage needs its own exact price and workspace declaration.
+This is a semantic graph/storage transformation, not a calibrated kernel. The
+legacy contract replaces complete matrices with an initial immutable partition
+inventory. The shared-parent contract reads explicit slices of retained complete
+matrices, charging full-parent copies and allocating no shard aliases. Every
+new stage needs its own exact price and workspace declaration.
 Dense preprocessing/residual are performed once; MoE gather/scatter/combine
 remain outside this common FFN region.
 """
@@ -100,7 +102,7 @@ def parse_ffn_execution(document: Any) -> FFNExecutionSpec:
     raw = _object(document, FFNExecutionSpec.__dataclass_fields__, "ffn_execution")
     _choice(raw["format_version"], {FORMAT_VERSION}, "format_version")
     _choice(raw["provenance"], {"synthetic_execution"}, "provenance")
-    _choice(raw["weight_storage_contract"], {"materialized_partition_replaces_parent"}, "weight_storage_contract")
+    _choice(raw["weight_storage_contract"], {"materialized_partition_replaces_parent", "shared_parent_slice_views"}, "weight_storage_contract")
     for field in ("preprocess_device", "merge_device"):
         _choice(raw[field], {"cpu", "gpu"}, field)
     middle = _int(raw["intermediate_size"], "intermediate_size", 1)
@@ -174,17 +176,43 @@ def ffn_execution_document(spec: FFNExecutionSpec) -> dict[str, Any]:
     return result
 
 
-def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExecutionSpec) -> CompiledInvocation:
-    """Lower complete Dense or already selected-row/staged MoE FFN regions.
+def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExecutionSpec, *,
+                            request_ids: tuple[str, ...] | None = None) -> CompiledInvocation:
+    """Lower Dense or already selected-row/staged MoE FFN regions.
 
     Dense requires the existing complete F32 decoder contract. MoE requires
     materialized gate/up/down subweights (0.2), including inactive experts.
     Original output identities and all Attention/KV ports are preserved.
+    Dense request selection requires explicit shared-parent storage: gate/up
+    read output columns [start,end), down reads corresponding input rows, and
+    only hidden partials are summed before one residual add. Different disjoint
+    requests may therefore use different partitions without changing the common
+    physical matrix inventory. MoE row groups do not yet have this scoped mode.
     """
     spec = parse_ffn_execution(ffn_execution_document(execution_spec))
     boundary = deepcopy(compiled.physical_boundary or {})
-    if "ffn_execution" in boundary:
-        raise InvalidInput("FFN execution is already materialized")
+    prior = boundary.get("ffn_execution")
+    shared_parent = spec.weight_storage_contract == "shared_parent_slice_views"
+    if request_ids is not None:
+        if (not isinstance(request_ids, tuple) or not request_ids or
+                any(not isinstance(item, str) or not item for item in request_ids) or
+                len(set(request_ids)) != len(request_ids)):
+            raise InvalidInput("request_ids must be a nonempty tuple of distinct request IDs")
+        unknown = set(request_ids) - {request.request_id for request in compiled.invocation.requests}
+        if unknown:
+            raise InvalidInput(f"FFN selection contains unknown request IDs: {sorted(unknown)!r}")
+        if compiled.layer.ffn != "dense":
+            raise Unsupported("request-scoped FFN lowering requires Dense; aggregated MoE rows need a separate ownership contract")
+        if not shared_parent:
+            raise Unsupported("request-scoped FFN lowering requires explicit shared_parent_slice_views; materialized partitions cannot replace shared parent weights")
+    if prior:
+        if request_ids is None:
+            raise InvalidInput("FFN execution is already materialized")
+        if not shared_parent or prior.get("weight_storage_contract") != "shared_parent_slice_views":
+            raise Unsupported("request-scoped FFN cannot mix shared parent views and materialized parent replacement")
+        overlap = set(request_ids) & {region["request_id"] for region in prior["regions"]}
+        if overlap:
+            raise InvalidInput(f"FFN request regions are already materialized: {sorted(overlap)!r}")
     if compiled.workload_document["origin"]["kind"] != "synthetic_layer":
         raise Unsupported("FFN refinement requires synthetic_layer; measured macro prices cannot be split")
     devices = {spec.preprocess_device, spec.merge_device, *(shard.device for shard in spec.shards)}
@@ -194,6 +222,8 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
     if compiled.layer.hidden_bytes_per_token != 4 * hidden:
         raise Unsupported("FFN F32 execution requires hidden_bytes_per_token == 4 * hidden_size")
     dense = compiled.layer.ffn == "dense"
+    if shared_parent and not dense:
+        raise Unsupported("shared_parent_slice_views currently requires Dense FFN weights")
     row = boundary.get("row_execution", {})
     tensors = {item["id"]: deepcopy(item) for item in compiled.workload_document["tensors"]}
     old_operations = {item["id"]: deepcopy(item) for item in compiled.workload_document["operations"]}
@@ -218,6 +248,8 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
             raise Unsupported("Dense FFN RMSNorm requires its exact F32 gamma vector")
         for task in compiled.tasks:
             if task.kind != "dense_ffn":
+                continue
+            if request_ids is not None and task.request_id not in request_ids:
                 continue
             op = old_operations[task.operation_id]
             values = [tid for tid in op["inputs"] if tensors[tid]["role"] != ROLE_WEIGHT]
@@ -269,12 +301,14 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
                 raise Unsupported("this materialization must target every active routed/shared expert")
     if not regions:
         raise Unsupported("FFN refinement has no matching region")
+    spec_index = len(prior.get("execution_specs", [prior["execution_spec"]])) if prior else 0
+    consumer_requests = list(dict.fromkeys(region["template"].request_id for region in regions))
     for region in regions:
         count = region["template"].shape.tokens
         for port in (region["input_tensor"], region["output_tensor"]):
             if tensors[port]["dtype"] != DTYPE_F32 or tensors[port]["storage_bytes"] != 4 * hidden * count:
                 raise InvalidInput("FFN input/output row counts must match exact F32 hidden geometry")
-    weights, weight_children, logical_children, weight_partitions = {}, {}, {}, []
+    weights, weight_children, logical_children, weight_partitions, weight_views = {}, {}, {}, [], []
     for source_id, (stage, logical_parent) in matrix_sources.items():
         source = tensors[source_id]
         expected_shape = (spec.intermediate_size, hidden, 1, 1) if stage == "down" else (hidden, spec.intermediate_size, 1, 1)
@@ -282,6 +316,14 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
         expected_strides = (4, 4 * expected_shape[0], expected_bytes, expected_bytes)
         if source["dtype"] != DTYPE_F32 or tuple(source["ne"]) != expected_shape or source["storage_bytes"] != expected_bytes or tuple(source["nb"]) != expected_strides:
             raise Unsupported(f"FFN source {source_id!r} must be the exact complete contiguous F32 {stage} matrix")
+        if shared_parent:
+            for shard in spec.shards:
+                weight_views.append(dict(source_tensor_id=source_id, stage=stage, shard_id=shard.id,
+                    start=shard.start, end=shard.end,
+                    request_ids=list(consumer_requests), execution_spec_index=spec_index,
+                    slice_axis="input_rows" if stage == "down" else "output_columns",
+                    storage_bytes=0, allocation=False, copy_contract="complete_parent_tensor"))
+            continue
         weight_children[source_id] = []
         for shard in spec.shards:
             width = shard.end - shard.start
@@ -302,7 +344,7 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
     removed_tensors = {tid for oid in removed_ops for tid in [old_operations[oid]["output"], *old_operations[oid].get("extra_outputs", [])]} - kept_outputs
     if any(set(op["inputs"]) & removed_tensors for oid, op in old_operations.items() if oid not in removed_ops):
         raise Unsupported("cannot replace FFN internal values that have external consumers")
-    for tid in [*removed_tensors, *matrix_sources]:
+    for tid in [*removed_tensors, *(() if shared_parent else matrix_sources)]:
         del tensors[tid]
     tensors.update(weights)
     compute = {oid: deepcopy(value) for oid, value in compiled.scenario_document["costs"]["compute"].items() if oid not in removed_ops}
@@ -341,6 +383,10 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
         stages[oid] = dict(region_id=region_id, parent_expert_region=region["parent_region"] if not dense else None,
                            execution_stage=stage, execution_variant="ffn_partitioned", expert_id=region["expert_id"],
                            shard_id=None if shard is None else shard.id, input_count=len(inputs))
+        if shared_parent and stage in {"ffn_gate", "ffn_up", "ffn_down"}:
+            stages[oid].update(weight_storage_contract=spec.weight_storage_contract,
+                parent_weight_id=inputs[0], intermediate_range=[shard.start, shard.end],
+                slice_axis="input_rows" if stage == "ffn_down" else "output_columns")
         if template.work_items:
             scopes[output] = [dict(request_id=req, absolute_position=pos) for req, pos in template.work_items]
         return oid
@@ -360,14 +406,15 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
             values = {}
             for stage in ("gate", "up"):
                 values[stage] = tensor_id(compiled.layer.id, template.request_id, prefix + "." + shard.id + "." + stage)
-                leaf = f"{region['weights'][stage]}:ffn:{shard.id}"
+                leaf = region['weights'][stage] if shared_parent else f"{region['weights'][stage]}:ffn:{shard.id}"
                 add(region, "ffn_" + stage, prefix + "." + shard.id + "." + stage, [leaf, source],
                     values[stage], width, shard.device, width, shard)
             activated = tensor_id(compiled.layer.id, template.request_id, prefix + "." + shard.id + ".swiglu")
             add(region, "ffn_swiglu", prefix + "." + shard.id + ".swiglu", [values["gate"], values["up"]],
                 activated, width, shard.device, width, shard)
             partial = tensor_id(compiled.layer.id, template.request_id, prefix + "." + shard.id + ".partial")
-            add(region, "ffn_down", prefix + "." + shard.id + ".down", [f"{region['weights']['down']}:ffn:{shard.id}", activated],
+            down_weight = region['weights']['down'] if shared_parent else f"{region['weights']['down']}:ffn:{shard.id}"
+            add(region, "ffn_down", prefix + "." + shard.id + ".down", [down_weight, activated],
                 partial, hidden, shard.device, width, shard)
             partials.append(partial)
         summed = tensor_id(compiled.layer.id, template.request_id, prefix + ".sum") if dense else region["output_tensor"]
@@ -383,6 +430,9 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
             operation_ids=new_ids, partial_output_tensors=partials,
             merge_input_count=spec.merge_input_count,
             residual_add_count=1 if dense else 0, norm_count=1 if dense else 0))
+        if shared_parent:
+            result_regions[-1].update(execution_spec_index=spec_index,
+                weight_storage_contract=spec.weight_storage_contract)
     # Insert each replacement at its source region's first operation, preserving
     # a topological serial replay order while permitting runtime overlap.
     by_first = {region["old_ids"][0]: result for region, result in zip(regions, result_regions)}
@@ -398,7 +448,8 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
     workload = deepcopy(compiled.workload_document)
     workload["tensors"] = list(tensors.values())
     workload["operations"] = [operation_map[task.operation_id] for task in task_order]
-    workload["origin"]["sample"] += "; materialized F32 intermediate-axis FFN partitions"
+    workload["origin"]["sample"] += ("; shared-parent F32 intermediate-axis FFN slice views" if shared_parent else
+                                      "; materialized F32 intermediate-axis FFN partitions")
     scenario_doc = deepcopy(compiled.scenario_document)
     for parent, children in weight_children.items():
         if parent in workload["outputs"]:
@@ -430,13 +481,14 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
             dependencies.update({child: deepcopy(gate) for child in children})
     scenario_doc["mapspace"]["transfer_dependencies"] = {key: value for key, value in dependencies.items() if key in tensors}
     _, scenario_doc["costs"]["transfer"] = expand_transfer_costs(table, {tid: item["storage_bytes"] for tid, item in tensors.items()},
-                                                                   scenario_doc["mapspace"]["allowed_transfers"])
+                                                                   scenario_doc["mapspace"]["allowed_transfers"],
+                                                                   shared_memory=compiled.scenario.architecture.memory_mode == "shared")
     if row:
         row["operation_stages"] = {oid: value for oid, value in row.get("operation_stages", {}).items() if oid not in removed_ops}
         row["operation_stages"].update(stages)
         row["tensor_row_scopes"] = {tid: value for tid, value in row.get("tensor_row_scopes", {}).items() if tid not in removed_tensors}
         row["tensor_row_scopes"].update(scopes)
-    boundary["ffn_execution"] = dict(format_version=FORMAT_VERSION, execution_spec=ffn_execution_document(spec),
+    current_boundary = dict(format_version=FORMAT_VERSION, execution_spec=ffn_execution_document(spec),
         operation_stages=stages, tensor_row_scopes=scopes, regions=result_regions,
         weight_children={**weight_children, **logical_children}, weight_partitions=weight_partitions,
         weight_storage_contract=spec.weight_storage_contract,
@@ -447,6 +499,22 @@ def transform_ffn_execution(compiled: CompiledInvocation, execution_spec: FFNExe
         numeric_execution_verified=False, numeric_weights_loaded=False, measured_costs_supported=False,
         cost_semantics="independent exact declared synthetic stage prices scoped to outer FFN spec including merge_input_count; no macro splitting",
         partition_materialization="initial_representation_only; no free runtime slicing or copies")
+    if shared_parent:
+        current_boundary.update(weight_views=weight_views,
+            execution_specs=[ffn_execution_document(spec)],
+            partition_materialization="shared_parent_slice_views; no allocation or repacking; COPY charges complete parent bytes")
+        if prior:
+            current_boundary["execution_spec"] = deepcopy(prior["execution_spec"])
+            current_boundary["execution_specs"] = deepcopy(prior.get("execution_specs", [prior["execution_spec"]])) + [ffn_execution_document(spec)]
+            for field in ("operation_stages", "tensor_row_scopes", "weight_children"):
+                current_boundary[field] = {**deepcopy(prior.get(field, {})), **current_boundary[field]}
+            for field in ("regions", "weight_partitions", "weight_views"):
+                current_boundary[field] = deepcopy(prior.get(field, [])) + current_boundary[field]
+            merge_counts = {region["merge_input_count"] for region in current_boundary["regions"]}
+            current_boundary["merge_input_count"] = next(iter(merge_counts)) if len(merge_counts) == 1 else None
+            current_boundary["merge_cost_contract"] = dict(scope="each_region_execution_spec",
+                input_count=current_boundary["merge_input_count"], changed_input_count_requires_new_exact_cost_declaration=True)
+    boundary["ffn_execution"] = current_boundary
     boundary.update(physical_macro_contract=False, original_model_kernel_reproduced=False)
     scenario = build_scenario(workload, scenario_doc, where="ffn_execution")
     return replace(compiled, workload_document=workload, scenario_document=scenario_doc, scenario=scenario,

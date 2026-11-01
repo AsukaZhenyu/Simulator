@@ -13,6 +13,7 @@ from tensor_mapping.python_frontend import ModelPlan, Scheduling
 
 from .analytical import AnalyticalCosts
 from .config import Hardware, Model, Workload
+from .request_flow import RequestFlow
 
 
 def _empty_directory(path):
@@ -35,10 +36,11 @@ class Simulator:
                  cost_model: AnalyticalCosts):
         for value, expected, label in (
             (model, Model, "model"), (hardware, Hardware, "hardware"),
-            (workload, Workload, "workload"),
+            (workload, (Workload, RequestFlow), "workload"),
         ):
             if not isinstance(value, expected):
-                raise InvalidInput(f"{label} must be {expected.__name__}")
+                names=" or ".join(cls.__name__ for cls in expected) if isinstance(expected,tuple) else expected.__name__
+                raise InvalidInput(f"{label} must be {names}")
         if not isinstance(cost_model, AnalyticalCosts):
             raise Unsupported("choose AnalyticalCosts explicitly; for measured/exact costs use ModelPlan")
         self.model, self.hardware = model, hardware
@@ -46,10 +48,15 @@ class Simulator:
 
     def compile(self, *, scheduling: Scheduling, configure=None, directory=None,
                 environment_events=(), max_decisions=100000,
-                visibility_mode="data_dependencies"):
+                visibility_mode="data_dependencies", services_file=None):
         """Generate exact inputs and freeze a strategy through the real compiler.
 
-        configure(plan) may call module/place/transform/prepare/runtime_policy.
+        configure(plan) may call module/place/transform/prepare/transfer/inspect.
+        services_file optionally supplies an explicit shared-link/engine service
+        contract. Its rates and payload-only boundary must be chosen deliberately;
+        no measured contract is selected from the local machine automatically.
+        Relative service paths resolve from the caller's working directory.
+        Preserve that external file when retaining a project/checkpoint.
         A persistent directory is recommended when saving checkpoints. With no
         directory, the returned object owns its temporary input files until
         close(). No generated input depends on repository fixtures/profiles.
@@ -65,6 +72,7 @@ class Simulator:
             raise InvalidInput("environment_events must be a tuple of EnvironmentEvent")
         if scheduling.reconfiguration is not None:
             raise Unsupported("resource reclaim control needs explicit control costs; use ModelPlan with environment-trace-0.2")
+        service_source = Path(services_file).resolve() if services_file is not None else None
         temporary = tempfile.TemporaryDirectory(prefix="llm-simulator-") if directory is None else None
         root = Path(temporary.name) if temporary else _empty_directory(directory)
         try:
@@ -77,6 +85,7 @@ class Simulator:
             plan = ModelPlan(id="library-simulation", model_kind=inputs["model_kind"],
                 model_file=inputs["model_file"], environment_file=inputs["environment_file"],
                 base_dir=root, scheduling=scheduling, max_decisions=max_decisions,
+                services_file=service_source,
                 visibility_mode=visibility_mode)
             if configure is not None:
                 configure(plan)
@@ -165,7 +174,7 @@ class SimulationResult:
     def summary(self):
         evaluation, run = self.evaluation, self.raw[0]
         metadata = self.compiled.metadata
-        return dict(status=self.status, success=self.success,
+        result = dict(status=self.status, success=self.success,
                     termination_reason=run.termination_reason,
                     compilation_error=run.compilation_error,
                     error_code=evaluation.error_code,
@@ -182,6 +191,12 @@ class SimulationResult:
                     macro_contract=metadata.get("macro_contract"),
                     numerical_llm_execution=False,
                     input_directory=str(self.compiled.directory.resolve()))
+        if metadata.get("hardware", {}).get("memory_mode") == "shared":
+            result.update(memory_mode="shared", peak_shared_bytes=evaluation.peak_shared_bytes,
+                physical_memory_peaks_bytes={"shared": evaluation.peak_shared_bytes},
+                logical_memory_views="peak_dram_bytes and peak_vram_bytes alias one physical pool; do not add",
+                shared_visibility_count=sum(event.kind == "SHARE" for event in evaluation.events))
+        return result
 
     def checkpoint(self):
         """Same-source replay; keep the project and use this compiled object."""

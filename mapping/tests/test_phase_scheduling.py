@@ -162,6 +162,37 @@ class PhasePlacementTests(unittest.TestCase):
 
 
 class PreparationRuntimeTests(unittest.TestCase):
+    def test_spare_orders_visible_consumers_before_lexical_tensor_names(self):
+        from dataclasses import replace
+        from tensor_mapping.python_frontend import _PlanPolicy
+        from tensor_mapping.composition_policy import parse_composition_policy
+        from llm_infer_model.m2.causal import PublicOperation, DevicePrice
+        from .test_composition_policy import inline_policy, observe
+        from .test_policy_executor import small_observation, tensor
+        document=inline_policy(cache="lru",unit="tensor",budget=32)
+        document["placements"]["dense_ffn"]="gpu"
+        policy=_PlanPolicy(SimpleNamespace(composition=parse_composition_policy(document),history=()),
+            (),None,(DataPreparation(tensor_ids=("w:a_later","w:z_first"),trigger="spare"),))
+        prices=(DevicePrice("gpu",10,0,0),)
+        operations=(PublicOperation("first","dense_ffn","NOT_STARTED",("w:z_first","x"),("y",),prices),
+                    PublicOperation("later","dense_ffn","NOT_STARTED",("w:a_later","x"),("z",),prices))
+        observed=observe(replace(small_observation(free_vram=4096),operations=operations,experts=(),
+            tensors=(tensor("x",16,("vram",)),tensor("w:z_first",32,("dram",),"weight"),
+                     tensor("w:a_later",32,("dram",),"weight"),tensor("y",16),tensor("z",16))),
+            weight_catalogue=(("w:a_later","L0","late",None),("w:z_first","L0","early",None)))
+        policy._public_catalogue(observed)
+        first=policy._preparation_step(observed,"spare")
+        self.assertEqual((first.kind,first.target_id),("COPY","w:z_first"))
+        loaded=replace(observed,tensors=tuple(replace(t,copies=tuple(
+            (loc,"READY" if loc=="vram" else status) for loc,status in t.copies))
+            if t.id=="w:z_first" else t for t in observed.tensors))
+        # Preload remains enabled, but cannot evict the first stage merely to
+        # speculate on a later stage when only one weight fits.
+        self.assertIsNone(policy._preparation_step(loaded,"spare"))
+        finished=replace(observed,operations=(replace(operations[0],status="DONE"),operations[1]))
+        later=policy._preparation_step(finished,"spare")
+        self.assertEqual((later.kind,later.target_id),("COPY","w:a_later"))
+
     def test_startup_rejects_custom_control_override_explicitly(self):
         plan = dense_plan(device="cpu")
         plan.prepare(DataPreparation(layer_id="denseL1", trigger="startup", max_count=1))

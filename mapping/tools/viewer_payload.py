@@ -211,6 +211,8 @@ def m1_block(scenario: Scenario) -> dict[str, Any] | None:
     mapspace = scenario.mapspace
 
     labels = {LOC_DRAM: "DRAM", LOC_VRAM: "VRAM", LOC_SSD: "SSD"}
+    if architecture.memory_mode == "shared":
+        labels.update(dram="Shared memory / CPU view", vram="Shared memory / GPU view")
     devices = {LOC_DRAM: DEVICE_CPU, LOC_VRAM: DEVICE_GPU, LOC_SSD: None}
     locations: list[dict[str, Any]] = []
     for domain in GOAL_LOCATIONS_M1:
@@ -226,6 +228,8 @@ def m1_block(scenario: Scenario) -> dict[str, Any] | None:
                 "device": devices[domain],
                 # 淘汰只在**有容量**的域上有意义：SSD 没有容量，所以没有可淘汰的。
                 "can_evict": architecture.capacity_of(domain) is not None,
+                **({"physical_pool": architecture.pool_of(domain)}
+                   if architecture.memory_mode == "shared" else {}),
             }
         )
 
@@ -259,6 +263,12 @@ def m1_block(scenario: Scenario) -> dict[str, Any] | None:
     ]
 
     return {
+        **(dict(memory_mode="shared", physical_pools={"shared": dict(
+            capacity_bytes=architecture.shared_capacity_bytes,
+            reserved_bytes=architecture.shared_runtime_reserved_bytes,
+            alignment_bytes=architecture.shared_alignment_bytes)},
+            allocation_semantics="DRAM/VRAM are views; shared references do not duplicate physical allocation")
+            if architecture.memory_mode == "shared" else {}),
         "locations": locations,
         "resources": resources,
         "routes": routes,
@@ -507,6 +517,10 @@ class _TreeRecorder:
             node["used_dram_bytes"] = used_bytes(self.scenario, state, LOC_DRAM)
             node["dram_status"] = dict(state.dram_status)
             node["ssd_status"] = dict(state.ssd_status)
+            if self.scenario.architecture.memory_mode == "shared":
+                node["used_shared_bytes"] = used_bytes(self.scenario, state, "shared")
+                node["storage_allocations"] = [dict(tensor_id=t, location=p, allocation_id=a)
+                    for t, p, a in state.storage_allocations]
         self.nodes.append(node)
         self.states.append(state)
         self.actions.append(action)
@@ -746,6 +760,8 @@ def explore(
         solution["d2h_bytes"] = evaluation.d2h_bytes if evaluation else None
         solution["ssd_read_bytes"] = evaluation.ssd_read_bytes if evaluation else None
         solution["ssd_write_bytes"] = evaluation.ssd_write_bytes if evaluation else None
+        if scenario.architecture.memory_mode == "shared":
+            solution["peak_shared_bytes"] = evaluation.peak_shared_bytes if evaluation else None
 
     block: dict[str, Any] = {
         "verdict": verdict,
@@ -1485,6 +1501,10 @@ def params_echo(scenario: Scenario, result: SearchResult) -> dict[str, Any]:
         architecture = scenario.architecture
         return {
             **common,
+            **(dict(memory_mode="shared", shared_capacity_bytes=architecture.shared_capacity_bytes,
+                shared_runtime_reserved_bytes=architecture.shared_runtime_reserved_bytes,
+                shared_alignment_bytes=architecture.shared_alignment_bytes)
+                if architecture.memory_mode == "shared" else {}),
             "dram_capacity_bytes": architecture.dram_capacity_bytes,
             "dram_runtime_reserved_bytes": architecture.dram_runtime_reserved_bytes,
             "vram_runtime_reserved_bytes": architecture.reserved_of(LOC_VRAM),

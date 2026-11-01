@@ -41,7 +41,8 @@ class UnifiedPolicy(DeclarativePolicy):
         self._transport_records = []
 
     def _placement(self, operation):
-        if operation.kind == "state_update" and operation.execution_stage == "trace_supplied_next_token":
+        if operation.kind == "state_update" and operation.execution_stage in {
+                "trace_supplied_next_token","request_input_materialization","prefill_decode_handoff"}:
             if len(operation.prices) != 1:
                 raise Unsupported("trace input gates require one explicitly bound device")
             return operation.prices[0].device
@@ -58,6 +59,9 @@ class UnifiedPolicy(DeclarativePolicy):
                 raise Unsupported("engine bindings require a services-enabled model")
             prices = []
             for price in tensor.transfers:
+                if price.timing_scope == "shared_access_only":
+                    prices.append(price)
+                    continue
                 if price.engine_durations_ns:
                     duration = dict(price.engine_durations_ns).get(engine)
                     if duration is None:
@@ -87,6 +91,8 @@ class UnifiedPolicy(DeclarativePolicy):
 
     @staticmethod
     def _resource_available(observation, resource, compute=False):
+        if resource == "shared_view":
+            return True
         from llm_infer_model.m2.causal import compute_service_available
         if resource in ("cpu_compute", "gpu_compute") and not compute_service_available(
                 observation, "cpu" if resource == "cpu_compute" else "gpu"):
@@ -114,8 +120,9 @@ class UnifiedPolicy(DeclarativePolicy):
     def observe_final(self, observation):
         super().observe_final(self._fragment_catalogue(observation))
 
-    def _eviction(self, observation, tensors, location, protected):
-        return super()._eviction(self._fragment_catalogue(observation), tensors, location, protected)
+    def _eviction(self, observation, tensors, location, protected, *, require_physical_release=False):
+        return super()._eviction(self._fragment_catalogue(observation), tensors, location, protected,
+                                 require_physical_release=require_physical_release)
 
     def _prefetch(self, observation, tensors):
         if not self.policy.prefetch_enabled:

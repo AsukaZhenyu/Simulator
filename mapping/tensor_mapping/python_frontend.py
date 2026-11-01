@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from typing import Mapping
 
-from llm_infer_model.tensor.spec import InvalidInput, Unsupported, ROLE_WEIGHT, COPY_READY
+from llm_infer_model.tensor.spec import InvalidInput, Unsupported, ROLE_WEIGHT, COPY_READY, OP_NOT_STARTED
 
 from .causal import Decision, ControlDecision, compile_command
 from .composition_ir import compile_composition_document
@@ -24,9 +24,11 @@ from .composition_policy import CompositionPolicy
 from .policy_ir import OPERATION_KINDS, EXPERT_COMPUTE_KINDS
 from .reconfiguration import ReconfigurationSpec
 from .phase_scheduling import DataPreparation
+from .request_scheduling import RequestPipeline, PhaseHandoff
 
 
-FORMAT_VERSION = "hierarchical-strategy-0.2"
+FORMAT_VERSION = "hierarchical-strategy-0.5"
+DECLARATION_VERSION = "strategy-declaration-0.1"
 
 
 def _json(value):
@@ -132,13 +134,19 @@ class Scheduling:
     transport: Transport = field(default_factory=Transport)
     reconfiguration: ReconfigurationSpec | None = None
     default_device: str | None = None
+    expert_order: str = "graph_order"
+    request_pipeline: RequestPipeline | None = None
+    phase_handoffs: tuple[PhaseHandoff, ...] = ()
 
     def sections(self):
         if not isinstance(self.cache, Cache) or not isinstance(self.prefetch, Prefetch) or not isinstance(self.transport, Transport):
             raise InvalidInput("Scheduling requires Cache, Prefetch and Transport objects")
+        if not isinstance(self.phase_handoffs,tuple) or any(not isinstance(row,PhaseHandoff) for row in self.phase_handoffs):
+            raise InvalidInput("Scheduling.phase_handoffs must be an immutable tuple of PhaseHandoff")
         result = dict(policy=dict(placements=dict(self.placements),
                                   request_placements=deepcopy(dict(self.request_placements)),
-                                  experts=dict(device_rule=self.expert_rule, selection_unit="expert_region"),
+                                  experts=dict(device_rule=self.expert_rule, selection_unit="expert_region",
+                                               order_rule=self.expert_order),
                                   release=dict(rule=self.release)),
                       cache=asdict(self.cache), prefetch=self.prefetch.document(),
                       transport=self.transport.document())
@@ -233,6 +241,8 @@ def _rebase_execution_sources(document, directory):
     document=deepcopy(document)
     if document.get("format_version")=="execution-pipeline-0.1":
         document["transforms"]=[_rebase_execution_sources(row,directory) for row in document["transforms"]]
+    elif document.get("format_version")=="execution-region-0.1":
+        document["transform"]=_rebase_execution_sources(document["transform"],directory)
     elif document.get("format_version")=="dense-attention-execution-0.1":
         document["invocation_files"]=[str((Path(directory)/path).resolve()) for path in document["invocation_files"]]
     return document
@@ -261,6 +271,10 @@ class ModelPlan:
         if scheduling.default_device is not None and scheduling.default_device not in {"cpu","gpu"}:
             raise Unsupported("default_device must be explicit cpu, gpu or None")
         self._default_device=scheduling.default_device
+        if scheduling.request_pipeline is not None:
+            self.pipeline(scheduling.request_pipeline)
+        for handoff in scheduling.phase_handoffs:
+            self.handoff(handoff)
 
     def _initialize(self, document, base_dir, visibility_mode):
         if visibility_mode not in {"scope_barriers", "data_dependencies"}:
@@ -275,7 +289,32 @@ class ModelPlan:
         self._source_snapshots = {}
         self._runtime_spec = None
         self._preparations = []
+        self._scoped_transport = []
         self._default_device = None
+        self._request_pipeline = None
+        self._phase_handoffs = []
+
+    def pipeline(self, spec):
+        """Choose public ready-work ordering; never synthesize a fused batch."""
+        if self._stack:
+            raise InvalidInput("request pipeline is one global rule; declare it outside module scopes")
+        if not isinstance(spec,RequestPipeline):
+            raise InvalidInput("pipeline requires RequestPipeline")
+        spec.__post_init__()
+        if self._request_pipeline is not None:
+            raise InvalidInput("request pipeline is already declared")
+        self._request_pipeline=spec
+        return self
+
+    def handoff(self, spec):
+        """Require a charged all-layer KV join before a request starts Decode."""
+        if self._stack:
+            raise InvalidInput("declare handoff request_ids explicitly outside module scopes")
+        if not isinstance(spec,PhaseHandoff):
+            raise InvalidInput("handoff requires PhaseHandoff")
+        spec.__post_init__()
+        self._phase_handoffs.append(spec)
+        return self
 
     @classmethod
     def from_strategy(cls, path, *, visibility_mode="scope_barriers"):
@@ -326,6 +365,11 @@ class ModelPlan:
     def refine(self, invocation_id, spec, *, replace_existing=False):
         """Bind an existing exact Attention/MoE refinement, never guessed costs."""
         _identity(invocation_id, "refinement invocation")
+        request = self._require_invocation_scope(invocation_id, "refine")
+        if request is not None:
+            from llm_infer_model.m2.execution_pipeline import parse_transform, transform_document
+            raw = deepcopy(spec) if isinstance(spec, dict) else transform_document(spec)
+            spec = transform_document(self._scope_transform(parse_transform(raw), request))
         rows = self._document["execution"]
         previous = [row for row in rows if row["scope_id"] == invocation_id]
         if previous and not replace_existing:
@@ -349,8 +393,10 @@ class ModelPlan:
         """Append a semantic pass, retaining prior inline/model transformations."""
         from llm_infer_model.m2.execution_pipeline import parse_transform, transform_document, ExecutionPipelineSpec
         _identity(invocation_id,"transform invocation")
+        request = self._require_invocation_scope(invocation_id, "transform")
         raw=deepcopy(spec) if isinstance(spec,dict) else transform_document(spec)
         normalized=parse_transform(raw)
+        normalized=self._scope_transform(normalized,request)
         raw=transform_document(normalized)
         rows=self._document["execution"]
         existing=next((row for row in rows if row["scope_id"]==invocation_id),None)
@@ -360,7 +406,9 @@ class ModelPlan:
                       else [existing["spec"]])
         elif self._document["model"]["kind"]=="global_m2":
             model,model_path=self._read_bound_source(self._document["model"]["file"])
-            entry=next((entry for round_ in model["rounds"] for entry in round_["invocations"]
+            steps=(model["rounds"] if model.get("format_version")=="global-execution-0.1" else
+                   [step for request in model.get("requests",()) for step in request["steps"]])
+            entry=next((entry for round_ in steps for entry in round_["invocations"]
                         if entry["id"]==invocation_id),None)
             if entry is not None and entry["execution_file"] is not None:
                 inherited,file=self._read_bound_source(model_path.parent/entry["execution_file"])
@@ -374,16 +422,147 @@ class ModelPlan:
         return self
 
     def transform_file(self, invocation_id, path):
+        self._require_invocation_scope(invocation_id, "transform_file")
         raw,file=self._read_bound_source(path)
         return self.transform(invocation_id,_rebase_execution_sources(raw,file.parent))
 
-    def prepare(self, rule):
+    def _require_invocation_scope(self, invocation_id, action):
+        """Return an explicit request region; reject other unbound selectors."""
+        if not self._stack:
+            return
+        selector = self._stack[-1].selector
+        if selector.invocation_id not in (None, invocation_id):
+            raise InvalidInput(f"{action} invocation contradicts the enclosing module selector")
+        narrower = [key for key, value in asdict(selector).items()
+                    if key not in {"invocation_id", "request_id"} and value is not None]
+        if narrower:
+            raise Unsupported(f"{action} targets a whole invocation or explicit request region; module selectors "
+                              f"{', '.join(narrower)} are not implemented as region targets. "
+                              "Bind by invocation and optional request identity.")
+        return selector.request_id
+
+    def _scope_transform(self, spec, request):
+        if request is None:
+            return spec
+        from llm_infer_model.m2.execution_pipeline import (
+            ExecutionPipelineSpec, ExecutionRegionSpec, parse_transform, transform_document,
+        )
+        if isinstance(spec, ExecutionPipelineSpec):
+            result = ExecutionPipelineSpec(tuple(self._scope_transform(row, request) for row in spec.transforms))
+        elif isinstance(spec, ExecutionRegionSpec):
+            if request not in spec.request_ids:
+                raise InvalidInput("execution region contradicts the enclosing request selector")
+            result = ExecutionRegionSpec((request,), spec.transform)
+        else:
+            result = ExecutionRegionSpec((request,), spec)
+        return parse_transform(transform_document(result))
+
+    def _weight_scope(self, action):
+        """Return static physical ownership, never infer it from consumers."""
+        current = self._stack[-1] if self._stack else ModuleIR((), Select())
+        unsupported = [key for key, value in asdict(current.selector).items()
+                       if key != "layer_id" and value is not None]
+        if unsupported:
+            raise Unsupported(f"{action} selects physical weights; module selectors "
+                              f"{', '.join(unsupported)} do not define static weight ownership. "
+                              "Use a layer-only module and explicit tensor/stage/expert selectors.")
+        return current
+
+    def transfer(self, *, engine, role="weight", src="dram", dst="vram",
+                 select=None, priority=0):
+        """Choose a weight transfer engine under one shared storage ledger.
+
+        Module layer selectors are inherited. Other module selectors are
+        rejected instead of guessing ownership from a request or an invocation.
+        Scoped rules override the global engine rule; priority then selector
+        specificity resolves their own overlaps, with ambiguity rejected.
+        """
+        from .storage_rules import ScopedTransportRule, TensorSelect
+        current = self._weight_scope("transfer")
+        selected = TensorSelect() if select is None else select
+        if not isinstance(selected, TensorSelect):
+            raise InvalidInput("transfer.select must be TensorSelect")
+        selector = TensorSelect(layer_id=current.selector.layer_id).intersect(selected)
+        self._scoped_transport.append(ScopedTransportRule(
+            role=role, src=src, dst=dst, engine=engine, selector=selector,
+            priority=priority, module_path=current.path))
+        return self
+
+    def prepare(self, rule=None, **options):
+        current = self._weight_scope("prepare")
+        if rule is not None and options:
+            raise InvalidInput("prepare accepts a DataPreparation or keyword fields, not both")
+        if rule is None:
+            fields = dict(options)
+            if fields.get("layer_id") is None:
+                fields["layer_id"] = current.selector.layer_id
+            try:
+                rule = DataPreparation(**fields)
+            except TypeError as error:
+                raise InvalidInput(f"invalid preparation fields: {error}") from error
         if not isinstance(rule,DataPreparation):
             raise InvalidInput("prepare requires a DataPreparation rule")
         # Revalidation also catches directly constructed malformed tuples.
         rule=DataPreparation.from_document(rule.document())
+        rule = rule.with_scope(layer_id=current.selector.layer_id)
         self._preparations.append(rule)
         return self
+
+    def declaration_document(self):
+        """Snapshot declared choices without compiling or filling any price.
+
+        Model/profile references remain explicit legacy inputs. This document
+        cannot be executed and is not a proof of lowering or runtime legality.
+        """
+        if self._stack:
+            raise InvalidInput("close all module contexts before inspecting the plan")
+        return dict(format_version=DECLARATION_VERSION, executable=False,
+                    backend=deepcopy(self._document),
+                    visibility_mode=self._visibility_mode,
+                    modules=[asdict(row) for row in self._modules],
+                    placements=[asdict(row) for row in self._bindings],
+                    data_preparations=[rule.document() for rule in self._preparations],
+                    scoped_transport=[rule.document() for rule in self._scoped_transport],
+                    default_device=self._default_device,
+                    runtime_policy=self._runtime_spec.document() if self._runtime_spec else None,
+                    request_pipeline=self._request_pipeline.document() if self._request_pipeline else None,
+                    phase_handoffs=[rule.document() for rule in self._phase_handoffs],
+                    contracts=dict(resource_ledger="single_modeling_runtime",
+                                   module_boundary="transparent_selector_scope",
+                                   transform_target="invocation_or_explicit_request_region",
+                                   physical_weight_scope="static_owner_labels_only"))
+
+    def inspect(self):
+        """Check declarations without reading costs or constructing a runtime."""
+        from .strategy_inspection import inspect_strategy_document
+        self.declaration_document()  # Also rejects an unfinished module context.
+        for source, digest in self._source_snapshots.items():
+            if hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+                raise InvalidInput(f"Python frontend source changed since import/binding: {source}")
+        return inspect_strategy_document(self._document, base_dir=self._base_dir,
+            placements=tuple(self._bindings), modules=tuple(self._modules),
+            scoped_transport=tuple(self._scoped_transport),
+            default_device=self._default_device, visibility_mode=self._visibility_mode)
+
+    def explain(self):
+        """Return a readable declaration report, never an executable plan."""
+        report = self.inspect().render_text()
+        lines = [report, "", "Declared execution bindings:"]
+        for binding in self._bindings:
+            labels = ", ".join(f"{key}={value}" for key, value in asdict(binding.selector).items()
+                               if value is not None)
+            lines.append(f"  {labels} -> {binding.device} (priority {binding.priority})")
+        if not self._bindings:
+            lines.append("  use the explicitly supplied global placement table")
+        for rule in self._scoped_transport:
+            labels = ", ".join(f"{key}={value}" for key, value in asdict(rule.selector).items()
+                               if value is not None) or "all weights"
+            lines.append(f"Weight transfer: {labels}, {rule.src}->{rule.dst}, "
+                         f"engine={rule.engine}, priority={rule.priority}")
+        for rule in self._preparations:
+            lines.append(f"Weight preparation: {rule.document()}")
+        lines.append("One shared cache budget and one modeling resource ledger.")
+        return "\n".join(lines)
 
     def runtime_policy(self, factory, *, parameters=None, source_files=(),
                        allow_device_override=False, allow_transport_override=False,
@@ -419,6 +598,8 @@ class ModelPlan:
         compiled = compile_composition_document(self._document, base_dir=self._base_dir,
             source_files=tuple(sorted(sources)), visibility_mode=self._visibility_mode,
             derive_placements=True, default_device=self._default_device,
+            scoped_transport=tuple(self._scoped_transport),
+            request_pipeline=self._request_pipeline,phase_handoffs=tuple(self._phase_handoffs),
             placement_resolver=lambda operation: (rule.device if (rule:=_choose_rule(self._bindings,operation)) else None))
         for source in compiled.sources:
             expected = self._source_snapshots.get(Path(source["path"]))
@@ -458,11 +639,16 @@ class ModelPlan:
                   visibility_mode=self._visibility_mode,
                   modules=[asdict(row) for row in self._modules],
                   placements=[asdict(row) for row in self._bindings],
+                  scoped_transport=[rule.document() for rule in self._scoped_transport],
                   runtime_policy=self._runtime_spec.document() if self._runtime_spec else None,
                   data_preparations=[rule.document() for rule in self._preparations],
                   default_device=self._default_device,
+                  request_pipeline=self._request_pipeline.document() if self._request_pipeline else None,
+                  phase_handoffs=[rule.document() for rule in self._phase_handoffs],
                   contracts=dict(module_boundary="transparent_selector_scope",
                                  resource_ledger="single_modeling_runtime",
+                                 physical_weight_scope="static_owner_labels_only",
+                                 transform_target="invocation_or_explicit_request_region",
                                  python_control="construction_or_causal_runtime_callback",
                                  cross_round="trace_gate_preserved", moe_revelation="scope_router_barrier_preserved"))
         frozen = _json(ir)
@@ -607,7 +793,22 @@ class _PlanPolicy(CompositionPolicy):
         pending=False
         for index,rule in enumerate(self._preparations):
             if rule.trigger!=trigger:continue
-            for tid in self._preparation_targets[index]:
+            targets = self._preparation_targets[index]
+            if trigger == "spare":
+                # Lexical tensor order can preload a final projection before
+                # the first stage, consuming the only cache slot. Prefer the
+                # earliest visible consumer on this destination. Static future
+                # catalogue targets remain eligible after visible consumers;
+                # no private future router information is inspected.
+                device = "gpu" if rule.destination == "vram" else "cpu"
+                first_use = {}
+                for position, operation in enumerate(observation.operations):
+                    if operation.status != OP_NOT_STARTED or self._placement(operation) != device:
+                        continue
+                    for tid in operation.inputs:
+                        first_use.setdefault(tid, position)
+                targets = sorted(targets, key=lambda tid: (first_use.get(tid, len(observation.operations)), tid))
+            for tid in targets:
                 if (index,tid) in self._prepared:continue
                 pending=True
                 tensor=tensors[tid]

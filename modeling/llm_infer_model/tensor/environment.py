@@ -22,9 +22,10 @@ from .engine import (
     STATUS_INCOMPLETE_MAPPING, STATUS_INVALID_MAPPING, STATUS_VALID, State,
     StateSnapshot, _accumulate_transfer_bytes, _event_for, _snapshot,
     advance_elapsed, initial_state, is_goal, transition, used_bytes,
+    released_physical_bytes, has_independent_backup,
 )
 from .spec import (
-    COPY_ABSENT, COPY_READY, DOMAINS, LOC_DRAM, LOC_SSD, LOC_VRAM, OP_DONE,
+    COPY_ABSENT, COPY_READY, DOMAINS, LOC_DRAM, LOC_SSD, LOC_VRAM, LOC_SHARED, OP_DONE,
     RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE, ROLE_WEIGHT, Scenario, InvalidInput,
 )
 
@@ -54,8 +55,8 @@ class EnvironmentReclaimRequest:
         for field in ("t_notice_ns", "target_external_bytes", "deadline_ns"):
             if type(getattr(self, field)) is not int or getattr(self, field) < 0:
                 raise InvalidInput(f"reclaim.{field} must be a non-negative integer")
-        if self.domain != LOC_VRAM:
-            raise InvalidInput("reclaim supports only vram")
+        if self.domain not in (LOC_VRAM, LOC_SHARED):
+            raise InvalidInput("reclaim supports vram or an explicit shared physical pool")
         if self.deadline_ns < self.t_notice_ns:
             raise InvalidInput("reclaim deadline precedes notice")
 
@@ -139,9 +140,10 @@ class EnvironmentEvent:
     cpu_service_rate_denominator: int | None = None
     gpu_service_rate_numerator: int | None = None
     gpu_service_rate_denominator: int | None = None
+    shared_external_bytes: int | None = None
 
     def __post_init__(self) -> None:
-        for name in ("t_ns", "dram_external_bytes", "vram_external_bytes"):
+        for name in ("t_ns", "dram_external_bytes", "vram_external_bytes", "shared_external_bytes"):
             value = getattr(self, name)
             if value is None and name != "t_ns":
                 continue
@@ -160,7 +162,7 @@ class EnvironmentEvent:
                 raise InvalidInput(f"environment.{device}_service_rate requires non-negative integer numerator "
                                    "and positive integer denominator")
         if all(getattr(self, key) is None for key in
-               ("dram_external_bytes", "vram_external_bytes", "cpu_available",
+               ("dram_external_bytes", "vram_external_bytes", "shared_external_bytes", "cpu_available",
                 "cpu_service_rate_numerator", "gpu_service_rate_numerator")):
             raise InvalidInput("environment event must change at least one field")
 
@@ -174,6 +176,7 @@ class MemoryUsage:
     tensor_bytes: int
     workspace_bytes: int
     used_bytes: int
+    physical_pool: str | None = None
 
     @property
     def available_bytes(self) -> int | None:
@@ -223,6 +226,7 @@ class EnvironmentRecord:
     cpu_service_rate_denominator: int = 1
     gpu_service_rate_numerator: int = 1
     gpu_service_rate_denominator: int = 1
+    shared_external_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -298,12 +302,18 @@ class SimulationSession:
             raise InvalidInput("environment_events must contain EnvironmentEvent objects")
         if any(a.t_ns > b.t_ns for a, b in zip(queue, queue[1:])):
             raise InvalidInput("environment events must be ordered by t_ns")
+        for event in queue:
+            if scenario.architecture.is_shared:
+                if event.dram_external_bytes is not None or event.vram_external_bytes is not None:
+                    raise InvalidInput("shared memory requires shared_external_bytes, not duplicated DRAM/VRAM occupancy")
+            elif event.shared_external_bytes is not None:
+                raise InvalidInput("shared_external_bytes requires shared memory mode")
         group_fields: set[str] = set()
         group_time = None
         for event in queue:
             if event.t_ns != group_time:
                 group_time, group_fields = event.t_ns, set()
-            for field in ("dram_external_bytes", "vram_external_bytes", "cpu_available",
+            for field in ("dram_external_bytes", "vram_external_bytes", "shared_external_bytes", "cpu_available",
                           "cpu_service_rate_numerator", "gpu_service_rate_numerator"):
                 if getattr(event, field) is not None:
                     if field in group_fields:
@@ -312,6 +322,9 @@ class SimulationSession:
         requests = tuple(reclaim_requests)
         if any(not isinstance(request, EnvironmentReclaimRequest) for request in requests):
             raise InvalidInput("reclaim_requests must contain EnvironmentReclaimRequest objects")
+        expected_domain = LOC_SHARED if scenario.architecture.is_shared else LOC_VRAM
+        if any(request.domain != expected_domain for request in requests):
+            raise InvalidInput(f"this architecture requires reclaim domain {expected_domain!r}")
         if len({request.id for request in requests}) != len(requests):
             raise InvalidInput("reclaim request ids must be unique")
         if any(a.deadline_ns >= b.t_notice_ns for a, b in zip(requests, requests[1:])):
@@ -334,6 +347,7 @@ class SimulationSession:
         self._queue_index = 0
         self._visibility = visibility
         self._dram_external = self._vram_external = 0
+        self._shared_external = 0
         self._cpu_available = True
         self._compute_rates = {RESOURCE_CPU_COMPUTE: Fraction(1), RESOURCE_GPU_COMPUTE: Fraction(1)}
         self._compute_work: dict[tuple[str, str], Fraction] = {}
@@ -373,11 +387,23 @@ class SimulationSession:
                 and self._pending_reclaim is None and self._control_running is None)
 
     def _memory(self, state: State | None = None, *, dram: int | None = None,
-                vram: int | None = None) -> tuple[MemoryUsage, ...]:
+                vram: int | None = None, shared: int | None = None) -> tuple[MemoryUsage, ...]:
         state = self._state if state is None else state
         externals = {LOC_DRAM: self._dram_external if dram is None else dram,
                      LOC_VRAM: self._vram_external if vram is None else vram}
         result = []
+        if self._scenario.architecture.is_shared:
+            external = self._shared_external if shared is None else shared
+            reserve = self._scenario.architecture.reserved_of(LOC_SHARED)
+            # CPU and GPU workspaces are separate allocations even when their
+            # input views alias. The two compatibility rows describe ONE pool.
+            workspace = sum(self._scenario.workspace_alloc(task.target_id, task.device)
+                            for task in state.running if task.resource in
+                            (RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE))
+            baseline = used_bytes(self._scenario, state, LOC_SHARED)
+            return tuple(MemoryUsage(domain, self._scenario.architecture.capacity_of(LOC_SHARED),
+                reserve, external, baseline - reserve - workspace, workspace,
+                baseline + external, LOC_SHARED) for domain in DOMAINS)
         for domain in DOMAINS:
             reserve = self._scenario.architecture.reserved_of(domain)
             tensors = sum(self._scenario.size_alloc(tid, domain)
@@ -412,6 +438,7 @@ class SimulationSession:
         if self._queue_index >= len(self._queue) or self._queue[self._queue_index].t_ns != self._state.t:
             return
         dram, vram, cpu = self._dram_external, self._vram_external, self._cpu_available
+        shared = self._shared_external
         rates = dict(self._compute_rates)
         while self._queue_index < len(self._queue) and self._queue[self._queue_index].t_ns == self._state.t:
             event = self._queue[self._queue_index]
@@ -419,6 +446,8 @@ class SimulationSession:
                 dram = event.dram_external_bytes
             if event.vram_external_bytes is not None:
                 vram = event.vram_external_bytes
+            if event.shared_external_bytes is not None:
+                shared = event.shared_external_bytes
             if event.cpu_available is not None:
                 cpu = event.cpu_available
             for device, resource in (("cpu", RESOURCE_CPU_COMPUTE), ("gpu", RESOURCE_GPU_COMPUTE)):
@@ -426,18 +455,20 @@ class SimulationSession:
                 if numerator is not None:
                     rates[resource] = Fraction(numerator, getattr(event, f"{device}_service_rate_denominator"))
             self._queue_index += 1
-        memory = self._memory(dram=dram, vram=vram)
+        memory = self._memory(dram=dram, vram=vram, shared=shared)
         conflict = self._capacity_message(memory)
         self._environment_records.append(EnvironmentRecord(self._state.t, dram, vram, cpu,
             memory, conflict is None, rates[RESOURCE_CPU_COMPUTE].numerator,
             rates[RESOURCE_CPU_COMPUTE].denominator, rates[RESOURCE_GPU_COMPUTE].numerator,
-            rates[RESOURCE_GPU_COMPUTE].denominator))
+            rates[RESOURCE_GPU_COMPUTE].denominator,
+            shared if self._scenario.architecture.is_shared else None))
         if conflict:
             self._fail(CODE_EXTERNAL_MEMORY_CONFLICT,
                        "under this environment trace, external allocation was rejected: " + conflict,
                        action_index=action_index)
         else:
             self._dram_external, self._vram_external, self._cpu_available = dram, vram, cpu
+            self._shared_external = shared
             self._compute_rates = rates
             self._project_compute_rates()
 
@@ -449,7 +480,8 @@ class SimulationSession:
             return
         request = self._reclaim_queue[self._reclaim_queue_index]
         self._reclaim_queue_index += 1
-        invalid = request.target_external_bytes <= self._vram_external
+        external = self._shared_external if self._scenario.architecture.is_shared else self._vram_external
+        invalid = request.target_external_bytes <= external
         self._reclaim_records.append(ReclaimRecord(request.id, request.domain,
             request.target_external_bytes, request.t_notice_ns, request.deadline_ns,
             "invalid_target" if invalid else "pending", self._state.t if invalid else None,
@@ -479,10 +511,22 @@ class SimulationSession:
             times.append(self._control_running.end_ns)
         return times
 
-    def _safe_weight_release(self, tensor_id: str) -> bool:
+    def _safe_weight_release(self, tensor_id: str, location: str = LOC_VRAM,
+                             *, require_physical_release: bool = True) -> bool:
         tensor = self._scenario.workload.tensor_by_id.get(tensor_id)
         if not self._scenario.is_m1 or tensor is None or tensor.role != ROLE_WEIGHT:
             return False
+        if self._scenario.architecture.is_shared:
+            if (self._state.copy_at(tensor_id, location) != COPY_READY or
+                    (require_physical_release and
+                     released_physical_bytes(self._scenario, self._state, tensor_id, location) <= 0) or
+                    not has_independent_backup(self._scenario, self._state, tensor_id, location)):
+                return False
+            try:
+                transition(self._scenario, self._state, Action(ACTION_EVICT, tensor_id, location=location))
+            except MappingError:
+                return False
+            return True
         # Weights are immutable leaves. The identical tensor ID is therefore
         # the same version; mutable KV/outputs are never admitted by this rule.
         if (self._state.copy_at(tensor_id, LOC_VRAM) != COPY_READY or
@@ -498,6 +542,13 @@ class SimulationSession:
         if self._control_running and self._control_running.kind != "WAIT_UNTIL":
             return "serial controller is busy; advance until its operation completes"
         if not self._pending_reclaim:
+            return None
+        if self._scenario.architecture.is_shared:
+            if action.kind == ACTION_EVICT and not self._safe_weight_release(
+                    action.target_id, action.location, require_physical_release=False):
+                return "pending shared reclaim requires actual physical release with an independent backup"
+            if used_bytes(self._scenario, candidate, LOC_SHARED) > used_bytes(self._scenario, self._state, LOC_SHARED):
+                return "pending shared reclaim blocks new physical tensor/workspace reservations"
             return None
         if action.kind == ACTION_EVICT and action.location == LOC_VRAM:
             if not self._safe_weight_release(action.target_id):
@@ -529,12 +580,17 @@ class SimulationSession:
             elif command.kind == "DECLINE_RECLAIM":
                 self._resolve_reclaim("declined", command.reason)
             else:
-                conflict = self._capacity_message(self._memory(vram=request.target_external_bytes))
+                memory = (self._memory(shared=request.target_external_bytes) if self._scenario.architecture.is_shared
+                          else self._memory(vram=request.target_external_bytes))
+                conflict = self._capacity_message(memory)
                 if conflict:
                     status, reason = "rejected", conflict
                     self._resolve_reclaim("capacity_rejected", conflict)
                 else:
-                    self._vram_external = request.target_external_bytes
+                    if self._scenario.architecture.is_shared:
+                        self._shared_external = request.target_external_bytes
+                    else:
+                        self._vram_external = request.target_external_bytes
                     self._resolve_reclaim("accepted")
         if interrupted and command.kind == "WAIT_UNTIL":
             status, reason = "interrupted", "earlier runtime boundary made observation available"
@@ -606,6 +662,10 @@ class SimulationSession:
 
     def _snapshot(self, index: int) -> StateSnapshot:
         raw = _snapshot(self._scenario, self._state, index)
+        if self._scenario.architecture.is_shared:
+            return replace(raw, used_dram_bytes=raw.used_dram_bytes + self._shared_external,
+                           used_vram_bytes=raw.used_vram_bytes + self._shared_external,
+                           used_shared_bytes=raw.used_shared_bytes + self._shared_external)
         return replace(raw, used_dram_bytes=raw.used_dram_bytes + self._dram_external,
                        used_vram_bytes=raw.used_vram_bytes + self._vram_external)
 
@@ -695,7 +755,8 @@ class SimulationSession:
                 self._pending_reclaim.id, self._pending_reclaim.domain,
                 self._pending_reclaim.target_external_bytes, self._pending_reclaim.deadline_ns,
                 "pending", self._pending_reclaim.t_notice_ns),
-            tuple(sorted(tid for tid in tensors if self._safe_weight_release(tid)))
+            tuple(sorted(tid for tid in tensors if any(self._safe_weight_release(tid, location)
+                for location in (DOMAINS if self._scenario.architecture.is_shared else (LOC_VRAM,)))))
             if self._control_costs is not None else (),
             tuple(self._reclaim_records), self._control_running, self._control_costs,
             **self._current_rate_fields(),
@@ -737,9 +798,10 @@ class SimulationSession:
         conflict = self._capacity_message(self._memory(candidate))
         if conflict:
             return self._fail(CODE_CAPACITY_EXCEEDED, conflict, action_index=action_index)
+        before = self._state
         self._state = candidate
         self._register_compute_work()
-        event = _event_for(self._scenario, self._state, len(self._events), action)
+        event = _event_for(self._scenario, self._state, len(self._events), action, before=before)
         self._nominal_ends.append(event.end_ns)
         if event.resource is not None and action.kind != "EVICT":
             self._launches[(event.resource, event.target_id)] = len(self._events)
@@ -820,6 +882,7 @@ class SimulationSession:
             error_code=self._error_code, error_action_index=self._error_action_index,
             error_t_ns=self._error_t, d2h_bytes=self._amounts[1], ssd_read_bytes=self._amounts[2],
             ssd_write_bytes=self._amounts[3], peak_dram_bytes=self._peak_dram,
+            peak_shared_bytes=self._peak_vram if self._scenario.architecture.is_shared else 0,
         )
         return SessionResult(evaluation, self._state, tuple(self._environment_records),
                              tuple(self._service), tuple(self._nominal_ends), tuple(self._sources),

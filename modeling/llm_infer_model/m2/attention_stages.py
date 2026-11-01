@@ -162,7 +162,8 @@ def _frontend(compiled, spec):
     return weight_id(layer.id, pack.id)
 
 
-def transform_attention_stages(compiled: CompiledInvocation, execution_spec: AttentionStagesSpec) -> CompiledInvocation:
+def transform_attention_stages(compiled: CompiledInvocation, execution_spec: AttentionStagesSpec,
+                               *, request_ids=None) -> CompiledInvocation:
     """Lower one supported attention macro without altering other refinements.
 
     All stage costs apply to this spec's exact frontend/geometry and retain the
@@ -173,8 +174,16 @@ def transform_attention_stages(compiled: CompiledInvocation, execution_spec: Att
         raise InvalidInput("attention stages require a validated CompiledInvocation")
     spec = parse_attention_stages(attention_stages_document(execution_spec))
     boundary = deepcopy(compiled.physical_boundary or {})
-    if boundary.get("attention_stages"):
-        raise InvalidInput("attention execution was already refined")
+    available = {request.request_id for request in compiled.invocation.requests}
+    if request_ids is not None and (not isinstance(request_ids, tuple) or not request_ids or
+            any(not isinstance(request, str) or not request for request in request_ids) or
+            len(set(request_ids)) != len(request_ids) or not set(request_ids).issubset(available)):
+        raise InvalidInput("attention region requires distinct existing request identities")
+    selected = available if request_ids is None else set(request_ids)
+    previous = boundary.get("attention_stages", {})
+    refined = {region["request_id"] for region in previous.get("regions", ())}
+    if selected & refined:
+        raise InvalidInput("attention execution was already refined for a selected request")
     pack = _frontend(compiled, spec)
     g = spec.geometry
     workload, document = deepcopy(compiled.workload_document), deepcopy(compiled.scenario_document)
@@ -186,9 +195,9 @@ def transform_attention_stages(compiled: CompiledInvocation, execution_spec: Att
     requests = {r.request_id: r for r in compiled.invocation.requests}
     projections = {t.request_id: t for t in compiled.tasks if t.kind == "projection"}
     attentions = {t.request_id: t for t in compiled.tasks if t.kind in ("attention", "attention_core")}
-    if set(attentions) != set(requests) or set(projections) != set(requests):
-        raise Unsupported("requires one projection and one attention macro/core per request")
-    core_only = any(task.kind == "attention_core" for task in attentions.values())
+    if not selected.issubset(attentions) or not selected.issubset(projections):
+        raise Unsupported("requires one projection and one attention macro/core per selected request")
+    core_only = any(attentions[request].kind == "attention_core" for request in selected)
     if core_only and (pack is not None or not boundary.get("attention_execution")):
         raise Unsupported("existing pure attention cores require their materialized Dense frontend boundary")
     tasks, operations, regions, metadata, scopes, new_ids = [], [], [], {}, {}, []
@@ -228,6 +237,8 @@ def transform_attention_stages(compiled: CompiledInvocation, execution_spec: Att
         return oid
 
     for task in compiled.tasks:
+        if task.request_id not in selected:
+            tasks.append(task); operations.append(deepcopy(old_ops[task.operation_id])); continue
         if task.kind == "projection" and pack is not None:
             request = requests[task.request_id]
             prefix = task.task_id + ".staged"
@@ -304,13 +315,22 @@ def transform_attention_stages(compiled: CompiledInvocation, execution_spec: Att
     for route, ids in routes.items():
         additions = new_ids if route in table.allowed_transfer_routes else []
         routes[route] = list(dict.fromkeys([tid for tid in ids if tid in tensors] + additions))
-    _, document["costs"]["transfer"] = expand_transfer_costs(table, {tid: t["storage_bytes"] for tid, t in tensors.items()}, routes)
+    _, document["costs"]["transfer"] = expand_transfer_costs(table, {tid: t["storage_bytes"] for tid, t in tensors.items()}, routes,
+        shared_memory=compiled.scenario.architecture.memory_mode == "shared")
     document["costs"]["source"] += ";attention-stages:synthetic_execution"
     scenario = build_scenario(workload, document, where="attention_stages")
     boundary.update(numeric_execution_verified=False, physical_macro_contract=False,
                     original_model_kernel_reproduced=False)
-    boundary["attention_stages"] = dict(format_version=FORMAT_VERSION, execution_spec=attention_stages_document(spec),
-        regions=regions, operation_stages=metadata, tensor_row_scopes=scopes,
+    bound_specs = deepcopy(previous.get("execution_specs", []))
+    if previous and not bound_specs:
+        bound_specs = [dict(request_ids=sorted(refined), spec=deepcopy(previous["execution_spec"]))]
+    bound_specs.append(dict(request_ids=sorted(selected), spec=attention_stages_document(spec)))
+    boundary["attention_stages"] = dict(format_version=FORMAT_VERSION,
+        execution_spec=deepcopy(previous.get("execution_spec", attention_stages_document(spec))),
+        execution_specs=bound_specs,
+        regions=[*deepcopy(previous.get("regions", [])), *regions],
+        operation_stages={**deepcopy(previous.get("operation_stages", {})), **metadata},
+        tensor_row_scopes={**deepcopy(previous.get("tensor_row_scopes", {})), **scopes},
         cost_semantics="independent_exact_stage_prices_scoped_to_declared_geometry_frontend; no_macro_division",
         qk_semantics="Q_times_K_transpose_scaled_by_inverse_sqrt_head_dim; query_head//(heads//kv_heads)",
         softmax_semantics="stable_softmax_with_absolute_causal_mask_key_position<=query_position",

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT,
     ACTION_READ_SSD, ACTION_WRITE_SSD, Action, State,
 )
 from ..tensor.spec import (
@@ -97,9 +97,55 @@ class PublicTensor:
     allocation_bytes: tuple[tuple[str, int], ...] = ()
     initial_locations: tuple[str, ...] = ()
     goal_location: str | None = None
+    # Public physical identity, not a prediction about future model activity.
+    memory_pools: tuple[tuple[str, str], ...] = ()
+    allocation_refs: tuple[tuple[str, str | None], ...] = ()
+    physical_release_bytes: tuple[tuple[str, int], ...] = ()
+    independent_backups: tuple[tuple[str, bool], ...] = ()
 
     def status_at(self, location: str) -> str:
         return dict(self.copies).get(location, COPY_ABSENT)
+
+    def pool_at(self, location: str) -> str:
+        return dict(self.memory_pools).get(location, location)
+
+    def same_pool(self, source: str, destination: str) -> bool:
+        return source != "ssd" and destination != "ssd" and self.pool_at(source) == self.pool_at(destination)
+
+    def share_source(self, destination: str) -> str | None:
+        if self.status_at(destination) != COPY_ABSENT:
+            return None
+        routes = {(price.src, price.dst) for price in self.transfers}
+        return next((source for source, status in self.copies
+                     if source != destination and status == COPY_READY
+                     and self.same_pool(source, destination) and (source, destination) in routes), None)
+
+    def can_access(self, destination: str) -> bool:
+        return self.status_at(destination) == COPY_READY or self.share_source(destination) is not None
+
+    def released_bytes(self, location: str) -> int:
+        explicit = dict(self.physical_release_bytes)
+        return explicit.get(location, dict(self.allocation_bytes).get(location, 0))
+
+    def has_independent_backup(self, location: str) -> bool:
+        explicit = dict(self.independent_backups)
+        if location in explicit:
+            return explicit[location]
+        return any(other != location and status == COPY_READY for other, status in self.copies)
+
+
+def public_storage_metadata(scenario, state, tensor_id: str) -> dict:
+    """Expose only current physical ownership for a currently public tensor."""
+    if getattr(scenario.architecture, "memory_mode", "separate") != "shared":
+        return {}
+    from ..tensor.engine import allocation_identity, released_physical_bytes, has_independent_backup
+    return dict(memory_pools=tuple((loc, scenario.architecture.pool_of(loc)) for loc in ("dram", "vram")),
+                allocation_refs=tuple((loc, allocation_identity(scenario, state, tensor_id, loc))
+                                      for loc in ("dram", "vram")),
+                physical_release_bytes=tuple((loc, released_physical_bytes(scenario, state, tensor_id, loc))
+                                            for loc in ("dram", "vram")),
+                independent_backups=tuple((loc, has_independent_backup(scenario, state, tensor_id, loc))
+                                          for loc in ("dram", "vram")))
 
 
 @dataclass(frozen=True)
@@ -190,7 +236,7 @@ class _MoEVisibility:
             return True
         if action.kind == ACTION_COMPUTE:
             return action.target_id in self.visible_operation_ids(state)
-        if action.kind in (ACTION_COPY, ACTION_READ_SSD, ACTION_WRITE_SSD, ACTION_EVICT):
+        if action.kind in (ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD, ACTION_WRITE_SSD, ACTION_EVICT):
             return action.target_id in self.visible_tensor_ids(state)
         return False
 
@@ -220,7 +266,7 @@ class _DenseVisibility:
     def allow_action(self,action,state):
         if action.kind==ACTION_ADVANCE:return True
         if action.kind==ACTION_COMPUTE:return action.target_id in self._operations
-        if action.kind in (ACTION_COPY,ACTION_READ_SSD,ACTION_WRITE_SSD,ACTION_EVICT):return action.target_id in self._tensors
+        if action.kind in (ACTION_COPY,ACTION_SHARE,ACTION_READ_SSD,ACTION_WRITE_SSD,ACTION_EVICT):return action.target_id in self._tensors
         return False
 
 
@@ -247,6 +293,7 @@ def _causal_scenario(compiled: CompiledInvocation):
         compiled.cost_table,
         {t.id: t.storage_bytes for t in compiled.scenario.workload.tensors},
         mapspace["allowed_transfers"],
+        shared_memory=compiled.scenario.architecture.memory_mode == "shared",
     )
     document["costs"]["transfer"] = transfers
     return build_scenario(compiled.workload_document, document, where="causal_moe"), document
@@ -263,11 +310,11 @@ class CausalM2Session:
                  execution_spec=None, services: ServiceContract | None = None,
                  reclaim_requests=(), control_costs=None):
         if execution_spec is not None:
-            from .execution_pipeline import ExecutionPipelineSpec, apply_execution_transform
+            from .execution_pipeline import ExecutionPipelineSpec, ExecutionRegionSpec, apply_execution_transform
             from .ffn_execution import FFNExecutionSpec
             from .attention_stages import AttentionStagesSpec
             from .attention_execution import DenseAttentionExecutionSpec, attention_execution_document, transform_dense_attention
-            if isinstance(execution_spec,(ExecutionPipelineSpec,FFNExecutionSpec,AttentionStagesSpec)):
+            if isinstance(execution_spec,(ExecutionPipelineSpec,ExecutionRegionSpec,FFNExecutionSpec,AttentionStagesSpec)):
                 compiled=apply_execution_transform(compiled,execution_spec)
             elif isinstance(execution_spec,DenseAttentionExecutionSpec):
                 existing=(compiled.physical_boundary or {}).get("attention_execution")
@@ -360,6 +407,7 @@ class CausalM2Session:
                                               metadata.get("execution_variant", ""),
                                               self._compiled.layer.id, self._compiled.invocation.id))
         visible = self._visibility.visible_tensor_ids(state)
+        visible_set = set(visible)
         tensors = []
         for tensor_id in visible:
             tensor = scenario.workload.tensor_by_id[tensor_id]
@@ -368,6 +416,9 @@ class CausalM2Session:
                 if scenario.mapspace.allows(route, tensor_id):
                     price = scenario.costs.transfer_cost(route, tensor_id)
                     if price is None:
+                        if src != "ssd" and dst != "ssd" and scenario.architecture.pool_of(src) == scenario.architecture.pool_of(dst):
+                            transfers.append(TransferPrice(route, src, dst, 0, timing_scope="shared_access_only"))
+                            continue
                         raise Unsupported(f"public transfer {tensor_id!r}/{route} has no exact cost")
                     if isinstance(self._runtime, ServiceSession) and route in ("dram_to_vram", "vram_to_dram"):
                         transfers.append(TransferPrice(route, src, dst, None,
@@ -383,12 +434,13 @@ class CausalM2Session:
                                               for item in row_scopes.get(tensor_id, ())),
                                         tuple((domain, scenario.size_alloc(tensor_id, domain))
                                               for domain in ("dram", "vram")),
-                                        tensor.initial_locations, scenario.goal.output_locations.get(tensor_id)))
+                                        tensor.initial_locations, scenario.goal.output_locations.get(tensor_id),
+                                        **public_storage_metadata(scenario, state, tensor_id)))
         # Deliveries are only for currently public produced values. Weight goals
         # and hidden future expert outputs are not passed to a policy.
         deliveries = tuple(sorted((tensor, location)
                                   for tensor, location in scenario.goal.output_locations.items()
-                                  if tensor in visible and scenario.workload.tensor_by_id[tensor].role != ROLE_WEIGHT))
+                                  if tensor in visible_set and scenario.workload.tensor_by_id[tensor].role != ROLE_WEIGHT))
         return CausalObservation(base.t_ns, tuple(operations), tuple(tensors),
                                  base.running, base.memory, base.cpu_available,
                                  self._visibility.revealed_routes(state), deliveries,
@@ -434,6 +486,8 @@ class CausalM2Session:
 
     def state_out(self):
         from .runner import state_out_from_result
+        if self._runtime.scenario.architecture.memory_mode == "shared":
+            raise Unsupported("shared allocation identity requires persistent_state_document; legacy state_out records only locations")
         if ((self._compiled.physical_boundary or {}).get("row_execution", {}).get("subweights") or
                 (self._compiled.physical_boundary or {}).get("ffn_execution")):
             raise Unsupported("materialized subweights require persistent_state_document; "
@@ -454,7 +508,8 @@ class CausalM2Session:
         rows = (self._compiled.physical_boundary or {}).get("row_execution", {}).get("subweights", ())
         partitions=(self._compiled.physical_boundary or {}).get("ffn_execution",{}).get("weight_partitions",())
         evaluation = self._runtime.result().evaluation
-        if not rows and not partitions and evaluation.status == STATUS_VALID:
+        shared = self._runtime.scenario.architecture.memory_mode == "shared"
+        if not shared and not rows and not partitions and evaluation.status == STATUS_VALID:
             return to_state_document(self.state_out())
         kv_state = None
         if evaluation.status == STATUS_VALID:
@@ -496,6 +551,9 @@ class CausalM2Session:
             whole_weights.append(dict(tensor_id=tensor.id, version=previous.version if previous else None,
                                       storage_bytes=tensor.storage_bytes, locations=locations))
         return dict(format_version="causal-persistent-state-0.1",
+            **(dict(memory_mode="shared", runtime_state=asdict(self._runtime.state),
+                    allocation_identity_scope="physical_tensor_allocations_and_logical_access_views",
+                    legacy_state_in_import_supported=False) if shared else {}),
             state_scope="KV_hidden_and_materialized_weight_fragments_not_legacy_state_in",
             status=evaluation.status, t_ns=self._runtime.state.t,
             kv_state=kv_state, weight_fragments=fragments, whole_weights=whole_weights,

@@ -44,6 +44,7 @@ from .spec import (
     DOMAIN_OF_DEVICE,
     LOC_DRAM,
     LOC_SSD,
+    LOC_SHARED,
     LOC_VRAM,
     M1Costs,
     M1Mapspace,
@@ -91,6 +92,7 @@ __all__ = [
     "ACTION_ADVANCE",
     "ACTION_COMPUTE",
     "ACTION_COPY",
+    "ACTION_SHARE",
     "ACTION_COPY_H2D",
     "ACTION_EVICT",
     "ACTION_READ_SSD",
@@ -111,6 +113,13 @@ __all__ = [
     "transition",
     "advance_elapsed",
     "used_bytes",
+    "used_physical_bytes",
+    "allocation_identity",
+    "can_access",
+    "shared_source",
+    "incremental_allocation_bytes",
+    "released_physical_bytes",
+    "has_independent_backup",
     "used_vram_bytes",
     "evaluate_mapping",
     # `MappingError.code`、`EvaluationResult.status` / `.reason` 的取值域。
@@ -152,6 +161,7 @@ ACTION_ADVANCE = "ADVANCE"
 # spelled with the old name; it is not, because the old name also carries the
 # old *resource* name and the old single-slot assumption with it.
 ACTION_COPY = "COPY"
+ACTION_SHARE = "SHARE"
 ACTION_READ_SSD = "READ_SSD"
 ACTION_WRITE_SSD = "WRITE_SSD"
 
@@ -236,7 +246,7 @@ class Action:
             return self.kind
         if self.kind == ACTION_COMPUTE and self.device is not None:
             return f"{self.kind}({self.target_id}, {self.device})"
-        if self.kind == ACTION_COPY:
+        if self.kind in (ACTION_COPY, ACTION_SHARE):
             return f"{self.kind}({self.target_id}, {self.src}->{self.dst})"
         if self.kind == ACTION_EVICT and self.location is not None:
             return f"{self.kind}({self.target_id}, {self.location})"
@@ -255,7 +265,7 @@ class Action:
             return ROUTE_SSD_TO_DRAM
         if self.kind == ACTION_WRITE_SSD:
             return ROUTE_DRAM_TO_SSD
-        if self.kind != ACTION_COPY:
+        if self.kind not in (ACTION_COPY, ACTION_SHARE):
             return None
         for route, (source, destination) in ROUTE_ENDS.items():
             if route in (ROUTE_SSD_TO_DRAM, ROUTE_DRAM_TO_SSD):
@@ -334,6 +344,15 @@ class State:
     running: tuple[RunningTask, ...]
     dram_status: tuple[tuple[str, str], ...] = ()
     ssd_status: tuple[tuple[str, str], ...] = ()
+    storage_allocations: tuple[tuple[str, str, str], ...] = ()
+    next_allocation_id: int = 0
+
+    @cached_property
+    def _allocation_refs(self) -> dict[tuple[str, str], str]:
+        return {(tensor, location): allocation for tensor, location, allocation in self.storage_allocations}
+
+    def allocation_ref(self, tensor_id: str, location: str) -> str | None:
+        return self._allocation_refs.get((tensor_id, location))
 
     @cached_property
     def _ops(self) -> dict[str, str]:
@@ -403,13 +422,22 @@ class State:
         Every ledger is sorted by id and the task tuple is sorted, so the key
         does not depend on insertion order.
         """
-        return (
+        base = (
             self.op_status,
             self.copy_status,
             self.running,
             self.dram_status,
             self.ssd_status,
         )
+        if self.storage_allocations or self.next_allocation_id:
+            # Allocation names are provenance, not scheduling state. Canonical
+            # alias classes avoid distinguishing copy/evict cycles solely by
+            # the monotonically increasing allocation serial.
+            names: dict[str, int] = {}
+            refs = tuple((tensor, location, names.setdefault(identity, len(names)))
+                         for tensor, location, identity in sorted(self.storage_allocations))
+            return base + (refs,)
+        return base
 
 
 @dataclass(frozen=True)
@@ -426,6 +454,9 @@ class StateSnapshot:
     # there is no usage number to report. What a reader needs is the same thing
     # the search needs -- which copies exist and whether a write has landed.
     ssd_status: tuple[tuple[str, str], ...] = ()
+    storage_allocations: tuple[tuple[str, str, str], ...] = ()
+    next_allocation_id: int = 0
+    used_shared_bytes: int = 0
 
     def statuses(self, location: str) -> tuple[tuple[str, str], ...]:
         """The ``location`` ledger, exactly as :meth:`State.statuses` reports it.
@@ -493,6 +524,7 @@ class EvaluationResult:
     ssd_read_bytes: int = 0
     ssd_write_bytes: int = 0
     peak_dram_bytes: int = 0
+    peak_shared_bytes: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -536,8 +568,25 @@ def used_bytes(scenario: Scenario, state: State, domain: str) -> int:
     is charged to nothing, and asking this function for its "usage" would be
     asking for a number the design does not define (``M1_DESIGN.md`` §5).
     """
-    assert domain in DOMAINS, f"{domain!r} is not a storage domain"
     architecture = scenario.architecture
+    assert domain in DOMAINS or (domain == LOC_SHARED and architecture.is_shared), f"{domain!r} is not a storage domain"
+    if architecture.is_shared:
+        used = architecture.shared_runtime_reserved_bytes
+        allocations: dict[str, str] = {}
+        for location in DOMAINS:
+            for tensor_id, status in state.statuses(location):
+                if status == COPY_ABSENT:
+                    continue
+                identity = allocation_identity(scenario, state, tensor_id, location)
+                if identity is None:
+                    raise InvalidInput(f"shared state lost allocation identity for {tensor_id!r} in {location}")
+                previous = allocations.setdefault(identity, tensor_id)
+                if previous != tensor_id:
+                    raise InvalidInput("an allocation may alias only the same immutable tensor")
+        used += sum(scenario.size_alloc(tensor_id, LOC_SHARED) for tensor_id in allocations.values())
+        used += sum(scenario.workspace_alloc(task.target_id, _task_device(scenario, task))
+                    for task in state.running if task.resource in (RESOURCE_CPU_COMPUTE, RESOURCE_GPU_COMPUTE))
+        return used
     used = architecture.reserved_of(domain)
     for tensor_id, status in state.statuses(domain):
         if status != COPY_ABSENT:
@@ -549,6 +598,65 @@ def used_bytes(scenario: Scenario, state: State, domain: str) -> int:
             continue
         used += scenario.workspace_alloc(task.target_id, _task_device(scenario, task))
     return used
+
+
+def used_physical_bytes(scenario: Scenario, state: State) -> dict[str, int]:
+    """One entry per physical pool: callers must not add UMA DRAM and VRAM."""
+    return {pool: used_bytes(scenario, state, pool) for pool in scenario.architecture.memory_domains}
+
+
+def allocation_identity(scenario: Scenario, state: State, tensor_id: str, location: str) -> str | None:
+    if state.copy_at(tensor_id, location) == COPY_ABSENT:
+        return None
+    if location == LOC_SSD:
+        return f"ssd:{tensor_id}"
+    if scenario.architecture.is_shared:
+        return state.allocation_ref(tensor_id, location)
+    return f"{location}:{tensor_id}"
+
+
+def shared_source(scenario: Scenario, state: State, tensor_id: str, destination: str) -> str | None:
+    if destination not in DOMAINS or not scenario.architecture.is_shared:
+        return None
+    return next((location for location in DOMAINS if location != destination
+                 and state.copy_at(tensor_id, location) == COPY_READY), None)
+
+
+def can_access(scenario: Scenario, state: State, tensor_id: str, location: str) -> bool:
+    """Whether this logical view is ready now; SHARE is never implicit."""
+    return state.copy_at(tensor_id, location) == COPY_READY
+
+
+def incremental_allocation_bytes(scenario: Scenario, state: State, tensor_id: str, location: str,
+                                 *, share_from: str | None = None) -> int:
+    """Physical increment for a new buffer or an explicitly shared reference."""
+    if location not in DOMAINS or state.copy_at(tensor_id, location) != COPY_ABSENT:
+        return 0
+    if share_from is not None:
+        if (scenario.architecture.pool_of(share_from) != scenario.architecture.pool_of(location)
+                or state.copy_at(tensor_id, share_from) != COPY_READY):
+            raise InvalidInput("share_from must name a READY allocation in the same physical pool")
+        return 0
+    return scenario.size_alloc(tensor_id, location)
+
+
+def released_physical_bytes(scenario: Scenario, state: State, tensor_id: str, location: str) -> int:
+    """Bytes actually freed by deleting one logical reference (before deletion)."""
+    if location not in DOMAINS or state.copy_at(tensor_id, location) == COPY_ABSENT:
+        return 0
+    identity = allocation_identity(scenario, state, tensor_id, location)
+    if scenario.architecture.is_shared and any(
+            other != location and state.copy_at(tensor_id, other) != COPY_ABSENT
+            and allocation_identity(scenario, state, tensor_id, other) == identity for other in DOMAINS):
+        return 0
+    return scenario.size_alloc(tensor_id, location)
+
+
+def has_independent_backup(scenario: Scenario, state: State, tensor_id: str, location: str) -> bool:
+    identity = allocation_identity(scenario, state, tensor_id, location)
+    return any(other != location and state.copy_at(tensor_id, other) == COPY_READY
+               and allocation_identity(scenario, state, tensor_id, other) != identity
+               for other in (*DOMAINS, LOC_SSD))
 
 
 def used_vram_bytes(scenario: Scenario, state: State) -> int:
@@ -595,6 +703,14 @@ def _read_locks(scenario: Scenario, state: State) -> dict[tuple[str, str], int]:
         else:
             key = (task.target_id, domain)
             locks[key] = locks.get(key, 0) + 1
+    if scenario.architecture.is_shared:
+        # A read protects the physical buffer through every alias, including
+        # the CPU reference while a GPU task reads the same allocation.
+        identities = {allocation_identity(scenario, state, tensor, location): count
+                      for (tensor, location), count in locks.items()}
+        for tensor, location, identity in state.storage_allocations:
+            if identity in identities:
+                locks[(tensor, location)] = max(locks.get((tensor, location), 0), identities[identity])
     return locks
 
 
@@ -650,6 +766,14 @@ def initial_state(scenario: Scenario) -> State:
             (t.id, COPY_READY if LOC_SSD in t.initial_locations else COPY_ABSENT)
             for t in sorted(scenario.workload.tensors, key=lambda t: t.id)
         )
+    allocations: list[tuple[str, str, str]] = []
+    next_id = 0
+    if scenario.architecture.is_shared:
+        for tensor in sorted(scenario.workload.tensors, key=lambda tensor: tensor.id):
+            locations = sorted(set(tensor.initial_locations) & set(DOMAINS))
+            if locations:
+                allocations.extend((tensor.id, location, f"a{next_id}") for location in locations)
+                next_id += 1
     return State(
         t=0,
         op_status=op_status,
@@ -657,6 +781,8 @@ def initial_state(scenario: Scenario) -> State:
         running=(),
         dram_status=dram_status,
         ssd_status=ssd_status,
+        storage_allocations=tuple(allocations),
+        next_allocation_id=next_id,
     )
 
 
@@ -995,6 +1121,8 @@ def _check_m1(scenario: Scenario, state: State, action: Action) -> None:
     mapspace = _m1_mapspace(scenario)
     if action.kind == ACTION_COMPUTE:
         _m1_check_compute(scenario, state, action, mapspace)
+    elif action.kind == ACTION_SHARE:
+        _m1_check_share(scenario, state, action, mapspace)
     elif action.kind in (ACTION_COPY, ACTION_READ_SSD, ACTION_WRITE_SSD):
         # One checker for all three: they differ only in which route they name,
         # and every precondition in M1_DESIGN.md §6 is a statement about the
@@ -1008,6 +1136,26 @@ def _check_m1(scenario: Scenario, state: State, action: Action) -> None:
             f"unknown 0.2 action kind {action.kind!r}",
             t_ns=state.t,
         )
+
+
+def _m1_check_share(scenario: Scenario, state: State, action: Action, mapspace: M1Mapspace) -> None:
+    tensor_id = action.target_id
+    route = action.route
+    if (not scenario.architecture.is_shared or tensor_id not in scenario.workload.tensor_by_id
+            or route is None or action.src not in DOMAINS or action.dst not in DOMAINS
+            or action.src == action.dst):
+        raise MappingError(CODE_ILLEGAL_ACTION, "SHARE requires two logical domains in one shared physical pool", t_ns=state.t, tensor_id=tensor_id)
+    if not mapspace.allows(route, tensor_id):
+        raise MappingError(CODE_ILLEGAL_ACTION, f"SHARE of {tensor_id!r} is not permitted on {route}", t_ns=state.t, tensor_id=tensor_id)
+    for operation_id in mapspace.transfer_dependencies.get(tensor_id, ()):
+        if state.op(operation_id) != OP_DONE:
+            raise MappingError(CODE_TRANSFER_DEPENDENCY_NOT_READY, f"SHARE requires {operation_id!r} DONE", t_ns=state.t, tensor_id=tensor_id, operation_id=operation_id)
+    if state.copy_at(tensor_id, action.src) != COPY_READY:
+        raise MappingError(CODE_INPUT_NOT_READY, f"SHARE source {tensor_id!r} in {action.src} is not READY", t_ns=state.t, tensor_id=tensor_id)
+    if state.copy_at(tensor_id, action.dst) != COPY_ABSENT:
+        raise MappingError(CODE_ILLEGAL_ACTION, f"SHARE destination {tensor_id!r} in {action.dst} already exists", t_ns=state.t, tensor_id=tensor_id)
+    if not _m1_transfer_has_a_purpose(scenario, state, tensor_id, action.dst):
+        raise MappingError(CODE_ILLEGAL_ACTION, f"nothing needs {tensor_id!r} in {action.dst}", t_ns=state.t, tensor_id=tensor_id)
 
 
 def _m1_check_resources_free(
@@ -1216,6 +1364,11 @@ def _m1_check_transfer(
             t_ns=state.t,
             tensor_id=tensor_id,
         )
+
+    costs = scenario.costs
+    assert isinstance(costs, M1Costs)
+    if costs.transfer_cost(route, tensor_id) is None:
+        raise MappingError(CODE_ILLEGAL_ACTION, f"real {action.kind} requires an explicit positive copy price for {tensor_id!r} on {route}", t_ns=state.t, tensor_id=tensor_id)
 
     for operation_id in mapspace.transfer_dependencies.get(tensor_id, ()):
         if state.op(operation_id) != OP_DONE:
@@ -1468,6 +1621,8 @@ def transition(scenario: Scenario, state: State, action: Action) -> State:
     if scenario.is_m1:
         if action.kind == ACTION_COMPUTE:
             return _m1_start_compute(scenario, state, action)
+        if action.kind == ACTION_SHARE:
+            return _m1_share(scenario, state, action)
         if action.kind == ACTION_EVICT:
             return _m1_evict(scenario, state, action)
         return _m1_start_transfer(scenario, state, action)
@@ -1540,7 +1695,31 @@ def _m1_start_transfer(scenario: Scenario, state: State, action: Action) -> Stat
             route=route,
         ),
     )
-    return _rebuild(state, copies=copies, dram=dram, ssd=ssd, running=running)
+    refs, next_id = _new_allocations(scenario, state, ((action.target_id, destination),))
+    return _rebuild(state, copies=copies, dram=dram, ssd=ssd, running=running,
+                    storage_allocations=refs, next_allocation_id=next_id)
+
+
+def _new_allocations(scenario: Scenario, state: State, targets: Iterable[tuple[str, str]]) -> tuple[tuple[tuple[str, str, str], ...], int]:
+    refs = list(state.storage_allocations)
+    next_id = state.next_allocation_id
+    if scenario.architecture.is_shared:
+        for tensor_id, location in targets:
+            if location in DOMAINS:
+                refs.append((tensor_id, location, f"a{next_id}"))
+                next_id += 1
+    return tuple(sorted(refs)), next_id
+
+
+def _m1_share(scenario: Scenario, state: State, action: Action) -> State:
+    assert action.target_id is not None and action.src is not None and action.dst is not None
+    identity = allocation_identity(scenario, state, action.target_id, action.src)
+    if identity is None:
+        raise InvalidInput("SHARE source has no physical allocation identity")
+    copies, dram, ssd = dict(state.copy_status), dict(state.dram_status), dict(state.ssd_status)
+    _set_copy(copies, dram, ssd, action.target_id, action.dst, COPY_READY)
+    refs = tuple(sorted((*state.storage_allocations, (action.target_id, action.dst, identity))))
+    return _rebuild(state, copies=copies, dram=dram, ssd=ssd, storage_allocations=refs)
 
 
 def _m1_start_compute(scenario: Scenario, state: State, action: Action) -> State:
@@ -1573,7 +1752,9 @@ def _m1_start_compute(scenario: Scenario, state: State, action: Action) -> State
             device=action.device,
         ),
     )
-    return _rebuild(state, ops=ops, copies=copies, dram=dram, ssd=ssd, running=running)
+    refs, next_id = _new_allocations(scenario, state, ((produced, DOMAIN_OF_DEVICE[action.device]) for produced in operation.outputs))
+    return _rebuild(state, ops=ops, copies=copies, dram=dram, ssd=ssd, running=running,
+                    storage_allocations=refs, next_allocation_id=next_id)
 
 
 def _m1_evict(scenario: Scenario, state: State, action: Action) -> State:
@@ -1582,7 +1763,8 @@ def _m1_evict(scenario: Scenario, state: State, action: Action) -> State:
     dram = dict(state.dram_status)
     ssd = dict(state.ssd_status)
     _set_copy(copies, dram, ssd, action.target_id, action.location, COPY_ABSENT)
-    return _rebuild(state, copies=copies, dram=dram, ssd=ssd)
+    refs = tuple(ref for ref in state.storage_allocations if ref[:2] != (action.target_id, action.location))
+    return _rebuild(state, copies=copies, dram=dram, ssd=ssd, storage_allocations=refs)
 
 
 def _set_copy(
@@ -1673,6 +1855,8 @@ def advance_elapsed(
         running=tuple(sorted(still_running)),
         dram_status=tuple(sorted(dram.items())),
         ssd_status=tuple(sorted(ssd.items())),
+        storage_allocations=state.storage_allocations,
+        next_allocation_id=state.next_allocation_id,
     )
 
 
@@ -1721,6 +1905,8 @@ def _rebuild(
     running: Sequence[RunningTask] | None = None,
     dram: dict[str, str] | None = None,
     ssd: dict[str, str] | None = None,
+    storage_allocations: tuple[tuple[str, str, str], ...] | None = None,
+    next_allocation_id: int | None = None,
 ) -> State:
     return State(
         t=state.t,
@@ -1729,6 +1915,8 @@ def _rebuild(
         running=tuple(sorted(running)) if running is not None else state.running,
         dram_status=tuple(sorted(dram.items())) if dram is not None else state.dram_status,
         ssd_status=tuple(sorted(ssd.items())) if ssd is not None else state.ssd_status,
+        storage_allocations=state.storage_allocations if storage_allocations is None else storage_allocations,
+        next_allocation_id=state.next_allocation_id if next_allocation_id is None else next_allocation_id,
     )
 
 
@@ -1791,6 +1979,8 @@ def _m1_candidates(scenario: Scenario) -> list[Action]:
             elif route == ROUTE_DRAM_TO_SSD:
                 candidates.append(Action(ACTION_WRITE_SSD, tensor_id))
             else:
+                if scenario.architecture.is_shared:
+                    candidates.append(Action(ACTION_SHARE, tensor_id, src=source, dst=destination))
                 candidates.append(
                     Action(ACTION_COPY, tensor_id, src=source, dst=destination)
                 )
@@ -1881,6 +2071,7 @@ def evaluate_mapping(
             )
 
         try:
+            before = state
             state = transition(scenario, state, action)
         except MappingError as error:
             return _failure(
@@ -1902,7 +2093,7 @@ def evaluate_mapping(
                 ssd_write_bytes=ssd_write_bytes,
             )
 
-        event = _event_for(scenario, state, index, action)
+        event = _event_for(scenario, state, index, action, before=before)
         events.append(event)
         h2d_bytes, d2h_bytes, ssd_read_bytes, ssd_write_bytes = _accumulate_transfer_bytes(
             event, h2d_bytes, d2h_bytes, ssd_read_bytes, ssd_write_bytes
@@ -1946,6 +2137,7 @@ def evaluate_mapping(
         ssd_read_bytes=ssd_read_bytes,
         ssd_write_bytes=ssd_write_bytes,
         peak_dram_bytes=peak_dram,
+        peak_shared_bytes=peak if scenario.architecture.is_shared else 0,
     )
 
 
@@ -1972,7 +2164,7 @@ def _accumulate_transfer_bytes(
     return h2d, d2h, ssd_read, ssd_write
 
 
-def _event_for(scenario: Scenario, state: State, index: int, action: Action) -> Event:
+def _event_for(scenario: Scenario, state: State, index: int, action: Action, *, before: State | None = None) -> Event:
     """Describe an applied action.
 
     ``start_ns`` and ``end_ns`` are both recorded. A copy begins at the current
@@ -1996,7 +2188,7 @@ def _event_for(scenario: Scenario, state: State, index: int, action: Action) -> 
             end_ns=state.t,
         )
     if scenario.is_m1:
-        return _m1_event_for(scenario, state, index, action)
+        return _m1_event_for(scenario, state, index, action, before=before)
     if action.kind == ACTION_COPY_H2D:
         assert action.target_id is not None
         tensor = scenario.workload.tensor_by_id[action.target_id]
@@ -2042,7 +2234,7 @@ def _event_for(scenario: Scenario, state: State, index: int, action: Action) -> 
     )
 
 
-def _m1_event_for(scenario: Scenario, state: State, index: int, action: Action) -> Event:
+def _m1_event_for(scenario: Scenario, state: State, index: int, action: Action, *, before: State | None = None) -> Event:
     """The 0.2 branch of :func:`_event_for`."""
     assert action.target_id is not None
     costs = scenario.costs
@@ -2050,6 +2242,8 @@ def _m1_event_for(scenario: Scenario, state: State, index: int, action: Action) 
 
     if action.kind == ACTION_EVICT:
         assert action.location is not None
+        if scenario.architecture.is_shared and before is None:
+            raise InvalidInput("shared EVICT event requires the state before deletion")
         return Event(
             action_index=index,
             kind=ACTION_EVICT,
@@ -2060,9 +2254,15 @@ def _m1_event_for(scenario: Scenario, state: State, index: int, action: Action) 
             end_ns=state.t,
             # Released bytes are the *aligned* allocation, the same number the
             # ledger charged, so the event and the ledger cannot disagree.
-            bytes_released=scenario.size_alloc(action.target_id, action.location),
+            bytes_released=(released_physical_bytes(scenario, before, action.target_id, action.location)
+                            if before is not None else scenario.size_alloc(action.target_id, action.location)),
             location=action.location,
         )
+
+    if action.kind == ACTION_SHARE:
+        return Event(action_index=index, kind=ACTION_SHARE, target_id=action.target_id,
+                     resource=None, t_ns=state.t, start_ns=state.t, end_ns=state.t,
+                     bytes_transferred=0, src=action.src, dst=action.dst)
 
     if action.kind == ACTION_COMPUTE:
         assert action.device is not None
@@ -2111,6 +2311,9 @@ def _snapshot(scenario: Scenario, state: State, action_index: int) -> StateSnaps
         used_dram_bytes=used_bytes(scenario, state, LOC_DRAM),
         dram_status=state.dram_status,
         ssd_status=state.ssd_status,
+        storage_allocations=state.storage_allocations,
+        next_allocation_id=state.next_allocation_id,
+        used_shared_bytes=used_vram_bytes(scenario, state) if scenario.architecture.is_shared else 0,
     )
 
 
@@ -2150,6 +2353,7 @@ def _failure(
         ssd_read_bytes=ssd_read_bytes,
         ssd_write_bytes=ssd_write_bytes,
         peak_dram_bytes=peak_dram,
+        peak_shared_bytes=peak if scenario.architecture.is_shared else 0,
     )
 
 
@@ -2223,6 +2427,7 @@ class MappingDocument:
 _ACTION_KINDS = (ACTION_COPY_H2D, ACTION_COMPUTE, ACTION_EVICT, ACTION_ADVANCE)
 _ACTION_KINDS_M1 = (
     ACTION_COPY,
+    ACTION_SHARE,
     ACTION_READ_SSD,
     ACTION_WRITE_SSD,
     ACTION_COMPUTE,
@@ -2437,7 +2642,7 @@ def _parse_action_m1(
     if device is not None:
         raise InvalidInput(f"{where}: {kind} does not take a device")
 
-    if kind == ACTION_COPY:
+    if kind in (ACTION_COPY, ACTION_SHARE):
         if src is None or dst is None:
             raise InvalidInput(
                 f"{where}: 0.2 {ACTION_COPY} requires both src and dst; a route is a "

@@ -197,6 +197,57 @@ class CompleteExpertRegionTests(unittest.TestCase):
 
 
 class CompositionCacheAndPrefetchTests(unittest.TestCase):
+    def test_pending_input_transfer_keeps_its_already_loaded_weight_until_compute(self):
+        document=inline_policy(cache="lru", unit="tensor", budget=32)
+        document["placements"].update(expert_gate="gpu",expert_up="gpu",
+                                      expert_swiglu="gpu",expert_down="gpu")
+        policy = CompositionPolicy(parse_composition_policy(document))
+        observed = region_observation()
+        observed = replace(observed, tensors=tuple(
+            tensor("compact",16,("dram",),transfer_ns=10) if t.id=="compact" else t
+            for t in observed.tensors))
+        first = policy(observed)
+        self.assertEqual((first.kind,first.target_id,first.dst),("COPY","wg","vram"))
+        observed = replace(observed,tensors=tuple(
+            replace(t,copies=tuple((loc,COPY_READY if loc=="vram" else status)
+                                  for loc,status in t.copies)) if t.id=="wg" else t
+            for t in observed.tensors))
+        second = policy(observed)
+        self.assertEqual((second.kind,second.target_id,second.dst),("COPY","compact","vram"))
+        in_flight = replace(observed,running=(RunningObservation("h2d","compact",None,None),),
+            tensors=tuple(replace(t,copies=tuple((loc,"LOADING" if loc=="vram" else status)
+                for loc,status in t.copies)) if t.id=="compact" else t for t in observed.tensors))
+        waiting = policy(in_flight)
+        self.assertEqual(waiting.kind,"ADVANCE")
+        self.assertIn("wg",policy._protected(in_flight,{t.id:t for t in in_flight.tensors}))
+        ready = replace(observed,tensors=tuple(replace(t,copies=tuple(
+            (loc,COPY_READY if loc=="vram" else status) for loc,status in t.copies))
+            if t.id=="compact" else t for t in observed.tensors))
+        compute = policy(ready)
+        self.assertEqual((compute.kind,compute.target_id),("COMPUTE","gate"))
+        # Protection is stage scoped. With a one-matrix cache, the consumed
+        # gate weight must become evictable so that up/down can stream.
+        finished = replace(ready,operations=tuple(replace(op,status="DONE")
+            if op.id=="gate" else op for op in ready.operations),tensors=tuple(
+                replace(t,copies=tuple((loc,COPY_READY if loc=="vram" else status)
+                    for loc,status in t.copies)) if t.id=="g" else t for t in ready.tensors))
+        eviction = policy(finished)
+        self.assertEqual((eviction.kind,eviction.target_id),("EVICT","wg"))
+
+    def test_guard_rollback_discards_tentative_input_preparation(self):
+        policy = CompositionPolicy(parse_composition_policy(inline_policy(
+            cache="lru", unit="tensor", budget=32)))
+        observed=region_observation()
+        policy._public_catalogue(observed)
+        tensors={t.id:t for t in observed.tensors}
+        before=policy._intent_snapshot()
+        decision=policy._demand(next(op for op in observed.operations if op.id=="gate"),
+                                observed,tensors,"gpu")
+        self.assertEqual(decision.kind,"COPY")
+        self.assertEqual(policy._preparing_operations,{"gate":"gpu"})
+        policy._restore_intent(before)
+        self.assertFalse(policy._preparing_operations)
+
     def test_partial_group_residency_reserves_all_fragment_bytes(self):
         observed = region_observation()
         observed = replace(observed, tensors=tuple(replace(item, copies=tuple((location, COPY_READY if location == "vram" else status)
@@ -394,6 +445,7 @@ class CompositionTransportTests(unittest.TestCase):
         self.assertEqual(policy.audit_document()["region_bindings"], [])
         self.assertEqual(policy.audit_document()["decisions"], [])
         self.assertEqual(policy.audit_document()["mrs_updates"], [])
+        self.assertEqual(policy._preparing_operations, {})
         self.assertEqual(policy._clock, 0)
         self.assertEqual(policy.audit_document()["transport_decisions"][0]["reason"], "explicit_slot_owner_release")
 
@@ -425,6 +477,79 @@ class CompositionStagedIntegrationTests(unittest.TestCase):
                 self.assertEqual({kind for kind, _ in stages}, {"expert_gate", "expert_up", "expert_swiglu", "expert_down"})
                 self.assertEqual(len({device for _, device in stages}), 1)
             self.assertTrue(run.evaluation.ssd_read_bytes)
+
+
+class PublicCriticalPathPriorityTests(unittest.TestCase):
+    """The ready-order rank is the load released on the other machine."""
+
+    def chain(self, edges, durations, ready=("x", "w")):
+        tensors = [tensor("x", 16, ("dram", "vram")), tensor("w", 32, ("dram", "vram"), "weight")]
+        operations = []
+        for index, (name, kind, inputs, outputs) in enumerate(edges):
+            tensors.append(tensor(outputs[0], 16))
+            operations.append(PublicOperation(name, kind, "NOT_STARTED", inputs, outputs,
+                (DevicePrice("cpu", durations[index], 0, 0),
+                 DevicePrice("gpu", max(1, durations[index] // 2), 0, 0)),
+                phase="prefill", request_id="r", layer_id="L0"))
+        document = inline_policy()
+        document["placements"].update(projection="gpu", attention="gpu", dense_ffn="cpu")
+        policy = CompositionPolicy(parse_composition_policy(document))
+        observation = replace(small_observation(), operations=tuple(operations), tensors=tuple(tensors))
+        return policy, observation, {t.id: t for t in tensors}
+
+    def test_rank_is_the_load_released_elsewhere_not_the_local_or_summed_chain(self):
+        edges = (("proj", "projection", ("x", "w"), ("y",)),
+                 ("attn", "attention", ("y",), ("z",)),
+                 ("ffn", "dense_ffn", ("z",), ("o",)))
+        policy, observation, tensors = self.chain(edges, (10, 20, 40))
+        rank = policy._public_critical_path(observation, tensors)
+        # proj and attn sit on the GPU and both release the 40-unit CPU ffn;
+        # the CPU ffn releases nothing on the GPU.
+        self.assertEqual(rank, {"proj": 40, "attn": 40, "ffn": 0})
+        # Falsify the summed bottom level (55/50/40) and the local-only chain
+        # (15/10/0): either would put the CPU tail first.
+        self.assertNotEqual(rank, {"proj": 55, "attn": 50, "ffn": 40})
+        self.assertNotEqual(rank, {"proj": 15, "attn": 10, "ffn": 0})
+
+    def test_ready_work_that_releases_the_longer_other_chain_ranks_higher(self):
+        edges = (("proj", "projection", ("x", "w"), ("y",)),
+                 ("other", "projection", ("x", "w"), ("v",)),
+                 ("ffn", "dense_ffn", ("y",), ("o",)),
+                 ("small", "dense_ffn", ("v",), ("p",)))
+        policy, observation, tensors = self.chain(edges, (10, 10, 40, 10))
+        rank = policy._public_critical_path(observation, tensors)
+        self.assertEqual((rank["proj"], rank["other"]), (40, 10))
+        self.assertGreater(rank["proj"], rank["other"])
+
+    def test_a_missing_input_transfer_is_charged_to_the_shared_link(self):
+        edges = (("proj", "projection", ("x", "w"), ("y",)), ("ffn", "dense_ffn", ("y",), ("o",)))
+        policy, observation, tensors = self.chain(edges, (10, 40))
+        self.assertEqual(policy._public_critical_path(observation, tensors)["proj"], 40)
+        # "y" is produced but never resident on the CPU: the CPU ffn must pay
+        # its VRAM->DRAM copy (the helper's price is 100 ns), and that pending
+        # link load is what ranks the GPU work that releases it.
+        charged = dict(tensors)
+        charged["y"] = replace(charged["y"], copies=tuple(
+            (location, COPY_READY if location == "vram" else COPY_ABSENT)
+            for location in ("dram", "vram", "ssd")))
+        observation = replace(observation, tensors=tuple(charged.values()))
+        rank = policy._public_critical_path(observation, charged)
+        self.assertEqual((rank["ffn"], rank["proj"]), (100, 100))
+        self.assertIsNone(policy._transfer_estimate(tensor("ghost", 8), "dram"))
+
+    def test_a_cycle_is_rejected_instead_of_returning_a_plausible_number(self):
+        edges = (("a", "projection", ("t2",), ("t1",)),
+                 ("b", "attention", ("t1",), ("t2",)))
+        policy, observation, tensors = self.chain(edges, (10, 20))
+        with self.assertRaises(Unsupported):
+            policy._public_critical_path(observation, tensors)
+
+    def test_placeholder_operation_absent_from_the_public_view_gets_no_rank(self):
+        edges = (("proj", "projection", ("x", "w"), ("y",)),)
+        policy, observation, tensors = self.chain(edges, (10,))
+        rank = policy._public_critical_path(observation, tensors)
+        self.assertEqual(set(rank), {"proj"})
+        self.assertNotIn("future-request", rank)
 
 
 if __name__ == "__main__":

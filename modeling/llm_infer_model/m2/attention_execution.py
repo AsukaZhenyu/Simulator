@@ -282,7 +282,8 @@ def compile_attention_subbatches(compilations: Sequence[CompiledInvocation], exe
     table=M2CostTable(source=first.cost_table.source+";independent_attention_stages",entries=entries,
         validation_only=any(source.cost_table.validation_only for source in sources),
         transfers=transfer_prices,format_version="m2-layer-0.5")
-    _,transfer_document=expand_transfer_costs(table,{name:t["storage_bytes"] for name,t in tensors.items()},transfers)
+    _,transfer_document=expand_transfer_costs(table,{name:t["storage_bytes"] for name,t in tensors.items()},transfers,
+        shared_memory=first.scenario.architecture.memory_mode == "shared")
     workload=deepcopy(first.workload_document)
     workload.update(id=first.workload_document["id"]+":attention-subbatches",tensors=list(tensors.values()),
                     operations=all_ops,outputs=list(goals))

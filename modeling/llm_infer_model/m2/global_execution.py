@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..tensor.engine import (Action, ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY,
+from ..tensor.engine import (Action, ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE,
     ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD)
 from ..tensor.spec import (InvalidInput, Unsupported, build_scenario, OP_DONE,
     ROLE_WEIGHT, ROLE_INTERMEDIATE, COPY_READY, ROUTE_ENDS)
@@ -63,6 +63,8 @@ class CompiledGlobalExecution:
 class GlobalObservation(CausalObservation):
     release_candidates: tuple[tuple[str, str], ...] = ()
     completed_invocations: tuple[str, ...] = ()
+    arrived_requests: tuple[str, ...] = ()
+    retired_requests: tuple[str, ...] = ()
 
 
 def _exact(value, keys, label):
@@ -103,8 +105,40 @@ def verify_global_sources(compiled):
             raise InvalidInput(f"global source changed after compile: {row['path']}")
 
 
+def _compile_leaf(entry, source_path, sources, overrides, scope_ids):
+    """Read and lower one source-bound invocation for both global formats."""
+    sid = _identity(entry["id"], "invocation scope id")
+    if sid in scope_ids:
+        raise InvalidInput("global invocation scope IDs must be unique")
+    scope_ids.add(sid)
+    ipath = (source_path.parent / entry["invocation_file"]).resolve()
+    from .spec import parse_invocation_document, parse_layer_document
+    from .costs import parse_cost_table
+    from .expand import compile_invocation
+    invocation = parse_invocation_document(_read(ipath, sources), where=str(ipath))
+    if invocation.layer_file is None:
+        raise InvalidInput("global invocation requires layer_file")
+    layer_path = ipath.parent / invocation.layer_file
+    layer = parse_layer_document(_read(layer_path, sources), where=str(layer_path))
+    costs = (invocation.raw_cost_table if invocation.raw_cost_table is not None
+             else _read(ipath.parent / invocation.costs_file, sources))
+    compiled = compile_invocation(layer, invocation, parse_cost_table(costs), where=str(ipath))
+    execution = overrides.get(sid)
+    if sid not in overrides and entry["execution_file"] is not None:
+        from .execution_pipeline import parse_transform
+        execution = parse_transform(_read(source_path.parent / entry["execution_file"], sources))
+    if execution is not None:
+        from .execution_pipeline import apply_execution_transform
+        compiled = apply_execution_transform(compiled, execution)
+    elif sid in overrides:
+        raise InvalidInput("execution override cannot be null")
+    if compiled.layer.ffn == "moe" and compiled.invocation.information_mode != "causal_replay":
+        raise Unsupported("global MoE refuses offline_oracle inputs")
+    return compiled
+
+
 def compile_global_execution_file(path: str | Path, *, execution_overrides=(),
-                                  visibility_mode="scope_barriers") -> CompiledGlobalExecution:
+                                  visibility_mode="scope_barriers", handoffs=()) -> CompiledGlobalExecution:
     """Compile finite model ports with optional scope-bound mapping choices.
 
     Each override is ``(invocation_scope_id, parsed_execution_spec)``. It
@@ -131,6 +165,12 @@ def compile_global_execution_file(path: str | Path, *, execution_overrides=(),
         overrides[sid]=binding[1]
     source_path=Path(path).resolve(); sources={}
     document=_read(source_path,sources)
+    if document.get("format_version") == "global-execution-0.2":
+        from .request_flow import compile_request_flow
+        return compile_request_flow(document, source_path, sources, overrides,
+                                    handoffs=handoffs, visibility_mode=visibility_mode)
+    if handoffs:
+        raise Unsupported("P/D handoff bindings require the explicit global-execution-0.2 request-flow model")
     _exact(document,{"format_version","id","rounds"},"global_execution")
     if document["format_version"]!=FORMAT_VERSION:raise Unsupported("unsupported global execution version")
     _identity(document["id"],"global_execution.id")
@@ -201,7 +241,7 @@ def _combine(document,rounds,sources,*,visibility_mode="scope_barriers"):
     scopes=[]; gate_rows=[]; stage_metadata={}; row_scopes={}; subweight_catalog={}; weight_owners={}
     latest_blocks={}; layer_signatures={}; parent_versions={}; previous_round_hidden=None
     previous_scope_ops=(); hidden_uses={}; tensor_owners={}; expert_catalog={}; final_hidden_goals={}
-    global_weight_children={}; global_weight_partitions={}; pipeline_bindings=[]
+    global_weight_children={}; global_weight_partitions={}; pipeline_bindings=[]; global_weight_views=[]
 
     def add_tensor(entry):
         tid=entry["id"]
@@ -333,6 +373,10 @@ def _combine(document,rounds,sources,*,visibility_mode="scope_barriers"):
                 tid=part["tensor_id"]
                 old=global_weight_partitions.setdefault(tid,deepcopy(part))
                 if old!=part:raise InvalidInput("persistent weight partition geometry changed across rounds")
+            for view in boundary.get("ffn_execution",{}).get("weight_views",()):
+                # Views describe compute ranges over one retained allocation;
+                # they are not entries in the physical partition catalogue.
+                global_weight_views.append(dict(deepcopy(view), invocation_id=sid))
             if boundary.get("execution_pipeline"):
                 pipeline_bindings.append(dict(invocation_id=sid,pipeline=deepcopy(boundary["execution_pipeline"])))
             for part in row.get("subweights",[]):
@@ -341,10 +385,16 @@ def _combine(document,rounds,sources,*,visibility_mode="scope_barriers"):
                 subweight_catalog[part["parent_weight_id"]]=deepcopy(part)
             for route,costs in leaf.scenario_document["costs"]["transfer"].items():
                 for tid,price in costs.items():add_price(route,remap[tid],price)
+            if leaf.scenario.architecture.memory_mode == "shared":
+                for route in ("dram_to_vram", "vram_to_dram"):
+                    allowed[route].update(remap[tid] for tid in leaf.scenario_document["mapspace"]["allowed_transfers"].get(route, ()))
             # Catalogue prefetch is public even for inactive experts. Exact
             # costs must exist, rather than being inferred from an active peer.
             for tensor in leaf.scenario.workload.tensors:
                 if tensor.role!=ROLE_WEIGHT:continue
+                if leaf.scenario.architecture.memory_mode == "shared":
+                    for route in ("dram_to_vram", "vram_to_dram"):
+                        allowed[route].add(tensor.id)
                 for route in ROUTE_ENDS:
                     price=leaf.cost_table.transfers.get((route,tensor.storage_bytes))
                     if price is not None:add_price(route,tensor.id,dict(duration_ns=price.duration_ns))
@@ -399,7 +449,8 @@ def _combine(document,rounds,sources,*,visibility_mode="scope_barriers"):
     scenario=build_scenario(wd,sd,where="global_execution")
     global_boundary=dict(row_execution=dict(tensor_row_scopes=row_scopes,operation_stages=stage_metadata,
                             subweights=list(subweight_catalog.values())),
-        ffn_execution=dict(weight_children=global_weight_children,weight_partitions=list(global_weight_partitions.values())),
+        ffn_execution=dict(weight_children=global_weight_children,weight_partitions=list(global_weight_partitions.values()),
+                           weight_views=global_weight_views),
         execution_pipelines=pipeline_bindings,
         global_execution=dict(format_version=FORMAT_VERSION,invocation_scope_ids=[s.id for s in scopes],
             execution_bindings=[dict(invocation_id=s.id,variant=s.execution_variant) for s in scopes],
@@ -422,12 +473,19 @@ class _GlobalVisibility:
         self.compiled=compiled
         self.ops=compiled.scenario.workload.operation_by_id
         self.weights=tuple(t.id for t in compiled.scenario.workload.tensors if t.role==ROLE_WEIGHT)
-    def opened(self,scope,state):return all(state.op(oid)==OP_DONE for oid in scope.dependency_operations)
+        flow = (compiled.aggregate.physical_boundary or {}).get("request_flow", {})
+        self.requests = tuple(flow.get("requests", ()))
+        self.operation_arrivals = {oid: row["arrival_ns"] for row in self.requests for oid in row["operation_ids"]}
+    def arrived(self, oid, state):
+        return state.t >= self.operation_arrivals.get(oid, 0)
+    def opened(self,scope,state):
+        return (all(self.arrived(oid,state) for oid in scope.operation_ids)
+                and all(state.op(oid)==OP_DONE for oid in scope.dependency_operations))
     def closed(self,scope,state):return all(state.op(oid)==OP_DONE for oid in scope.operation_ids)
     def visible_operation_ids(self,state):
         result=[]
         for oid,dependencies in self.compiled.gate_operations:
-            if all(state.op(d)==OP_DONE for d in dependencies):result.append(oid)
+            if self.arrived(oid,state) and all(state.op(d)==OP_DONE for d in dependencies):result.append(oid)
         for scope in self.compiled.invocation_scopes:
             if self.opened(scope,state):
                 result.extend(scope.operation_ids if all(state.op(o)==OP_DONE for o in scope.router_operation_ids) else scope.static_operation_ids)
@@ -444,7 +502,7 @@ class _GlobalVisibility:
     def allow_action(self,action,state):
         if action.kind==ACTION_ADVANCE:return True
         if action.kind==ACTION_COMPUTE:return action.target_id in self.visible_operation_ids(state)
-        if action.kind in (ACTION_COPY,ACTION_READ_SSD,ACTION_WRITE_SSD,ACTION_EVICT):return action.target_id in self.visible_tensor_ids(state)
+        if action.kind in (ACTION_COPY,ACTION_SHARE,ACTION_READ_SSD,ACTION_WRITE_SSD,ACTION_EVICT):return action.target_id in self.visible_tensor_ids(state)
         return False
 
 
@@ -467,6 +525,13 @@ class GlobalM2Session(CausalM2Session):
         self._compiled=compiled.aggregate;self._execution_spec=None
         self._scenario_document=deepcopy(compiled.aggregate.scenario_document)
         self._visibility=_GlobalVisibility(compiled)
+        from .request_flow import RequestArrivalBoundary
+        arrivals = {row["arrival_ns"] for row in self._visibility.requests}
+        # A private no-op time boundary wakes the ordinary runtime, including
+        # interrupting a long in-flight compute. Future arrival times are never
+        # included in policy observations or control commands.
+        environment_events = tuple(sorted((*environment_events,
+            *(RequestArrivalBoundary(t_ns=t) for t in arrivals)), key=lambda event: event.t_ns))
         self._runtime=create_runtime(compiled.scenario,services=services,environment_events=environment_events,
                                      visibility=self._visibility,reclaim_requests=reclaim_requests,control_costs=control_costs)
         from .execution_pipeline import materialized_weight_members
@@ -488,15 +553,27 @@ class GlobalM2Session(CausalM2Session):
         boundary=self._compiled.physical_boundary["global_execution"]
         protected=set(boundary["kv_ids"])|set(boundary["weight_ids"])|set(self._runtime.scenario.goal.output_locations)
         candidates=[]
+        arrived = tuple(row["request_id"] for row in self._visibility.requests if state.t >= row["arrival_ns"])
+        retired = tuple(row["request_id"] for row in self._visibility.requests
+            if state.t >= row["arrival_ns"] and all(state.op(oid)==OP_DONE for oid in row["operation_ids"])
+            and all(state.copy_at(tid, self._runtime.scenario.goal.output_locations[tid]) == COPY_READY
+                    for tid in row["final_hidden_ids"]))
+        retired_kv = {tid for row in self._visibility.requests if row["request_id"] in retired
+                      for tid in row["kv_tensor_ids"]}
         for tensor in base.tensors:
-            if tensor.id in protected:continue
+            if tensor.id in protected and tensor.id not in retired_kv:continue
+            if tensor.id in retired_kv:
+                candidates.extend((tensor.id,location) for location in ("dram","vram")
+                                  if tensor.status_at(location)==COPY_READY)
+                continue
             owner=boundary["tensor_owners"].get(tensor.id)
             if owner not in closed:continue
             if any(scope not in closed for scope in boundary["hidden_port_successors"].get(tensor.id,())):continue
             candidates.extend((tensor.id,location) for location in ("dram","vram")
                               if tensor.status_at(location)==COPY_READY)
         observation=GlobalObservation(**{**base.__dict__,"operations":operations},release_candidates=tuple(sorted(candidates)),
-                                      completed_invocations=tuple(scope.id for scope in self.global_compiled.invocation_scopes if scope.id in closed))
+                                      completed_invocations=tuple(scope.id for scope in self.global_compiled.invocation_scopes if scope.id in closed),
+                                      arrived_requests=arrived, retired_requests=retired)
         from .routing_scores import reveal_routing_scores
         return reveal_routing_scores(observation,self._score_rows)
     def state_out(self):
@@ -518,6 +595,7 @@ class GlobalM2Session(CausalM2Session):
             weight_versions=self._compiled.physical_boundary["row_execution"]["subweights"],
             weight_children=self._compiled.physical_boundary.get("ffn_execution",{}).get("weight_children",{}),
             weight_partitions=self._compiled.physical_boundary.get("ffn_execution",{}).get("weight_partitions",[]),
+            weight_views=self._compiled.physical_boundary.get("ffn_execution",{}).get("weight_views",[]),
             declared_parent_versions=self._compiled.physical_boundary["global_execution"]["declared_parent_versions"],
             runtime_state=asdict(self._runtime.state),
             compute_progress=[asdict(row) for row in self._runtime.compute_progress_document()],

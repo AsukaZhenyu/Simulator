@@ -14,9 +14,9 @@ import hashlib
 from pathlib import Path
 
 from llm_infer_model.m2.causal import (CausalObservation, DevicePrice, current_compute_duration_ns,
-    PublicOperation, PublicTensor, TransferPrice)
+    PublicOperation, PublicTensor, TransferPrice, public_storage_metadata)
 from llm_infer_model.tensor.engine import (Action, ACTION_ADVANCE,
-    ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD)
+    ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD)
 from llm_infer_model.tensor.runtime import ExecutionCommand, create_runtime, dispatch_command
 from llm_infer_model.tensor.services import ServiceSession
 from llm_infer_model.tensor.spec import (COPY_READY, InvalidInput, OP_DONE,
@@ -119,7 +119,7 @@ class _BlockVisibility:
             return True
         if action.kind == ACTION_COMPUTE:
             return action.target_id in self.visible_operation_ids(state)
-        if action.kind in (ACTION_COPY, ACTION_READ_SSD, ACTION_WRITE_SSD, ACTION_EVICT):
+        if action.kind in (ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD, ACTION_WRITE_SSD, ACTION_EVICT):
             return action.target_id in self._tensors
         return False
 
@@ -168,6 +168,9 @@ class CausalBlockSession:
                     continue
                 price = scenario.costs.transfer_cost(route, tid)
                 if price is None:
+                    if src != "ssd" and dst != "ssd" and scenario.architecture.pool_of(src) == scenario.architecture.pool_of(dst):
+                        transfers.append(TransferPrice(route, src, dst, 0, timing_scope="shared_access_only"))
+                        continue
                     raise Unsupported(f"missing exact block transfer cost {tid}/{route}")
                 if isinstance(self._runtime, ServiceSession) and route in ("dram_to_vram", "vram_to_dram"):
                     transfers.append(TransferPrice(route, src, dst, None,
@@ -180,7 +183,8 @@ class CausalBlockSession:
                 tuple((location, state.copy_at(tid, location)) for location in ("dram", "vram", "ssd")),
                 tuple(transfers), allocation_bytes=tuple((domain, scenario.size_alloc(tid, domain))
                     for domain in ("dram", "vram")), initial_locations=tensor.initial_locations,
-                goal_location=scenario.goal.output_locations.get(tid)))
+                goal_location=scenario.goal.output_locations.get(tid),
+                **public_storage_metadata(scenario, state, tid)))
         closed = tuple(task.operation_id for task in self.model.tasks if state.op(task.operation_id) == OP_DONE)
         index = self._visibility.current_index(state)
         active = self.model.tasks[index] if index < len(self.model.tasks) else None
@@ -253,6 +257,9 @@ class CausalBlockSession:
     def persistent_state_document(self):
         state = self._runtime.state
         return dict(format_version="block-persistent-state-0.1", t_ns=state.t,
+            **(dict(memory_mode="shared", runtime_state=asdict(state),
+                    allocation_identity_scope="physical_tensor_allocations_and_logical_access_views")
+               if self._runtime.scenario.architecture.memory_mode == "shared" else {}),
             status=self.result().evaluation.status,
             state_scope="finite_block_inventory_and_in_flight_services",
             kv_identity_contract="immutable_absolute_position_tensor_ids_no_in_place_mutation",

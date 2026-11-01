@@ -6,12 +6,24 @@ from fractions import Fraction
 from types import MappingProxyType
 from typing import Mapping
 
-from .parameters import (InvalidModel, decode_fraction, encode_fraction,
+from .parameters import (InstantaneousRate, InvalidModel, decode_fraction, encode_fraction,
                          exact_fields, integer, nonempty, rational)
 
 
 @dataclass(frozen=True)
 class WorkDemand:
+    """Conserved work, including explicitly scoped active time of one thread.
+
+    ``thread_cpu_ns`` progresses only when its named service rate is available.
+    Such work may include declared runtime work; it is not automatically useful
+    FLOPs, GPU service, or an inclusive completed-action duration. A supplied
+    per-thread service trace must have an independent source/declared policy;
+    this contract does not derive it from heldout scheduling or utilization.
+    ``cpu_cycle`` is raw scoped CPU counter work, serviced by an empirical
+    ``cpu_cycle/s`` trajectory without converting cycles to active nanoseconds.
+    Its amount can include user/kernel runtime work; no useful-FLOP equivalence
+    or operating-system scheduling policy is inferred.
+    """
     parameter: str
     amount: int
     unit: str
@@ -19,8 +31,8 @@ class WorkDemand:
     def __post_init__(self):
         nonempty(self.parameter, "work parameter")
         integer(self.amount, "work amount")
-        if not isinstance(self.unit, str) or self.unit not in {"flop", "byte"}:
-            raise InvalidModel("work unit must be flop or byte")
+        if not isinstance(self.unit, str) or self.unit not in {"flop", "byte", "invocation", "thread_cpu_ns", "cpu_cycle"}:
+            raise InvalidModel("work unit must be flop, byte, invocation, thread_cpu_ns or cpu_cycle")
 
     def to_dict(self):
         return {"parameter": self.parameter, "amount": self.amount, "unit": self.unit}
@@ -60,6 +72,17 @@ class Task:
     latency is also a separate task, not an addition to already measured waits.
     ``extra_resources`` explicitly reserves shared engines or bandwidth domains;
     no implicit contention or proportional resource sharing is inferred.
+    Naming a resource for a thread only creates its exclusive execution lane;
+    explicit ``thread_cpu_ns/s`` inputs describe its CPU supply separately.
+    They do not automatically conserve shared CPU capacity between lanes or
+    implement preemption, runnable queues or an operating-system scheduler.
+
+    ``waits_for`` declares a completion gate with no separate work or fixed
+    duration. Launch dependencies still control when it may start. The gate
+    holds its explicitly named resources and reservations until every awaited
+    task completes. A CPU resource can express polling occupancy; a separate
+    virtual wait resource can express a blocked caller that releases the CPU.
+    The model never infers either choice from utilization or resource names.
     """
 
     id: str
@@ -69,6 +92,7 @@ class Task:
     fixed_parameter: str | None = None
     extra_resources: tuple[str, ...] = ()
     memory: tuple[MemoryReservation, ...] = ()
+    waits_for: tuple[str, ...] = ()
 
     def __post_init__(self):
         nonempty(self.id, "task id")
@@ -78,14 +102,17 @@ class Task:
             if type(value) is not tuple or any(not isinstance(x, item_type) for x in value):
                 raise InvalidModel(f"task {name} must be a tuple of {item_type.__name__}")
         for name, value in (("depends_on", self.depends_on),
-                            ("extra_resources", self.extra_resources)):
+                            ("extra_resources", self.extra_resources),
+                            ("waits_for", self.waits_for)):
             if type(value) is not tuple:
                 raise InvalidModel(f"task {name} must be a tuple")
             for item in value:
                 nonempty(item, name)
             if len(set(value)) != len(value):
                 raise InvalidModel(f"duplicate {name}")
-        if (self.fixed_parameter is None) == (not self.demands):
+        if self.waits_for and (self.fixed_parameter is not None or self.demands):
+            raise InvalidModel("completion gate cannot also have demands or fixed latency")
+        if not self.waits_for and (self.fixed_parameter is None) == (not self.demands):
             raise InvalidModel("task requires either physical demands or one fixed parameter")
         if self.fixed_parameter is not None:
             nonempty(self.fixed_parameter, "fixed parameter")
@@ -93,15 +120,20 @@ class Task:
             raise InvalidModel("primary resource repeated in extra_resources")
         if len({d.parameter for d in self.demands}) != len(self.demands):
             raise InvalidModel("duplicate work-demand parameter")
+        if any(d.unit == "invocation" for d in self.demands) and len(self.demands) != 1:
+            raise InvalidModel("an inclusive invocation response cannot be combined with physical demands")
         if len({m.domain for m in self.memory}) != len(self.memory):
             raise InvalidModel("duplicate task memory domain")
 
     def to_dict(self):
-        return {"id": self.id, "resource": self.resource,
+        result = {"id": self.id, "resource": self.resource,
                 "demands": [d.to_dict() for d in self.demands],
                 "depends_on": list(self.depends_on), "fixed_parameter": self.fixed_parameter,
                 "extra_resources": list(self.extra_resources),
                 "memory": [{"domain": m.domain, "bytes": m.bytes} for m in self.memory]}
+        if self.waits_for:
+            result["waits_for"] = list(self.waits_for)
+        return result
 
 
 @dataclass(frozen=True)
@@ -120,14 +152,14 @@ class Graph:
         if len(task_ids) != len(self.tasks) or len(domains) != len(self.memory_domains):
             raise InvalidModel("duplicate task or memory domain")
         for task in self.tasks:
-            if not set(task.depends_on) <= task_ids:
+            if not set(task.depends_on + task.waits_for) <= task_ids:
                 raise InvalidModel(f"unknown dependency for {task.id}")
             if any(m.domain not in domains for m in task.memory):
                 raise InvalidModel(f"unknown memory domain for {task.id}")
         visited = set()
         while len(visited) != len(self.tasks):
             ready = {t.id for t in self.tasks if t.id not in visited
-                     and set(t.depends_on) <= visited}
+                     and set(t.depends_on + t.waits_for) <= visited}
             if not ready:
                 raise InvalidModel("task graph contains a dependency cycle")
             visited.update(ready)
@@ -145,9 +177,12 @@ class Graph:
             raise InvalidModel("graph tasks and memory_domains must be lists")
         tasks = []
         for item in obj["tasks"]:
-            item = exact_fields(item, {"id", "resource", "demands", "depends_on",
-                "fixed_parameter", "extra_resources", "memory"}, "task")
-            for name in ("demands", "depends_on", "extra_resources", "memory"):
+            fields = {"id", "resource", "demands", "depends_on",
+                "fixed_parameter", "extra_resources", "memory"}
+            if isinstance(item, dict) and "waits_for" in item:
+                fields.add("waits_for")
+            item = exact_fields(item, fields, "task")
+            for name in ("demands", "depends_on", "extra_resources", "memory") + (("waits_for",) if "waits_for" in item else ()):
                 if not isinstance(item[name], list):
                     raise InvalidModel(f"task {name} must be a list")
             demands = tuple(WorkDemand(**exact_fields(d, {"parameter", "amount", "unit"},
@@ -155,7 +190,8 @@ class Graph:
             memory = tuple(MemoryReservation(**exact_fields(m, {"domain", "bytes"},
                                                              "reservation")) for m in item["memory"])
             tasks.append(Task(item["id"], item["resource"], demands, tuple(item["depends_on"]),
-                              item["fixed_parameter"], tuple(item["extra_resources"]), memory))
+                              item["fixed_parameter"], tuple(item["extra_resources"]), memory,
+                              tuple(item.get("waits_for", ()))))
         domains = tuple(MemoryDomain(**exact_fields(d, {"name", "capacity_parameter",
             "resident_bytes", "external_bytes"}, "memory domain")) for d in obj["memory_domains"])
         return cls(tuple(tasks), domains)
@@ -164,7 +200,7 @@ class Graph:
 @dataclass(frozen=True)
 class ResourcePoint:
     at_ns: int
-    rates: Mapping[str, int | Fraction] = field(default_factory=dict)
+    rates: Mapping[str, int | Fraction | InstantaneousRate] = field(default_factory=dict)
     capacities: Mapping[str, int] = field(default_factory=dict)
     external_memory: Mapping[str, int] = field(default_factory=dict)
 
@@ -177,7 +213,7 @@ class ResourcePoint:
             copied = {}
             for name, value in mapping.items():
                 nonempty(name, attr)
-                copied[name] = rational(value, name) if attr == "rates" else integer(value, name)
+                copied[name] = (value if isinstance(value, InstantaneousRate) else rational(value, name)) if attr == "rates" else integer(value, name)
             object.__setattr__(self, attr, MappingProxyType(copied))
 
     def to_dict(self):

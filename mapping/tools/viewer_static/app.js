@@ -63,6 +63,7 @@ const S = {
 const ACTION_LABEL = {
   COPY_H2D: 'COP',
   COPY: 'CPY',
+  SHARE: 'SHR',
   READ_SSD: 'RSD',
   WRITE_SSD: 'WSD',
   COMPUTE: 'CMP',
@@ -306,6 +307,9 @@ function renderHeader() {
     { k: '动作数', t: 'solution.action_count', v: num(payload.solution.action_count) },
     { k: '展开的状态数', t: 'explore.verdict.expanded_states', v: num(payload.explore.verdict.expanded_states) },
   ];
+  if (payload.m1 && payload.m1.memory_mode === 'shared') {
+    rows[1] = { k: '共享物理内存峰值', t: 'solution.peak_shared_bytes', v: fmtBytes(payload.solution.peak_shared_bytes) };
+  }
 
   const head = byId('headline');
   clear(head);
@@ -1071,9 +1075,10 @@ function renderTimeline() {
     if (event.resource != null) continue;
     const cx = x(event.t_ns);
     const isEvict = event.kind === 'EVICT';
+    const isShare = event.kind === 'SHARE';
     const dot = svgEl('circle', {
       cx: cx, cy: markY + 5, r: isEvict ? 3.4 : 2.4,
-      fill: isEvict ? 'var(--bad)' : 'var(--ink-3)',
+      fill: isEvict ? 'var(--bad)' : (isShare ? 'var(--ok)' : 'var(--ink-3)'),
       opacity: event.t_ns >= nowNs ? 0.35 : 1,
     });
     // 0.2 的 EVICT 带 ``location``（释放的是哪个域的副本）——这一格正是「锁定 / 释放」
@@ -1082,7 +1087,7 @@ function renderTimeline() {
     gantt.appendChild(dot);
   }
   gantt.appendChild(svgEl('text', { x: padL - 9, y: markY + 9, class: 'axis', 'text-anchor': 'end' },
-    '释放/推进'));
+    payload.m1 && payload.m1.memory_mode === 'shared' ? '共享/释放/推进' : '释放/推进'));
   gantt.appendChild(svgEl('text', { x: padL, y: height - 8, class: 'axis' }, '0'));
   gantt.appendChild(svgEl('text', {
     x: padL + plotW, y: height - 8, class: 'axis', 'text-anchor': 'end',
@@ -1094,22 +1099,24 @@ function renderTimeline() {
 
   // --- 容量曲线：显存一本账，0.2 再加内存一本。上限**只在 limits**，states 里没有。
   const limits = payload.source.limits || {};
+  const shared = payload.m1 && payload.m1.memory_mode === 'shared';
   drawMemoryCurve(byId('vram-svg'), {
     states: states, nowNs: nowNs, makespan: makespan,
-    limit: limits.vram_capacity_bytes,
-    usedOf: state => state.used_vram_bytes,
-    label: '显存 VRAM', color: 'var(--accent)',
+    limit: shared ? limits.shared_capacity_bytes : limits.vram_capacity_bytes,
+    usedOf: state => shared ? state.used_shared_bytes : state.used_vram_bytes,
+    label: shared ? '共享物理内存' : '显存 VRAM', color: 'var(--accent)',
   });
-  byId('vram-name').textContent = '显存 VRAM · 上限 ' +
-    (limits.vram_capacity_bytes == null ? '不设' : fmtBytes(limits.vram_capacity_bytes)) +
-    ' · 预留 ' + fmtBytes(limits.vram_runtime_reserved_bytes || 0);
+  const mainLimit = shared ? limits.shared_capacity_bytes : limits.vram_capacity_bytes;
+  byId('vram-name').textContent = (shared ? '共享物理内存 · 容量只计一次 · 上限 ' : '显存 VRAM · 上限 ') +
+    (mainLimit == null ? '不设' : fmtBytes(mainLimit)) +
+    ' · 预留 ' + fmtBytes((shared ? limits.shared_runtime_reserved_bytes : limits.vram_runtime_reserved_bytes) || 0);
 
   // 内存那条只有 0.2 有：0.1 压根没有 DRAM 这本账（``State`` 的文档写着），屏上也就没有
   // 这个格子。SSD **两条都不画**——它没有容量。
   const dramWrap = byId('dram-wrap');
   const m1 = payload.m1;
-  dramWrap.hidden = !m1;
-  if (m1) {
+  dramWrap.hidden = !m1 || shared;
+  if (m1 && !shared) {
     drawMemoryCurve(byId('dram-svg'), {
       states: states, nowNs: nowNs, makespan: makespan,
       limit: limits.dram_capacity_bytes,
@@ -1808,9 +1815,10 @@ function renderParams() {
   /** 有些旋钮在 scenario 里是嵌套的（costs.compute.<op>.duration_ns），
    *  echo 给的是扁平的点分路径，这里只用于显示，回填走的仍是 edit_scenario 的键。 */
   const m1 = payload.m1;
+  const shared = m1 && m1.memory_mode === 'shared';
   const vram = document.createElement('input');
-  vram.type = 'number'; vram.value = echo.vram_capacity_bytes;
-  knob('VRAM 容量', 'architecture.vram_capacity_bytes', vram);
+  vram.type = 'number'; vram.value = shared ? echo.shared_capacity_bytes : echo.vram_capacity_bytes;
+  knob(shared ? '共享物理内存容量' : 'VRAM 容量', shared ? 'architecture.shared_capacity_bytes' : 'architecture.vram_capacity_bytes', vram);
 
   // **两个域的预留名字不同**，这不是笔误：0.1 只有一笔 ``runtime_reserved_bytes``，
   // 0.2 的 VRAM 预留叫 ``vram_runtime_reserved_bytes``（``reserved_of(LOC_VRAM)`` 只在
@@ -1818,14 +1826,14 @@ function renderParams() {
   // 数字不动，而表单显示的是用户刚敲的那个数。所以按版本取名字。
   const reserved = document.createElement('input');
   reserved.type = 'number';
-  reserved.value = m1 ? echo.vram_runtime_reserved_bytes : echo.runtime_reserved_bytes;
-  knob('VRAM 运行时预留',
-    m1 ? 'architecture.vram_runtime_reserved_bytes' : 'architecture.runtime_reserved_bytes',
+  reserved.value = shared ? echo.shared_runtime_reserved_bytes : (m1 ? echo.vram_runtime_reserved_bytes : echo.runtime_reserved_bytes);
+  knob(shared ? '共享物理内存运行时预留' : 'VRAM 运行时预留',
+    shared ? 'architecture.shared_runtime_reserved_bytes' : (m1 ? 'architecture.vram_runtime_reserved_bytes' : 'architecture.runtime_reserved_bytes'),
     reserved);
 
   const dram = document.createElement('input');
   const dramReserved = document.createElement('input');
-  if (m1) {
+  if (m1 && !shared) {
     dram.type = 'number'; dram.value = echo.dram_capacity_bytes;
     knob('内存容量（DRAM）', 'architecture.dram_capacity_bytes', dram);
     dramReserved.type = 'number'; dramReserved.value = echo.dram_runtime_reserved_bytes;
@@ -1919,9 +1927,15 @@ function renderParams() {
     if (m1) {
       // **0.2 的预留键名与 0.1 不同**（见上面那个旋钮的注释）：这里写旧名字服务端会收下
       // 但不生效，所以按版本给。
-      params.vram_runtime_reserved_bytes = Number(reserved.value);
-      params.dram_capacity_bytes = Number(dram.value);
-      params.dram_runtime_reserved_bytes = Number(dramReserved.value);
+      if (shared) {
+        delete params.vram_capacity_bytes;
+        params.shared_capacity_bytes = Number(vram.value);
+        params.shared_runtime_reserved_bytes = Number(reserved.value);
+      } else {
+        params.vram_runtime_reserved_bytes = Number(reserved.value);
+        params.dram_capacity_bytes = Number(dram.value);
+        params.dram_runtime_reserved_bytes = Number(dramReserved.value);
+      }
       params.allow_cpu_gpu_overlap = !!body.querySelector('[data-flag="allow_cpu_gpu_overlap"]').checked;
     } else {
       params.runtime_reserved_bytes = Number(reserved.value);
@@ -1965,9 +1979,15 @@ function renderParams() {
       allow_eviction: echo.allow_eviction,
     };
     if (m1) {
-      params.vram_runtime_reserved_bytes = echo.vram_runtime_reserved_bytes;
-      params.dram_capacity_bytes = echo.dram_capacity_bytes;
-      params.dram_runtime_reserved_bytes = echo.dram_runtime_reserved_bytes;
+      if (shared) {
+        delete params.vram_capacity_bytes;
+        params.shared_capacity_bytes = echo.shared_capacity_bytes;
+        params.shared_runtime_reserved_bytes = echo.shared_runtime_reserved_bytes;
+      } else {
+        params.vram_runtime_reserved_bytes = echo.vram_runtime_reserved_bytes;
+        params.dram_capacity_bytes = echo.dram_capacity_bytes;
+        params.dram_runtime_reserved_bytes = echo.dram_runtime_reserved_bytes;
+      }
       params.allow_cpu_gpu_overlap = echo.allow_cpu_gpu_overlap;
       params.compute_ns = echo.compute_ns;
       params.transfer_ns = echo.transfer_ns;
@@ -2227,9 +2247,10 @@ function renderInspector() {
   const rows = [
     ['时间 t', fmtNs(snap.t_ns)],
     ['累计代价 g', isReplay() ? fmtNs(snap.t_ns) : fmtNs(currentNode() ? currentNode().g_ns : null)],
-    ['显存占用', fmtBytes(snap.used_vram_bytes)],
+    [payload.m1 && payload.m1.memory_mode === 'shared' ? '共享物理内存占用' : '显存占用',
+      fmtBytes(payload.m1 && payload.m1.memory_mode === 'shared' ? snap.used_shared_bytes : snap.used_vram_bytes)],
   ];
-  if (payload.m1) rows.push(['内存占用', fmtBytes(snap.used_dram_bytes)]);
+  if (payload.m1 && payload.m1.memory_mode !== 'shared') rows.push(['内存占用', fmtBytes(snap.used_dram_bytes)]);
   rows.push(['模式', isReplay() ? '回放计划' : '单步探索']);
   // 「这一步在哪台机器上干的」：动作字典里**有** device/src/dst/location，屏上不写出来
   // 就等于把它们丢了。0.1 的动作没有这几个字段，`routeText` 于是返回空串，这一行不出。
@@ -2279,7 +2300,7 @@ function renderInspector() {
       if (!entry) continue;
       const used = entry.used();
       const limit = place.capacity_bytes;
-      section('副本 · ' + place.label + '（' + place.id + '）');
+      section((payload.m1.memory_mode === 'shared' && place.physical_pool === 'shared' ? '访问视图 · ' : '副本 · ') + place.label + '（' + place.id + '）');
       const line = document.createElement('p');
       line.className = 'curve-name';
       line.textContent = (used == null ? '没有用量这一说' : '已用 ' + fmtBytes(used)) +
@@ -2287,6 +2308,7 @@ function renderInspector() {
         ' · 对齐 ' + fmtBytes(place.alignment_bytes) +
         (place.device ? ' · 设备 ' + place.device : '') +
         (place.can_evict ? ' · 可淘汰' : ' · 不可淘汰');
+      if (place.physical_pool === 'shared') line.textContent += ' · 与另一视图共用同一物理池，勿相加；移除引用不一定释放字节';
       panel.appendChild(line);
       const status = entry.status() || {};
       chips(graph.tensors.map(tensor => {

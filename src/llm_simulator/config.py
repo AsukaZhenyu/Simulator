@@ -121,8 +121,10 @@ class Hardware:
     cpu=None or gpu=None disables computation on that device. The existing
     runtime retains both storage domains, so each capacity must be >= 1 even
     when that domain has no compute device. GPU execution requires an explicit
-    DRAM/VRAM transfer bandwidth. The current MoE backend additionally requires
-    both SSD rates because it declares all four possible transfer directions.
+    DRAM/VRAM transfer bandwidth in separate mode. In shared mode, both logical
+    views reference one shared_capacity_bytes physical pool; same-buffer SHARE
+    needs no transfer quote. Explicit COPY still needs one. The MoE backend
+    requires both SSD rates for its declared SSD transfer directions.
     SSD models average sequential payload bandwidth; there is no SSD capacity,
     page, filesystem or queue-depth model in this API.
     """
@@ -135,6 +137,10 @@ class Hardware:
     ssd_read_bandwidth_bytes_per_second: float | None = None
     ssd_write_bandwidth_bytes_per_second: float | None = None
     transfer_latency_ns: int = 0
+    memory_mode: str = "separate"
+    shared_capacity_bytes: int | None = None
+    shared_runtime_reserved_bytes: int = 0
+    shared_alignment_bytes: int = 1
 
     def __post_init__(self):
         for name in ("cpu", "gpu"):
@@ -149,6 +155,37 @@ class Hardware:
                      "ssd_write_bandwidth_bytes_per_second"):
             _rate(getattr(self, name), f"Hardware.{name}", optional=True)
         _integer(self.transfer_latency_ns, "Hardware.transfer_latency_ns", 0)
+        if self.memory_mode not in ("separate", "shared"):
+            raise ValueError("Hardware.memory_mode must be 'separate' or 'shared'")
+        _integer(self.shared_runtime_reserved_bytes, "Hardware.shared_runtime_reserved_bytes", 0)
+        _integer(self.shared_alignment_bytes, "Hardware.shared_alignment_bytes")
+        if self.memory_mode == "shared":
+            _integer(self.shared_capacity_bytes, "Hardware.shared_capacity_bytes")
+            if self.shared_runtime_reserved_bytes > self.shared_capacity_bytes:
+                raise ValueError("shared runtime reserve exceeds shared capacity")
+        elif (self.shared_capacity_bytes is not None or self.shared_runtime_reserved_bytes != 0
+              or self.shared_alignment_bytes != 1):
+            raise ValueError("shared capacity/reserve/alignment require memory_mode='shared'")
+
+    @classmethod
+    def shared_memory(cls, *, cpu, gpu, capacity_bytes, runtime_reserved_bytes=0,
+                      alignment_bytes=1, **parameters):
+        """Declare one physical pool accessible by both compute devices.
+
+        The compatibility DRAM/VRAM capacities alias the same physical pool;
+        they must never be added. Same-buffer visibility has zero payload
+        movement in this abstraction. This is not a zero-cost real-platform
+        synchronization measurement or a shared-bandwidth calibration.
+        """
+        if any(key in parameters for key in ("memory_mode", "dram_capacity_bytes",
+                "vram_capacity_bytes", "shared_capacity_bytes",
+                "shared_runtime_reserved_bytes", "shared_alignment_bytes")):
+            raise ValueError("shared_memory() supplies physical-pool configuration")
+        return cls(cpu=cpu, gpu=gpu, dram_capacity_bytes=capacity_bytes,
+                   vram_capacity_bytes=capacity_bytes, memory_mode="shared",
+                   shared_capacity_bytes=capacity_bytes,
+                   shared_runtime_reserved_bytes=runtime_reserved_bytes,
+                   shared_alignment_bytes=alignment_bytes, **parameters)
 
     @property
     def devices(self):

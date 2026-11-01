@@ -110,12 +110,16 @@ class LibraryTests(unittest.TestCase):
         with self.assertRaisesRegex(Unsupported, "ssd_write"):
             simulator.run(scheduling=scheduling)
 
-    def test_dense_batch_is_explicitly_unsupported(self):
+    def test_dense_batch_uses_explicit_independent_request_kernels(self):
         simulator, scheduling = make_demo("dense")
         simulator = Simulator(model=simulator.model, hardware=simulator.hardware,
             workload=Workload(prefill_tokens=3, batch_size=2), cost_model=AnalyticalCosts())
-        with self.assertRaisesRegex(Unsupported, "batch_size=1"):
-            simulator.run(scheduling=scheduling)
+        with simulator.compile(scheduling=scheduling) as compiled:
+            result = compiled.run()
+            self.assertTrue(result.success, result.summary())
+            self.assertIn("independent_per_request_kernel", compiled.metadata["batch_accounting"])
+            layer = json.loads((compiled.directory / "layer0.layer.json").read_text(encoding="utf-8"))
+            self.assertEqual(layer["physical"]["request_accounting"], "independent_per_request_kernel")
 
     def test_replay_and_repeated_execution_are_deterministic(self):
         simulator, scheduling = make_demo("moe")

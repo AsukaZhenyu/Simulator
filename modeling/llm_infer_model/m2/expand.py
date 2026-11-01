@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..tensor.engine import ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, Action
+from ..tensor.engine import ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, Action
 from ..tensor.spec import (
     ALGORITHM_UNIFORM_COST,
     DTYPE_F32,
@@ -512,6 +512,9 @@ def _check_workspace_agreement(
             cost = cost_table.lookup(task.kind, device, task.shape,
                 physical_signature=physical_signatures.get((task.operation_id, device),
                                                           physical_signatures.get(task.operation_id)))
+            if (getattr(layer.physical, "request_accounting", None) == "independent_per_request_kernel"
+                    and cost.provenance != "synthetic_layer"):
+                raise Unsupported("independent_per_request_kernel requires synthetic_layer per-request prices; measured contracts are not extended")
             assert cost.workspace_bytes is not None
             per_request[task.request_id] = max(per_request.get(task.request_id, 0), cost.workspace_bytes)
     for request_id, measured in sorted(per_request.items()):
@@ -623,7 +626,8 @@ def compile_invocation(
         inventory = {tensor["id"]: tensor["storage_bytes"] for tensor in tensors}
         for route in ("dram_to_vram", "vram_to_dram"):
             allowed_transfers[route] = list(inventory)
-        transfer_provenances, transfer_document = expand_transfer_costs(cost_table, inventory, allowed_transfers)
+        transfer_provenances, transfer_document = expand_transfer_costs(cost_table, inventory, allowed_transfers,
+            shared_memory=invocation.hardware.memory_mode == "shared")
     costs_source, costs_document = expand_costs_document(
         cost_table,
         [(task.operation_id, task.kind, dev, task.shape) for task in tasks
@@ -662,6 +666,10 @@ def compile_invocation(
             "absolute_positions": {request.request_id: list(appended[request.request_id])
                                    for request in invocation.requests},
         })
+        if getattr(layer.physical, "request_accounting", None) == "independent_per_request_kernel":
+            boundary.update(request_accounting="independent_per_request_kernel",
+                            invocation_batch=invocation.batch, kernel_batch=1,
+                            timing_accounting="one_per_request_price_per_emitted_macro; not_fused_batch_kernel")
     if boundary is not None and isinstance(layer.physical, CudaDensePhysical):
         boundary.update({
             "device": "gpu", "backend": f"CUDA{layer.physical.cuda_device}",
@@ -700,6 +708,7 @@ def compile_invocation(
         "schema_version": SCHEMA_VERSION_M1,
         "id": workload_id,
         "architecture": {
+            **invocation.hardware.shared_document(),
             "dram_capacity_bytes": invocation.hardware.dram_capacity_bytes,
             "vram_capacity_bytes": invocation.hardware.vram_capacity_bytes,
             "dram_runtime_reserved_bytes": invocation.hardware.dram_runtime_reserved_bytes,
@@ -791,8 +800,11 @@ def plan_for(
         if not sources:
             raise InvalidInput(f"serial plan has no produced or initial source for {tensor_id!r}")
         source = sources[0]
-        actions.extend((Action(ACTION_COPY, tensor_id, src=source, dst=destination),
-                        Action(ACTION_ADVANCE)))
+        kind = (ACTION_SHARE if compiled.scenario.architecture.pool_of(source) ==
+                compiled.scenario.architecture.pool_of(destination) else ACTION_COPY)
+        actions.append(Action(kind, tensor_id, src=source, dst=destination))
+        if kind != ACTION_SHARE:
+            actions.append(Action(ACTION_ADVANCE))
         locations[tensor_id].add(destination)
 
     for task in compiled.tasks:

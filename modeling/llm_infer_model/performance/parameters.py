@@ -2,10 +2,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from fractions import Fraction
 
 SCHEMA_VERSION = "performance-parameters-1"
-UNITS = frozenset({"flop/s", "byte/s", "ns", "byte"})
+UNITS = frozenset({"flop/s", "byte/s", "invocation/s", "thread_cpu_ns/s", "cpu_cycle/s", "ns", "byte"})
+
+
+class InstantaneousRate(Enum):
+    """Explicit zero-duration approximation, restricted to invocation responses.
+
+    This is not a physical infinite throughput. An observed zero duration may
+    only reflect the source clock resolution or statistical convention.
+    Numeric zero still means no service; None still means unknown.
+    """
+
+    INSTANTANEOUS = "instantaneous"
+
+
+INSTANTANEOUS_RATE = InstantaneousRate.INSTANTANEOUS
 
 
 class InvalidModel(ValueError):
@@ -41,10 +56,14 @@ def rational(value, name):
 
 
 def encode_fraction(value):
+    if isinstance(value, InstantaneousRate):
+        return {"instantaneous": True}
     return {"numerator": value.numerator, "denominator": value.denominator}
 
 
 def decode_fraction(value, name):
+    if isinstance(value, dict) and set(value) == {"instantaneous"} and value["instantaneous"] is True:
+        return INSTANTANEOUS_RATE
     if not isinstance(value, dict) or set(value) != {"numerator", "denominator"}:
         raise InvalidModel(f"{name} requires numerator and denominator")
     return Fraction(integer(value["numerator"], name),
@@ -64,10 +83,16 @@ class Parameter:
     ``None`` means unknown, not zero. Scope identifies the hardware, backend,
     precision, shape family and timing boundary to which the value applies.
     Profiling supplies values and evidence; modeling consumes this contract.
+    ``thread_cpu_ns/s`` is explicit service for one named thread: 1e9 supplies
+    one active CPU nanosecond per wall nanosecond, zero pauses that work. It is
+    not a utilization/frequency conversion, aggregate-core rate or OS policy.
+    ``cpu_cycle/s`` instead services explicitly scoped raw CPU cycle work. It
+    has no implicit GHz conversion or universal bound, and CPU/kernel cycles
+    are not automatically useful FLOPs or an exact active-time measurement.
     """
 
     name: str
-    value: int | Fraction | None
+    value: int | Fraction | InstantaneousRate | None
     unit: str
     origin: str
     evidence: tuple[str, ...]
@@ -85,10 +110,16 @@ class Parameter:
         if self.origin == "profiled" and not self.evidence:
             raise InvalidModel("profiled parameters require evidence")
         nonempty(self.scope, "parameter scope")
+        if isinstance(self.value, InstantaneousRate):
+            if self.unit != "invocation/s":
+                raise InvalidModel("instantaneous rates are only a completed-invocation approximation")
+            return
         if self.value is not None:
             value = rational(self.value, self.name)
             if self.unit == "byte" and value.denominator != 1:
                 raise InvalidModel("capacity bytes must be integral")
+            if self.unit == "thread_cpu_ns/s" and value > 1_000_000_000:
+                raise InvalidModel("one thread cannot receive more than 1e9 active CPU ns per second")
             object.__setattr__(self, "value", value)
 
     def to_dict(self):

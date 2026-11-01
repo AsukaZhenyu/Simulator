@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from llm_infer_model.tensor.engine import (
-    ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD,
+    ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT, ACTION_READ_SSD, ACTION_WRITE_SSD,
     Action,
 )
 from llm_infer_model.tensor.program import (
@@ -111,6 +111,16 @@ def compile_strategy(
                 raise InvalidInput(f"instruction {index}: duplicate compute for {op_id!r}")
             seen_compute.add(op_id)
             steps.append(ActionStep(Action(ACTION_COMPUTE, op_id, device=ir.placements[op_id]), index))
+        elif kind == "share":
+            require_tensor(instruction.tensor_id)
+            src, dst = instruction.src, instruction.dst
+            if (src == "ssd" or dst == "ssd" or src == dst or
+                    scenario.architecture.pool_of(src) != scenario.architecture.pool_of(dst)):
+                raise Unsupported("share requires distinct views of one physical memory pool")
+            route = _ROUTE_FOR[(src, dst)]
+            if not scenario.mapspace.allows(route, instruction.tensor_id):
+                raise Unsupported("share route is not permitted")
+            steps.append(ActionStep(Action(ACTION_SHARE, instruction.tensor_id, src=src, dst=dst), index))
         elif kind == "transfer":
             src, dst = instruction.src, instruction.dst
             if {src, dst} == {"ssd", "vram"}:

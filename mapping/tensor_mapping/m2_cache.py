@@ -13,7 +13,7 @@ from typing import Mapping, Sequence
 from llm_infer_model.m2.expand import CompiledInvocation
 from llm_infer_model.m2.spec import weight_id
 from llm_infer_model.tensor.engine import (
-    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_EVICT, ACTION_READ_SSD,
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, ACTION_EVICT, ACTION_READ_SSD,
     ACTION_WRITE_SSD, CODE_CAPACITY_EXCEEDED, Action, MappingError,
     initial_state, transition,
 )
@@ -178,13 +178,13 @@ def plan_cache(
         if action.kind == ACTION_EVICT:
             stamps.pop((action.target_id, action.location), None)
             eviction_count += 1
-        if action.kind in {ACTION_COPY, ACTION_WRITE_SSD} and action.target_id in experts:
+        if action.kind in {ACTION_COPY, ACTION_SHARE, ACTION_WRITE_SSD} and action.target_id in experts:
             source = "dram" if action.kind == ACTION_WRITE_SSD else action.src
             key = (action.target_id, source)
             if key in stamps:
                 clock += 1
                 stamps[key] = (clock, stamps[key][1])
-        if action.kind in {ACTION_COPY, ACTION_READ_SSD} and action.target_id in experts:
+        if action.kind in {ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD} and action.target_id in experts:
             domain = "dram" if action.kind == ACTION_READ_SSD else action.dst
             if domain != sources[action.target_id]:
                 clock += 1
@@ -244,7 +244,7 @@ def plan_cache(
 
     def start(action: Action, domain: str, protected: set[tuple[str, str]]) -> None:
         additional = 0
-        if action.kind in {ACTION_COPY, ACTION_READ_SSD} and action.target_id in experts and sources[action.target_id] != domain:
+        if action.kind in {ACTION_COPY, ACTION_SHARE, ACTION_READ_SSD} and action.target_id in experts and sources[action.target_id] != domain:
             additional = scenario.size_alloc(action.target_id, domain)
         if domain in _DOMAINS:
             trim(domain, protected, additional)
@@ -261,13 +261,19 @@ def plan_cache(
                 evict_one(domain, protected, error)
 
     def transfer(action: Action, domain: str, protected: set[tuple[str, str]]) -> None:
-        if action.kind == ACTION_COPY:
+        if action.kind in (ACTION_COPY, ACTION_SHARE):
             protected = protected | {(action.target_id, action.src)}
         start(action, domain, protected)
-        commit(Action(ACTION_ADVANCE))
+        if action.kind != ACTION_SHARE:
+            commit(Action(ACTION_ADVANCE))
 
     def materialize(tensor: str, destination: str, protected: set[tuple[str, str]]) -> None:
         if state.copy_at(tensor, destination) == COPY_READY:
+            return
+        from llm_infer_model.tensor.engine import shared_source
+        source = shared_source(scenario, state, tensor, destination)
+        if source is not None:
+            transfer(Action(ACTION_SHARE, tensor, src=source, dst=destination), destination, protected)
             return
         if destination == "ssd":
             materialize(tensor, "dram", protected)

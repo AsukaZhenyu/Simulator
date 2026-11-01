@@ -75,7 +75,15 @@ class PerformanceOwnershipTests(unittest.TestCase):
         model = importlib.import_module("llm_infer_model.performance")
         for name in ("Parameter", "ParameterBundle", "WorkDemand", "Task", "Graph",
                      "MemoryDomain", "MemoryReservation", "ResourcePoint",
-                     "ResourceTimeline", "evaluate", "InvalidModel", "UnknownParameter"):
+                     "ResourceTimeline", "evaluate", "InvalidModel", "UnknownParameter",
+                     "CpuInterruptionTimebase", "ThreadCpuBinding", "CpuInterruption",
+                     "CpuInterruptionTrace", "compose_cpu_interruptions",
+                     "ServiceResponseParameter", "BackgroundReservoir",
+                     "ServiceInterference", "ServiceResponseModel",
+                     "ServiceRequestPoint", "ServiceRequestTrajectory",
+                     "ServiceResponseSample", "ServiceResponseResult",
+                     "build_service_response", "AvailableResources", "ServiceBinding",
+                     "AvailableResourceEvaluation", "evaluate_available_resources"):
             with self.subTest(name=name):
                 self.assertIs(getattr(public, name), getattr(model, name))
 

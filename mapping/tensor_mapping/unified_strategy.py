@@ -329,6 +329,14 @@ def write_unified_result(output, compiled, result):
         "search_performed": False, "optimality_proven": False, "paper_strategy_reproduced": False,
         "pcie_timing_scope": "payload_only_no_launch_latency" if compiled.services else "exact_table_contract",
         "sources": list(compiled.sources), "runtime_sha256": runtime_fingerprint()})
+    architecture = session._runtime.scenario.architecture
+    if architecture.memory_mode == "shared":
+        summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+        summary.update(memory_mode="shared", physical_memory_peaks_bytes={"shared": evaluation.peak_dram_bytes},
+                       dram_vram_peaks_are_views_of_one_pool=True,
+                       cache_budget_scope="explicit_gpu_access_view_payload_quota",
+                       shared_access_bytes=0, shared_access_cost_ns=0)
+        write_json(output / "summary.json", summary)
     if compiled.document["format_version"] == "unified-strategy-0.3":
         summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
         summary.update(reconfiguration_enabled=True, published_reclaim_request_count=len(reclaim_records),
