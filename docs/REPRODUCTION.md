@@ -64,24 +64,31 @@ with:
 ```
 
 Measured on a Windows 11 laptop with Python 3.12: **about 10 minutes** in total
-for 3,928 tests (9 min 51 s and 10 min 8 s across repeated runs). `mapping`
-dominates at about 278 s (1,206 tests), then `profiling` at about 55 s (844
-tests), `accuracy-suite` at 54 s, `expert-recipes` at 39 s, `modeling` at 35 s
-and `public-library` at 32 s; the other 28 suites finish under 15 s each. The
-heavy suites are combinatorial search and simulation rather than floating point,
-so a slower CPU stretches them roughly proportionally.
+for 3,928 tests (9 min 51 s in the working tree, 10 min 6 s from a `git archive`
+export of the same commit). `mapping` dominates at about 278 s (1,206 tests),
+then `profiling` at about 50 s (844 tests), `accuracy-suite` at 54 s,
+`expert-recipes` at 39 s, `modeling` at 37 s and `public-library` at 32 s; the
+other 28 suites finish under 15 s each. The heavy suites are combinatorial
+search and simulation rather than floating point, so a slower CPU stretches them
+roughly proportionally.
 
-A fresh clone reports **14 skips**, and none of them is a failure — they are
-checks whose optional prerequisite is not built:
+A fresh clone with only the `profiling` extra installed reports **25 skips**, and
+none of them is a failure — each is a check whose optional prerequisite is
+absent:
 
 | Skips | Suite | Prerequisite |
 |---|---|---|
 | 4 | `mapping` | the compiled `ggml-export-workload`; those tests say explicitly that the export side of the GGML chain was **not** regenerated in this run. Build it per `mapping/ggml/README.md`, or point `TENSOR_MAPPING_GGML_EXPORTER` at a binary |
 | 11 | `state-response` | `LLM_THREAD_HELPER_TEST_BINARY` — a separately built Windows thread helper |
-| 1 | `profiling` | `HIGHLEVEL_PROBE` — the timed high-level probe binary, for one opt-in real-GGML CPU check |
+| 2 | `profiling` | `HIGHLEVEL_PROBE`, the timed high-level probe binary, and the pinned external GGML checkout used by the F32 runtime comparison |
+| 1 | `workload-accuracy` | previously collected native evidence, which is not redistributed |
+| 5 | `modeling` | the optional `gguf` extra: `python -m pip install -e ".[gguf]"` |
 | 2 | `modeling` | the Nsight artifact used by the nsys analysis tests |
 
-A skip is not a pass: it marks a step the run did not perform.
+The count depends on the machine, not on the commit: a developer tree that still
+has the built exporter, the GGML checkout or the Nsight artifact reports fewer,
+and installing the `gguf` extra removes five. No skip changes a verdict — but a
+skip is not a pass: it marks a step the run did not perform.
 
 | Command | Effect |
 |---|---|
@@ -190,6 +197,11 @@ Use this order; each step is cheap and fails loudly.
 If step 5 fails, keep `report.md` and the console log. The report already
 carries the environment, the commit and each failing suite's full output, which
 is everything needed to work out whether the cause is the machine or the code.
+
+What a second machine should see: `34/34 suites passed`, roughly ten minutes,
+and 25 skips if nothing is built there (the table above). A different skip count
+is worth one line in the report — it says which optional prerequisite that
+machine happens to have — but it is not a failure.
 
 ## Troubleshooting
 
