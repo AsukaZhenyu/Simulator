@@ -63,12 +63,13 @@ with:
 34/34 suites passed in ...
 ```
 
-Measured on a Windows 11 laptop with Python 3.12: **10 minutes 8 seconds** in
-total for 3,928 tests. `mapping` dominates at 278 s (1,206 tests), then
-`profiling` at 60 s (844 tests), `accuracy-suite` at 54 s, `expert-recipes` at
-39 s, `modeling` at 35 s and `public-library` at 32 s; the other 28 suites finish
-under 15 s each. The heavy suites are combinatorial search and simulation rather
-than floating point, so a slower CPU stretches them roughly proportionally.
+Measured on a Windows 11 laptop with Python 3.12: **about 10 minutes** in total
+for 3,928 tests (9 min 51 s and 10 min 8 s across repeated runs). `mapping`
+dominates at about 278 s (1,206 tests), then `profiling` at about 55 s (844
+tests), `accuracy-suite` at 54 s, `expert-recipes` at 39 s, `modeling` at 35 s
+and `public-library` at 32 s; the other 28 suites finish under 15 s each. The
+heavy suites are combinatorial search and simulation rather than floating point,
+so a slower CPU stretches them roughly proportionally.
 
 A fresh clone reports **14 skips**, and none of them is a failure — they are
 checks whose optional prerequisite is not built:
