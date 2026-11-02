@@ -1,0 +1,151 @@
+{
+  "schema": "overlap-accuracy-suite-0.1",
+  "cases": [
+    {
+      "id": "ffn-h256-i512-q1-copy1MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 1,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h256-i512-q1-copy16MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 1,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h256-i512-q1-copy64MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 1,
+      "payload_bytes": 67108864
+    },
+    {
+      "id": "ffn-h256-i512-q32-copy1MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 32,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h256-i512-q32-copy16MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 32,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h256-i512-q32-copy64MiB",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 32,
+      "payload_bytes": 67108864
+    },
+    {
+      "id": "ffn-h512-i1024-q1-copy1MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 1,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h512-i1024-q1-copy16MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 1,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h512-i1024-q1-copy64MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 1,
+      "payload_bytes": 67108864
+    },
+    {
+      "id": "ffn-h512-i1024-q32-copy1MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 32,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h512-i1024-q32-copy16MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 32,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h512-i1024-q32-copy64MiB",
+      "hidden": 512,
+      "intermediate": 1024,
+      "tokens": 32,
+      "payload_bytes": 67108864
+    },
+    {
+      "id": "ffn-h1024-i2048-q1-copy1MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 1,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h1024-i2048-q1-copy16MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 1,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h1024-i2048-q1-copy64MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 1,
+      "payload_bytes": 67108864
+    },
+    {
+      "id": "ffn-h1024-i2048-q32-copy1MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 32,
+      "payload_bytes": 1048576
+    },
+    {
+      "id": "ffn-h1024-i2048-q32-copy16MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 32,
+      "payload_bytes": 16777216
+    },
+    {
+      "id": "ffn-h1024-i2048-q32-copy64MiB",
+      "hidden": 1024,
+      "intermediate": 2048,
+      "tokens": 32,
+      "payload_bytes": 67108864
+    }
+  ],
+  "profile_seeds": [
+    2903
+  ],
+  "heldout_seeds": [
+    3911
+  ],
+  "repeats": 3,
+  "protocol": {
+    "threads": 1,
+    "cpu_id": 0,
+    "device": 0,
+    "warmup": 10,
+    "samples": 31,
+    "min_warmup_ms": 100
+  },
+  "quality": {
+    "max_within_process_cv": 0.15,
+    "max_between_process_cv": 0.2,
+    "max_heldout_relative_error": 0.2
+  }
+}

@@ -21,6 +21,8 @@ mapping/outputs/
 modeling/llama_pipeline_kv.bin
 # 本机清理记录，不是产品文档
 /docs/maintenance/
+# 测量原始产物留在本机，不入库；可分发的输入 trace 放 profiling/data/
+/profiling/**/results/
 
 # ==================== Python ====================
 __pycache__/

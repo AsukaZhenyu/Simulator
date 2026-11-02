@@ -5,6 +5,9 @@ recursive-include examples/library *.py *.md
 recursive-include src/llm_simulator *.py py.typed
 recursive-include mapping/tensor_mapping *.py
 recursive-include modeling/llm_infer_model *.py
+# The measurement apparatus is not part of the distribution; only the library
+# package that modeling imports is.
+prune profiling
 recursive-include profiling/llm_infer_profile *.py
 include tests/test_distribution.py
 prune reference

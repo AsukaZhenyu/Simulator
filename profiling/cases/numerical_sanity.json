@@ -1,0 +1,13 @@
+{
+  "schema_version": "measurement_suite_v1",
+  "description": "Small isolated MUL_MAT cases to validate uniform24_v2 numerical checks; these are not M2 macro tasks or calibrated costs.",
+  "compute_cases": [
+    {"id": "numeric_f32_t1", "m": 32, "k": 256, "n": 1, "dtype": "f32"},
+    {"id": "numeric_f16_t1", "m": 32, "k": 256, "n": 1, "dtype": "f16"},
+    {"id": "numeric_f32_t3", "m": 32, "k": 256, "n": 3, "dtype": "f32"},
+    {"id": "numeric_f16_t3", "m": 32, "k": 256, "n": 3, "dtype": "f16"},
+    {"id": "numeric_q4k_t3", "m": 32, "k": 256, "n": 3, "dtype": "q4_k"},
+    {"id": "numeric_q6k_t3", "m": 32, "k": 256, "n": 3, "dtype": "q6_k"}
+  ],
+  "transfer_cases": []
+}

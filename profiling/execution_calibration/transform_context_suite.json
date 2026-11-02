@@ -1,0 +1,128 @@
+{
+  "format_version": "execution-transform-suite-0.1",
+  "cases": [
+    {
+      "id": "ffn-h256-i512-q1-cut128",
+      "family": "ffn",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 512,
+      "cpu_intermediate": 128,
+      "tokens": 1,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0
+    },
+    {
+      "id": "ffn-h256-i512-q3-cut128",
+      "family": "ffn",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 512,
+      "cpu_intermediate": 128,
+      "tokens": 3,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0
+    },
+    {
+      "id": "ffn-h256-i512-q1-cut256",
+      "family": "ffn",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 512,
+      "cpu_intermediate": 256,
+      "tokens": 1,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0
+    },
+    {
+      "id": "ffn-h256-i512-q3-cut256",
+      "family": "ffn",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 512,
+      "cpu_intermediate": 256,
+      "tokens": 3,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0
+    },
+    {
+      "id": "ffn-h512-i1024-q32-cut256",
+      "family": "ffn",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 512,
+      "intermediate": 1024,
+      "cpu_intermediate": 256,
+      "tokens": 32,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0
+    },
+    {
+      "id": "attention-h256-q32-hist0",
+      "family": "attention",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 0,
+      "cpu_intermediate": 0,
+      "tokens": 32,
+      "history": 0,
+      "heads": 8,
+      "kv_heads": 2,
+      "head_dim": 32
+    },
+    {
+      "id": "attention-h256-q1-hist128",
+      "family": "attention",
+      "backend": "hybrid",
+      "dtype": "f32",
+      "hidden": 256,
+      "intermediate": 0,
+      "cpu_intermediate": 0,
+      "tokens": 1,
+      "history": 128,
+      "heads": 8,
+      "kv_heads": 2,
+      "head_dim": 32
+    }
+  ],
+  "protocol": {
+    "threads": 1,
+    "cpu_id": 0,
+    "device": 0,
+    "warmup": 20,
+    "samples": 51,
+    "min_warmup_ms": 200,
+    "cuda_graphs": "disabled"
+  },
+  "profile_seeds": [
+    67
+  ],
+  "heldout_seeds": [
+    79
+  ],
+  "repeats": 2,
+  "quality": {
+    "max_within_process_cv": 0.15,
+    "max_between_process_cv": 0.2,
+    "max_heldout_relative_error": 0.2
+  },
+  "bootstrap": {
+    "iterations": 1000,
+    "seed": 7
+  }
+}

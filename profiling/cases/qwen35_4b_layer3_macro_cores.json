@@ -1,0 +1,66 @@
+{
+  "schema_version": "macro_measurement_suite_v1",
+  "description": "Qwen3.5-4B layer3 FFN-core dimensions and exact matrix dtype labels; generated weights, no norm/residual. Attention has matching geometry/gate/O but explicit F32 KV, unlike captured Flash Attention F16 KV. Not complete layer or calibrated M2 costs.",
+  "source_graph_sha256": "837a91f55ef6703ce2338eb8f77d9d73993a8bbebd245a0a3ba10b77fd351b4b",
+  "boundary_evidence": "qwen35_4b_layer3_boundary.json",
+  "cases": [
+    {
+      "id": "qwen35_layer3_ffn_core_prefill_q3",
+      "kind": "dense_ffn",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "hidden": 2560,
+      "intermediate": 9216,
+      "weight_dtypes": {
+        "gate": "q4_k",
+        "up": "q4_k",
+        "down": "q6_k"
+      }
+    },
+    {
+      "id": "qwen35_layer3_ffn_core_decode_q1_h3",
+      "kind": "dense_ffn",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden": 2560,
+      "intermediate": 9216,
+      "weight_dtypes": {
+        "gate": "q4_k",
+        "up": "q4_k",
+        "down": "q6_k"
+      }
+    },
+    {
+      "id": "qwen35_geometry_explicit_attention_prefill_q3",
+      "kind": "attention",
+      "phase": "prefill",
+      "batch": 1,
+      "tokens": 3,
+      "visible_history": 0,
+      "hidden": 2560,
+      "heads": 16,
+      "kv_heads": 4,
+      "head_dim": 256,
+      "weight_dtype": "q4_k",
+      "attention_gate": "sigmoid"
+    },
+    {
+      "id": "qwen35_geometry_explicit_attention_decode_q1_h3",
+      "kind": "attention",
+      "phase": "decode",
+      "batch": 1,
+      "tokens": 1,
+      "visible_history": 3,
+      "hidden": 2560,
+      "heads": 16,
+      "kv_heads": 4,
+      "head_dim": 256,
+      "weight_dtype": "q4_k",
+      "attention_gate": "sigmoid"
+    }
+  ]
+}

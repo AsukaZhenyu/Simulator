@@ -1,0 +1,11 @@
+{
+  "schema_version": "macro_measurement_suite_v1",
+  "description": "CPU batch-one partial Attention/FFN macro verification; generated inputs, not a complete layer or calibrated M2 costs",
+  "cases": [
+    {"id": "attention_prefill_q3_h0", "kind": "attention", "phase": "prefill", "batch": 1, "tokens": 3, "visible_history": 0, "hidden": 16, "heads": 4, "kv_heads": 2, "head_dim": 4, "weight_dtype": "f32", "attention_gate": "none"},
+    {"id": "attention_decode_q1_h3", "kind": "attention", "phase": "decode", "batch": 1, "tokens": 1, "visible_history": 3, "hidden": 16, "heads": 4, "kv_heads": 2, "head_dim": 4, "weight_dtype": "f32", "attention_gate": "none"},
+    {"id": "attention_decode_q1_h32", "kind": "attention", "phase": "decode", "batch": 1, "tokens": 1, "visible_history": 32, "hidden": 16, "heads": 4, "kv_heads": 2, "head_dim": 4, "weight_dtype": "f32", "attention_gate": "none"},
+    {"id": "dense_ffn_prefill_q3_h0", "kind": "dense_ffn", "phase": "prefill", "batch": 1, "tokens": 3, "visible_history": 0, "hidden": 16, "intermediate": 32, "weight_dtype": "f32"},
+    {"id": "dense_ffn_decode_q1_h3", "kind": "dense_ffn", "phase": "decode", "batch": 1, "tokens": 1, "visible_history": 3, "hidden": 16, "intermediate": 32, "weight_dtype": "f32"}
+  ]
+}

@@ -37,7 +37,7 @@ python mapping/examples/python/execution_combined_demo.py --out mapping/outputs/
 python mapping/examples/python/modular_moe.py --variant swiglu_staged --out mapping/outputs/moe-demo
 ```
 
-`--out` 必须是新目录或空目录。示例使用合成成本，证明表达和执行规则，不证明实机加速。当前完整性能质量门尚未通过；需要实机成本时，要在目标硬件重新采集并独立验证——测量装置随论文保留，不在本仓库。运行示例不要求已有 profile 或本机实验结果。
+`--out` 必须是新目录或空目录。示例使用合成成本，证明表达和执行规则，不证明实机加速。当前完整性能质量门尚未通过；需要实机成本时，按[执行变换校准工具](../profiling/execution_calibration/README.md)在目标硬件重新采集、独立验证。运行示例不要求已有 profile 或本机实验结果。
 
 ## 代码位置
 

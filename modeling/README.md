@@ -48,7 +48,7 @@ python -m pip install -e ./modeling -e ./mapping
 
 任务拆分需要独立的物化节点、权重/中间结果和匹配成本，不能按比例拆一个宏任务时间。未知项不静默补值：未知 GPU 私有 workspace 仍不能用于容量验收。
 
-逻辑模拟支持显式 Dense/MoE、多层/多轮以及声明的设备状态变化；这不表示任意真实模型、通用多 GPU 并行或操作系统都已经准确建模。当前完整性能质量门尚未通过。可在目标硬件重新采集并检验——测量装置随论文保留，不在本仓库；本机旧实验结果不随库分发，也不是运行前提。
+逻辑模拟支持显式 Dense/MoE、多层/多轮以及声明的设备状态变化；这不表示任意真实模型、通用多 GPU 并行或操作系统都已经准确建模。当前完整性能质量门尚未通过。可在目标硬件按[执行变换校准工具](../profiling/execution_calibration/README.md)重新采集并检验；本机旧实验结果不随库分发，也不是运行前提。
 
 详细合同见 [物理成本合同](llm_infer_model/m2/PHYSICAL_CONTRACT.md)、[资源响应运行时](RECLAIM_RUNTIME.md) 和 [代码地图](../docs/CODE_LAYOUT.md)。
 

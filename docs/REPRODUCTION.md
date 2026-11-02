@@ -13,7 +13,7 @@ without network access after installation**.
 |---|---|
 | Python | 3.10 – 3.13 (CI runs 3.10, 3.12, 3.13) |
 | OS | Linux, macOS or Windows; CI runs Ubuntu and Windows |
-| Third-party runtime dependencies | none. The optional `gguf` extra adds `gguf` and `numpy` for the GGUF import path only |
+| Third-party runtime dependencies | none for the simulator. `numpy`, `scipy` and `jinja2` come with the `profiling` extra, which only the measurement suites need; the `gguf` extra adds `gguf` and `numpy` for the GGUF import path |
 | GPU, CUDA, drivers | not needed by any test suite |
 | Network | only for `git clone` and `pip install` |
 
@@ -34,12 +34,13 @@ Activate the environment, then install once:
 source .venv/bin/activate
 
 python -m pip install -U pip
-python -m pip install -e .
+python -m pip install -e ".[profiling]"
 ```
 
 `-e` (editable) is the intended setup. The suite runner also works from a bare
 checkout without any install; the `llm-sim` command and the import check below
-need it.
+need it. `[profiling]` adds `numpy`, `scipy` and `jinja2` for the measurement
+suites; it installs neither CUDA nor any measurement tool.
 
 Verify the install:
 
@@ -59,22 +60,25 @@ That is the same set of suites the `regression` job in
 with:
 
 ```
-11/11 suites passed in ...
+34/34 suites passed in ...
 ```
 
-Measured on a Windows 11 laptop with Python 3.12: **7 minutes 16 seconds** in
-total for 2,120 tests. `mapping` dominates at 271 s (1,206 tests), then
-`expert-recipes` at 43 s, and `public-library` and `modeling` at about 33 s each;
-the remaining seven suites finish in under 16 s. The heavy suites are
-combinatorial search and simulation rather than floating point, so a slower CPU
-stretches them roughly proportionally.
+Measured on a Windows 11 laptop with Python 3.12: **10 minutes 8 seconds** in
+total for 3,928 tests. `mapping` dominates at 278 s (1,206 tests), then
+`profiling` at 60 s (844 tests), `accuracy-suite` at 54 s, `expert-recipes` at
+39 s, `modeling` at 35 s and `public-library` at 32 s; the other 28 suites finish
+under 15 s each. The heavy suites are combinatorial search and simulation rather
+than floating point, so a slower CPU stretches them roughly proportionally.
 
-A fresh clone reports a few **skips**, and they are not failures:
+A fresh clone reports **14 skips**, and none of them is a failure — they are
+checks whose optional prerequisite is not built:
 
-| Skips | Cause |
-|---|---|
-| 4 in `mapping` | the compiled `ggml-export-workload` binary is not built; those tests say explicitly that the export side of the GGML chain was **not** regenerated in this run. Build it per `mapping/ggml/README.md`, or point `TENSOR_MAPPING_GGML_EXPORTER` at a binary |
-| 2 in `modeling` | the Nsight artifact used by the nsys analysis tests is not present |
+| Skips | Suite | Prerequisite |
+|---|---|---|
+| 4 | `mapping` | the compiled `ggml-export-workload`; those tests say explicitly that the export side of the GGML chain was **not** regenerated in this run. Build it per `mapping/ggml/README.md`, or point `TENSOR_MAPPING_GGML_EXPORTER` at a binary |
+| 11 | `state-response` | `LLM_THREAD_HELPER_TEST_BINARY` — a separately built Windows thread helper |
+| 1 | `profiling` | `HIGHLEVEL_PROBE` — the timed high-level probe binary, for one opt-in real-GGML CPU check |
+| 2 | `modeling` | the Nsight artifact used by the nsys analysis tests |
 
 A skip is not a pass: it marks a step the run did not perform.
 
@@ -147,6 +151,11 @@ simulator.
 | Strategy semantics | `strategy-fidelity`, `policy-no-progress`, `dense-subbatches`, `expert-recipes` | a compiled strategy diverged from an independent reference, a declared policy became a dead end, or a batch/expert recipe changed |
 | Modeling | `modeling` | graph expansion, the tensor runtime, capacity accounting or cost binding changed |
 | Mapping | `mapping` | the policy frontend, IR, compiler or a causal policy changed |
+| Measurement contracts | `profiling` and the `profiling/*` suites, plus the five `native-*` suites | a measurement contract, a frozen parameter set or a provenance guard changed |
+
+The `native-*` suites read the probe sources and their provenance records; they
+do **not** compile CUDA code and do not need a GPU. Re-running a measurement is
+a separate, explicit step — see [profiling/README.md](../profiling/README.md).
 
 None of these suites measures hardware. A green run means the simulator is
 internally consistent with the references those suites encode; it says nothing
@@ -170,7 +179,7 @@ Library-level examples that run after installation live in
 Use this order; each step is cheap and fails loudly.
 
 1. `python -V` — confirm 3.10 or newer.
-2. Fresh venv, `python -m pip install -e .`.
+2. Fresh venv, `python -m pip install -e ".[profiling]"`.
 3. `llm-sim --version` and the four-module import check above.
 4. `python tools/run_tests.py -k public-library` — the fastest end-to-end signal.
 5. `python tools/run_tests.py --keep-going --report report.md` — the full
@@ -187,6 +196,7 @@ is everything needed to work out whether the cause is the machine or the code.
 |---|---|
 | `No module named 'llm_simulator'` | the editable install did not run in the active interpreter; reinstall with the venv's `python -m pip` |
 | `No module named 'tensor_mapping'` (or `llm_infer_model`) | running from outside the clone without installing; install editable, or set `PYTHONPATH` to `src;mapping;modeling;profiling` (POSIX: `:`) |
+| `No module named 'scipy'` or `'jinja2'` | the environment was installed without the extra; `python -m pip install -e ".[profiling]"` |
 | a suite fails only under a bare `python` | the tests must run with the interpreter that has the packages; use the venv, or use `tools/run_tests.py` |
 | demo writes into an existing directory | use new or empty directories; copied input snapshots are audit evidence, not checkpoints |
 | line-ending churn in `git status` | the repository pins `text=auto eol=lf` in `.gitattributes`; check with `git ls-files --eol`, do not "fix" it by re-saving files |
@@ -194,8 +204,10 @@ is everything needed to work out whether the cause is the machine or the code.
 
 ## What this repository does not contain
 
-The measurement apparatus, campaign outputs and study documents behind the
-paper's numbers are kept with the paper. This repository ships the simulator and
-its tests: no CUDA probes, no recorded traces, no measured profiles, and no
-script that produces them. A test run here reproduces the simulator's behaviour,
-not a hardware measurement.
+The apparatus is here; the **results** are not. Retained raw measurements
+(`profiling/**/results/`), the experiment drivers under `experiments/`, and the
+study documents stay with the paper. A test run here reproduces the simulator's
+behaviour and the measurement *contracts*, not a hardware measurement: re-running
+a campaign means building the probes and running them on the target machine,
+which is an explicit step described in
+[profiling/README.md](../profiling/README.md).

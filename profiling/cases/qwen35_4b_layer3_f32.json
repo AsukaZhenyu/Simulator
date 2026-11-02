@@ -1,0 +1,382 @@
+{
+  "schema_version": "measurement_suite_v1",
+  "description": "Measured projections with real exported shapes and generated tensor contents",
+  "model_source": {
+    "path": "..\\llama.cpp-implement\\Qwen-Series-GGUF-Q4_K_M\\Qwen3.5-4B-Q4_K_M.gguf",
+    "n_ctx": 87296,
+    "n_seq_max": 1,
+    "n_ubatch": 512,
+    "n_embd": 2560,
+    "n_vocab": 248320,
+    "n_layer": 32
+  },
+  "source_label": "b8705-graphprobe",
+  "compute_cases": [
+    {
+      "id": "mulmat_m1024_k2560_t128_f32",
+      "kind": "compute",
+      "m": 1024,
+      "k": 2560,
+      "n": 128,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_v.weight",
+          "blk.3.attn_k.weight"
+        ],
+        "node_ids": [
+          "g1:n199",
+          "g1:n201"
+        ],
+        "original_dtypes": [
+          "q6_k",
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m1024_k2560_t1_f32",
+      "kind": "compute",
+      "m": 1024,
+      "k": 2560,
+      "n": 1,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_v.weight",
+          "blk.3.attn_k.weight"
+        ],
+        "node_ids": [
+          "g1:n199",
+          "g1:n201"
+        ],
+        "original_dtypes": [
+          "q6_k",
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m1024_k2560_t32_f32",
+      "kind": "compute",
+      "m": 1024,
+      "k": 2560,
+      "n": 32,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_v.weight",
+          "blk.3.attn_k.weight"
+        ],
+        "node_ids": [
+          "g1:n199",
+          "g1:n201"
+        ],
+        "original_dtypes": [
+          "q6_k",
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k4096_t128_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 4096,
+      "n": 128,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_output.weight"
+        ],
+        "node_ids": [
+          "g1:n223"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k4096_t1_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 4096,
+      "n": 1,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_output.weight"
+        ],
+        "node_ids": [
+          "g1:n223"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k4096_t32_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 4096,
+      "n": 32,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_output.weight"
+        ],
+        "node_ids": [
+          "g1:n223"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k9216_t128_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 9216,
+      "n": 128,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_down.weight"
+        ],
+        "node_ids": [
+          "g1:n230"
+        ],
+        "original_dtypes": [
+          "q6_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k9216_t1_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 9216,
+      "n": 1,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_down.weight"
+        ],
+        "node_ids": [
+          "g1:n230"
+        ],
+        "original_dtypes": [
+          "q6_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m2560_k9216_t32_f32",
+      "kind": "compute",
+      "m": 2560,
+      "k": 9216,
+      "n": 32,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_down.weight"
+        ],
+        "node_ids": [
+          "g1:n230"
+        ],
+        "original_dtypes": [
+          "q6_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m8192_k2560_t128_f32",
+      "kind": "compute",
+      "m": 8192,
+      "k": 2560,
+      "n": 128,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_q.weight"
+        ],
+        "node_ids": [
+          "g1:n194"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m8192_k2560_t1_f32",
+      "kind": "compute",
+      "m": 8192,
+      "k": 2560,
+      "n": 1,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_q.weight"
+        ],
+        "node_ids": [
+          "g1:n194"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m8192_k2560_t32_f32",
+      "kind": "compute",
+      "m": 8192,
+      "k": 2560,
+      "n": 32,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.attn_q.weight"
+        ],
+        "node_ids": [
+          "g1:n194"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m9216_k2560_t128_f32",
+      "kind": "compute",
+      "m": 9216,
+      "k": 2560,
+      "n": 128,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_gate.weight",
+          "blk.3.ffn_up.weight"
+        ],
+        "node_ids": [
+          "g1:n227",
+          "g1:n228"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m9216_k2560_t1_f32",
+      "kind": "compute",
+      "m": 9216,
+      "k": 2560,
+      "n": 1,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_gate.weight",
+          "blk.3.ffn_up.weight"
+        ],
+        "node_ids": [
+          "g1:n227",
+          "g1:n228"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    },
+    {
+      "id": "mulmat_m9216_k2560_t32_f32",
+      "kind": "compute",
+      "m": 9216,
+      "k": 2560,
+      "n": 32,
+      "dtype": "f32",
+      "source": {
+        "tensor_names": [
+          "blk.3.ffn_gate.weight",
+          "blk.3.ffn_up.weight"
+        ],
+        "node_ids": [
+          "g1:n227",
+          "g1:n228"
+        ],
+        "original_dtypes": [
+          "q4_k"
+        ],
+        "shape_source": "exported GGML weight dimensions; requested token count",
+        "dtype_mode": "f32",
+        "weight_values": "generated in probe; not original model weights",
+        "fusion_note": "isolated MUL_MAT; actual backend fusion must be checked before binding a macro task"
+      }
+    }
+  ],
+  "transfer_cases": [],
+  "skipped": [],
+  "source_graph": {
+    "file": "graph.json",
+    "sha256": "837a91f55ef6703ce2338eb8f77d9d73993a8bbebd245a0a3ba10b77fd351b4b"
+  }
+}

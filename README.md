@@ -121,6 +121,7 @@ The convenience builder uses full-causal F32 geometry. Dense batch and decomposi
 | [mapping](mapping/README.md) | Strategy frontend, IR, execution transforms, compiler and causal policies |
 | [modeling](modeling/README.md) | LLM state/graph expansion, common tensor runtime, capacity/resource accounting |
 | `profiling/llm_infer_profile/` | Library package imported by modeling for calibration and provenance conversion |
+| [profiling](profiling/README.md) | Measurement apparatus: native CUDA/CPU probes, calibration campaigns, cost-table export and validation |
 | [docs](docs/CODE_LAYOUT.md) | Architecture notes and the reproduction guide |
 | [tools](tools/run_tests.py) | Runs every suite, and writes a Markdown report with `--report` |
 
@@ -131,12 +132,16 @@ Existing `tensor_mapping` and `llm_infer_model` imports remain available.
 One command runs every suite that CI runs:
 
 ```bash
-python -m pip install -e .
-python tools/run_tests.py                        # 11 suites
+python -m pip install -e ".[profiling]"
+python tools/run_tests.py                        # 34 suites
 python tools/run_tests.py -k mapping             # one group
 python tools/run_tests.py --list                 # what exists
 python tools/run_tests.py --report report.md     # Markdown report of the run
 ```
+
+The `profiling` extra adds `numpy`, `scipy` and `jinja2`; only the measurement
+suites under `profiling/` need them, and none of them needs a GPU or a saved
+profile.
 
 `--report` writes the environment (OS, CPU, GPU, Python, dependency versions),
 the repository commit, one row per suite and the complete output of every
@@ -162,10 +167,11 @@ tree.
 
 ## What is not in this repository
 
-The measurement apparatus, campaign outputs and study documents behind the
-paper's numbers are kept with the paper, not here. This repository ships the
-simulator and the tests for it; it does not contain CUDA probes, recorded traces
-or measured profiles.
+The retained raw measurements, campaign outputs and study documents are kept
+with the paper: `profiling/**/results/`, the experiment drivers under
+`experiments/`, and the result documents. What ships here is the simulator, its
+tests, and the apparatus that produces measured parameters, so a new machine can
+re-measure and re-fit; the recorded evidence itself is not redistributed.
 
 ## License
 

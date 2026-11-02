@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.24)
+project(reconfiguration_allocator_probe LANGUAGES CXX CUDA)
+find_package(CUDAToolkit REQUIRED)
+add_executable(reconfiguration-allocator-probe allocator.cu)
+set_target_properties(reconfiguration-allocator-probe PROPERTIES CUDA_STANDARD 17)
+target_link_libraries(reconfiguration-allocator-probe PRIVATE CUDA::cudart)

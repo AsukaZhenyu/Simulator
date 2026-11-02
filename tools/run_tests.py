@@ -41,6 +41,29 @@ SUITES: list[tuple[str, str, str, str | None]] = [
     ("policy-no-progress", "tests", "test_policy_no_progress.py", None),
     ("shared-memory-facade", "tests", "test_shared_memory_facade.py", None),
     ("expert-recipes", "tests", "test_expert_recipes.py", None),
+    ("execution-calibration", "profiling/execution_calibration/tests", "test*.py", None),
+    ("batched-calibration", "profiling/batched_calibration/tests", "test*.py", None),
+    ("composition-calibration", "profiling/composition_calibration/tests", "test*.py", None),
+    ("accuracy-suite", "profiling/accuracy_suite/tests", "test*.py", None),
+    ("chain-calibration", "profiling/chain_calibration/tests", "test*.py", None),
+    ("profiling", "profiling/tests", "test*.py", None),
+    ("workload-accuracy", "profiling/workload_accuracy/tests", "test*.py", None),
+    ("overlap-accuracy", "profiling/overlap_accuracy/tests", "test*.py", None),
+    ("native-execution-transforms", "profiling/native/execution_transforms_batch", "test_*.py", None),
+    ("state-calibration", "profiling/state_calibration/tests", "test*.py", None),
+    ("native-state-calibration", "profiling/native/state_calibration", "test_*.py", None),
+    ("resource-calibration", "profiling/resource_calibration/tests", "test*.py", None),
+    ("parameter-calibration", "profiling/parameter_calibration/tests", "test*.py", None),
+    ("available-service", "profiling/available_service/tests", "test*.py", None),
+    ("service-response", "profiling/service_response/tests", "test*.py", None),
+    ("state-response", "profiling/state_response/tests", "test*.py", None),
+    ("native-state-response", "profiling/native/state_response", "test_build.py", None),
+    ("single-layer-calibration", "profiling/single_layer_calibration/tests", "test*.py", None),
+    ("single-layer-context-pair", "profiling/single_layer_context_pair/tests", "test*.py", None),
+    ("single-layer-wait-diagnosis", "profiling/single_layer_wait_diagnosis/tests", "test*.py", None),
+    ("native-single-layer", "profiling/native/single_layer_calibration", "test_build.py", None),
+    ("native-context-pair", "profiling/native/single_layer_context_pair", "test_build.py", None),
+    ("native-wait-diagnosis", "profiling/native/single_layer_wait_diagnosis", "test_build.py", None),
     ("modeling", "modeling/tests", "test*.py", None),
     ("mapping", "mapping/tests", "test*.py", "mapping"),
 ]
@@ -56,11 +79,12 @@ def build_command(start: str, pattern: str, top: str | None) -> list[str]:
 def build_env() -> dict[str, str]:
     """Source roots first, so the runner works from a checkout without an install.
 
-    A freshly created virtual environment that never ran ``pip install -e .``
-    has no ``llm_simulator``, ``tensor_mapping``, ``llm_infer_model`` or
-    ``llm_infer_profile``; pointing PYTHONPATH at the four source directories
-    makes every suite behave the same installed or not, which is also what
-    `docs/REPRODUCTION.md` tells a human to reproduce by hand.
+    A freshly created virtual environment that never ran
+    ``pip install -e ".[profiling]"`` has no ``llm_simulator``,
+    ``tensor_mapping``, ``llm_infer_model`` or ``llm_infer_profile``; pointing
+    PYTHONPATH at the four source directories makes every suite behave the same
+    installed or not, which is also what `docs/REPRODUCTION.md` tells a human to
+    reproduce by hand.
     """
     env = dict(os.environ)
     parts = [str(ROOT / name) for name in ("src", "mapping", "modeling", "profiling")]
@@ -92,7 +116,7 @@ def repository_state() -> dict[str, str]:
 def dependency_versions() -> str:
     from importlib import metadata
 
-    wanted = ("numpy", "PyYAML", "gguf")
+    wanted = ("numpy", "scipy", "jinja2", "PyYAML", "gguf")
     parts = []
     for name in wanted:
         try:
@@ -195,7 +219,7 @@ def write_report(path: Path, *, command_line: str,
         "git clone %s" % (repository["remote"] or "<仓库地址>"),
         "cd Simulator && git checkout %s" % (repository["commit"] or "<commit>"),
         "python -m venv .venv && .venv\\Scripts\\activate    # POSIX: source .venv/bin/activate",
-        'python -m pip install -e .',
+        'python -m pip install -e ".[profiling]"',
         command_line,
         "```",
         "",

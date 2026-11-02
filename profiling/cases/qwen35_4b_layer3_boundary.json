@@ -1,0 +1,3896 @@
+{
+  "schema_version": "macro_boundary_evidence_v1",
+  "model_label": "Qwen3.5-4B layer 3 full causal dense",
+  "source_graph": {
+    "file": "visualization-llama.cpp-tensor/runs/qwen35-4b/graph.json",
+    "sha256": "837a91f55ef6703ce2338eb8f77d9d73993a8bbebd245a0a3ba10b77fd351b4b",
+    "graph_id": "g1",
+    "layer_id": 3
+  },
+  "source_implementation": {
+    "file": "llama.cpp-implement/release-b8705/llama.cpp-b8705/src/models/qwen35.cpp",
+    "sha256": "ceba68cf08c9c016117de86a679f509b5594286c6656b595bf85c8aac3c308e3"
+  },
+  "geometry": {
+    "hidden": 2560,
+    "intermediate": 9216,
+    "heads": 16,
+    "kv_heads": 4,
+    "head_dim": 256
+  },
+  "q_gate_layout": {
+    "packing": "interleaved_query_and_gate_per_head",
+    "query": {
+      "id": "g1:t195",
+      "name": "Qcur_reshaped-3",
+      "shape": [
+        256,
+        16
+      ],
+      "n_dims": 2,
+      "ggml_type": "f32",
+      "strides_bytes": [
+        4,
+        2048
+      ],
+      "data_bytes": 31744,
+      "role": "activation",
+      "role_evidence": "has_producer_node",
+      "is_view": true,
+      "producer_node_id": "g1:n195",
+      "view_of": "g1:t194",
+      "view_offset_bytes": 0,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "name_shared_by": 1,
+      "storage_at_capture": null
+    },
+    "gate": {
+      "id": "g1:t219",
+      "name": "Qcur_full-3 (view)",
+      "shape": [
+        256,
+        16
+      ],
+      "n_dims": 2,
+      "ggml_type": "f32",
+      "strides_bytes": [
+        4,
+        2048
+      ],
+      "data_bytes": 31744,
+      "role": "activation",
+      "role_evidence": "has_producer_node",
+      "is_view": true,
+      "producer_node_id": "g1:n219",
+      "view_of": "g1:t194",
+      "view_offset_bytes": 1024,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "name_shared_by": 1,
+      "storage_at_capture": null
+    },
+    "not_contiguous_halves": true
+  },
+  "original_execution": {
+    "attention_op": "FLASH_ATTN_EXT",
+    "kv_dtype": "f16",
+    "kv_bytes_per_token": 4096,
+    "weight_dtypes": "see explicit tensors; model file Q4_K_M is not each matrix dtype"
+  },
+  "weights": [
+    {
+      "id": "g1:t1887",
+      "name": "blk.3.attn_norm.weight",
+      "shape": [
+        2560
+      ],
+      "ggml_type": "f32",
+      "data_bytes": 10240
+    },
+    {
+      "id": "g1:t1888",
+      "name": "blk.3.attn_q.weight",
+      "shape": [
+        2560,
+        8192
+      ],
+      "ggml_type": "q4_K",
+      "data_bytes": 11796480
+    },
+    {
+      "id": "g1:t1889",
+      "name": "blk.3.attn_q_norm.weight",
+      "shape": [
+        256
+      ],
+      "ggml_type": "f32",
+      "data_bytes": 1024
+    },
+    {
+      "id": "g1:t1891",
+      "name": "blk.3.attn_v.weight",
+      "shape": [
+        2560,
+        1024
+      ],
+      "ggml_type": "q6_K",
+      "data_bytes": 2150400
+    },
+    {
+      "id": "g1:t1892",
+      "name": "blk.3.attn_k.weight",
+      "shape": [
+        2560,
+        1024
+      ],
+      "ggml_type": "q4_K",
+      "data_bytes": 1474560
+    },
+    {
+      "id": "g1:t1893",
+      "name": "blk.3.attn_k_norm.weight",
+      "shape": [
+        256
+      ],
+      "ggml_type": "f32",
+      "data_bytes": 1024
+    },
+    {
+      "id": "g1:t1899",
+      "name": "blk.3.attn_output.weight",
+      "shape": [
+        4096,
+        2560
+      ],
+      "ggml_type": "q4_K",
+      "data_bytes": 5898240
+    },
+    {
+      "id": "g1:t1900",
+      "name": "blk.3.post_attention_norm.weight",
+      "shape": [
+        2560
+      ],
+      "ggml_type": "f32",
+      "data_bytes": 10240
+    },
+    {
+      "id": "g1:t1901",
+      "name": "blk.3.ffn_gate.weight",
+      "shape": [
+        2560,
+        9216
+      ],
+      "ggml_type": "q4_K",
+      "data_bytes": 13271040
+    },
+    {
+      "id": "g1:t1902",
+      "name": "blk.3.ffn_up.weight",
+      "shape": [
+        2560,
+        9216
+      ],
+      "ggml_type": "q4_K",
+      "data_bytes": 13271040
+    },
+    {
+      "id": "g1:t1903",
+      "name": "blk.3.ffn_down.weight",
+      "shape": [
+        9216,
+        2560
+      ],
+      "ggml_type": "q6_K",
+      "data_bytes": 19353600
+    }
+  ],
+  "nodes": [
+    {
+      "id": "g1:n192",
+      "name": "norm-3",
+      "op": "RMS_NORM",
+      "op_desc": "RMS_NORM",
+      "op_symbol": "rms_norm(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 4,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t191"
+      ],
+      "output_tensor_ids": [
+        "g1:t192"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t191",
+          "name": "l_out-2",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n191",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 2,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t192",
+          "name": "norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n192",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n193",
+      "name": "attn_norm-3",
+      "op": "MUL",
+      "op_desc": "MUL",
+      "op_symbol": "x*y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t192",
+        "g1:t1887"
+      ],
+      "output_tensor_ids": [
+        "g1:t193"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t192",
+          "name": "norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n192",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1887",
+          "name": "blk.3.attn_norm.weight",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t193",
+          "name": "attn_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n193",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n194",
+      "name": "Qcur_full-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1888",
+        "g1:t193"
+      ],
+      "output_tensor_ids": [
+        "g1:t194"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1888",
+          "name": "blk.3.attn_q.weight",
+          "shape": [
+            2560,
+            8192
+          ],
+          "n_dims": 2,
+          "ggml_type": "q4_K",
+          "strides_bytes": [
+            144,
+            1440
+          ],
+          "data_bytes": 11796480,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t193",
+          "name": "attn_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n193",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t194",
+          "name": "Qcur_full-3",
+          "shape": [
+            8192
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 32768,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n194",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n195",
+      "name": "Qcur_reshaped-3",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t194"
+      ],
+      "output_tensor_ids": [
+        "g1:t195"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t194",
+          "name": "Qcur_full-3",
+          "shape": [
+            8192
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 32768,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n194",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t195",
+          "name": "Qcur_reshaped-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            2048
+          ],
+          "data_bytes": 31744,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n195",
+          "view_of": "g1:t194",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n196",
+      "name": "norm-3",
+      "op": "RMS_NORM",
+      "op_desc": "RMS_NORM",
+      "op_symbol": "rms_norm(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 4,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t195"
+      ],
+      "output_tensor_ids": [
+        "g1:t196"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t195",
+          "name": "Qcur_reshaped-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            2048
+          ],
+          "data_bytes": 31744,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n195",
+          "view_of": "g1:t194",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t196",
+          "name": "norm-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n196",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n197",
+      "name": "Qcur_normed-3",
+      "op": "MUL",
+      "op_desc": "MUL",
+      "op_symbol": "x*y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t196",
+        "g1:t1889"
+      ],
+      "output_tensor_ids": [
+        "g1:t197"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t196",
+          "name": "norm-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n196",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1889",
+          "name": "blk.3.attn_q_norm.weight",
+          "shape": [
+            256
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 1024,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t197",
+          "name": "Qcur_normed-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n197",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n198",
+      "name": "Qcur-3",
+      "op": "ROPE",
+      "op_desc": "ROPE",
+      "op_symbol": "rope(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t197",
+        "g1:t1890"
+      ],
+      "output_tensor_ids": [
+        "g1:t198"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t197",
+          "name": "Qcur_normed-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n197",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1890",
+          "name": "CUDA0#leaf_55#0",
+          "shape": [
+            4
+          ],
+          "n_dims": 1,
+          "ggml_type": "i32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16,
+          "role": "unknown",
+          "role_evidence": "unresolved",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": null,
+          "layer_id_evidence": "unresolved",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t198",
+          "name": "Qcur-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n198",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n199",
+      "name": "Vcur-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1891",
+        "g1:t193"
+      ],
+      "output_tensor_ids": [
+        "g1:t199"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1891",
+          "name": "blk.3.attn_v.weight",
+          "shape": [
+            2560,
+            1024
+          ],
+          "n_dims": 2,
+          "ggml_type": "q6_K",
+          "strides_bytes": [
+            210,
+            2100
+          ],
+          "data_bytes": 2150400,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t193",
+          "name": "attn_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n193",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t199",
+          "name": "Vcur-3",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n199",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n200",
+      "name": "Vcur-3",
+      "op": "RESHAPE",
+      "op_desc": "RESHAPE",
+      "op_symbol": "reshape(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t199"
+      ],
+      "output_tensor_ids": [
+        "g1:t200"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t199",
+          "name": "Vcur-3",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n199",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t200",
+          "name": "Vcur-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n200",
+          "view_of": "g1:t199",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n201",
+      "name": "Kcur-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1892",
+        "g1:t193"
+      ],
+      "output_tensor_ids": [
+        "g1:t201"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1892",
+          "name": "blk.3.attn_k.weight",
+          "shape": [
+            2560,
+            1024
+          ],
+          "n_dims": 2,
+          "ggml_type": "q4_K",
+          "strides_bytes": [
+            144,
+            1440
+          ],
+          "data_bytes": 1474560,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t193",
+          "name": "attn_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n193",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t201",
+          "name": "Kcur-3",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n201",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n202",
+      "name": "Kcur-3 (reshaped)",
+      "op": "RESHAPE",
+      "op_desc": "RESHAPE",
+      "op_symbol": "reshape(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t201"
+      ],
+      "output_tensor_ids": [
+        "g1:t202"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t201",
+          "name": "Kcur-3",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n201",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t202",
+          "name": "Kcur-3 (reshaped)",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n202",
+          "view_of": "g1:t201",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n203",
+      "name": "norm-3",
+      "op": "RMS_NORM",
+      "op_desc": "RMS_NORM",
+      "op_symbol": "rms_norm(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 4,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t202"
+      ],
+      "output_tensor_ids": [
+        "g1:t203"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t202",
+          "name": "Kcur-3 (reshaped)",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n202",
+          "view_of": "g1:t201",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t203",
+          "name": "norm-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n203",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n204",
+      "name": "Kcur_normed-3",
+      "op": "MUL",
+      "op_desc": "MUL",
+      "op_symbol": "x*y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t203",
+        "g1:t1893"
+      ],
+      "output_tensor_ids": [
+        "g1:t204"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t203",
+          "name": "norm-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n203",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1893",
+          "name": "blk.3.attn_k_norm.weight",
+          "shape": [
+            256
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 1024,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t204",
+          "name": "Kcur_normed-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n204",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n205",
+      "name": "Kcur-3",
+      "op": "ROPE",
+      "op_desc": "ROPE",
+      "op_symbol": "rope(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t204",
+        "g1:t1890"
+      ],
+      "output_tensor_ids": [
+        "g1:t205"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t204",
+          "name": "Kcur_normed-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n204",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1890",
+          "name": "CUDA0#leaf_55#0",
+          "shape": [
+            4
+          ],
+          "n_dims": 1,
+          "ggml_type": "i32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16,
+          "role": "unknown",
+          "role_evidence": "unresolved",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": null,
+          "layer_id_evidence": "unresolved",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t205",
+          "name": "Kcur-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n205",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n206",
+      "name": "Kcur-3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t205"
+      ],
+      "output_tensor_ids": [
+        "g1:t206"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t205",
+          "name": "Kcur-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n205",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t206",
+          "name": "Kcur-3 (view)",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n206",
+          "view_of": "g1:t205",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n207",
+      "name": "cache_k_l3 (view)",
+      "op": "SET_ROWS",
+      "op_desc": "SET_ROWS",
+      "op_symbol": "set_rows(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t206",
+        "g1:t1894",
+        "g1:t1895"
+      ],
+      "output_tensor_ids": [
+        "g1:t207"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t206",
+          "name": "Kcur-3 (view)",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n206",
+          "view_of": "g1:t205",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1894",
+          "name": "CUDA0#leaf_59#0",
+          "shape": [
+            1
+          ],
+          "n_dims": 1,
+          "ggml_type": "i64",
+          "strides_bytes": [
+            8
+          ],
+          "data_bytes": 8,
+          "role": "unknown",
+          "role_evidence": "unresolved",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": null,
+          "layer_id_evidence": "unresolved",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1895",
+          "name": "cache_k_l3",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "state",
+          "role_evidence": "cache_name",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t207",
+          "name": "cache_k_l3 (view)",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n207",
+          "view_of": "g1:t1895",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n208",
+      "name": "Vcur-3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t200"
+      ],
+      "output_tensor_ids": [
+        "g1:t208"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t200",
+          "name": "Vcur-3",
+          "shape": [
+            256,
+            4
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n200",
+          "view_of": "g1:t199",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t208",
+          "name": "Vcur-3 (view)",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n208",
+          "view_of": "g1:t199",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n209",
+      "name": "cache_v_l3 (view)",
+      "op": "SET_ROWS",
+      "op_desc": "SET_ROWS",
+      "op_symbol": "set_rows(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t208",
+        "g1:t1896",
+        "g1:t1897"
+      ],
+      "output_tensor_ids": [
+        "g1:t209"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t208",
+          "name": "Vcur-3 (view)",
+          "shape": [
+            1024
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 4096,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n208",
+          "view_of": "g1:t199",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1896",
+          "name": "CUDA0#leaf_61#0",
+          "shape": [
+            1
+          ],
+          "n_dims": 1,
+          "ggml_type": "i64",
+          "strides_bytes": [
+            8
+          ],
+          "data_bytes": 8,
+          "role": "unknown",
+          "role_evidence": "unresolved",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": null,
+          "layer_id_evidence": "unresolved",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1897",
+          "name": "cache_v_l3",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "state",
+          "role_evidence": "cache_name",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t209",
+          "name": "cache_v_l3 (view)",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n209",
+          "view_of": "g1:t1897",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n210",
+      "name": "Qcur-3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t198"
+      ],
+      "output_tensor_ids": [
+        "g1:t210"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t198",
+          "name": "Qcur-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n198",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t210",
+          "name": "Qcur-3 (view)",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n210",
+          "view_of": "g1:t198",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n211",
+      "name": "Qcur-3 (view) (permuted)",
+      "op": "PERMUTE",
+      "op_desc": "PERMUTE",
+      "op_symbol": "permute(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t210"
+      ],
+      "output_tensor_ids": [
+        "g1:t211"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t210",
+          "name": "Qcur-3 (view)",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n210",
+          "view_of": "g1:t198",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t211",
+          "name": "Qcur-3 (view) (permuted)",
+          "shape": [
+            256,
+            1,
+            16
+          ],
+          "n_dims": 3,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            16384,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n211",
+          "view_of": "g1:t198",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n212",
+      "name": "cache_k_l3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1895"
+      ],
+      "output_tensor_ids": [
+        "g1:t212"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1895",
+          "name": "cache_k_l3",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "state",
+          "role_evidence": "cache_name",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t212",
+          "name": "cache_k_l3 (view)",
+          "shape": [
+            256,
+            4,
+            87296
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            512,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n212",
+          "view_of": "g1:t1895",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n213",
+      "name": "cache_k_l3 (view) (permuted)",
+      "op": "PERMUTE",
+      "op_desc": "PERMUTE",
+      "op_symbol": "permute(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t212"
+      ],
+      "output_tensor_ids": [
+        "g1:t213"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t212",
+          "name": "cache_k_l3 (view)",
+          "shape": [
+            256,
+            4,
+            87296
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            512,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n212",
+          "view_of": "g1:t1895",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t213",
+          "name": "cache_k_l3 (view) (permuted)",
+          "shape": [
+            256,
+            87296,
+            4
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048,
+            512
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n213",
+          "view_of": "g1:t1895",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n214",
+      "name": "cache_v_l3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 2,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1897"
+      ],
+      "output_tensor_ids": [
+        "g1:t214"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1897",
+          "name": "cache_v_l3",
+          "shape": [
+            1024,
+            87296
+          ],
+          "n_dims": 2,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "state",
+          "role_evidence": "cache_name",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t214",
+          "name": "cache_v_l3 (view)",
+          "shape": [
+            256,
+            4,
+            87296
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            512,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n214",
+          "view_of": "g1:t1897",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n215",
+      "name": "cache_v_l3 (view) (permuted)",
+      "op": "PERMUTE",
+      "op_desc": "PERMUTE",
+      "op_symbol": "permute(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "cache_name",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t214"
+      ],
+      "output_tensor_ids": [
+        "g1:t215"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t214",
+          "name": "cache_v_l3 (view)",
+          "shape": [
+            256,
+            4,
+            87296
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            512,
+            2048
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n214",
+          "view_of": "g1:t1897",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 2,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t215",
+          "name": "cache_v_l3 (view) (permuted)",
+          "shape": [
+            256,
+            87296,
+            4
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048,
+            512
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n215",
+          "view_of": "g1:t1897",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n217",
+      "name": "__fattn__-3",
+      "op": "FLASH_ATTN_EXT",
+      "op_desc": "FLASH_ATTN_EXT",
+      "op_symbol": "flash_attn_ext(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t211",
+        "g1:t213",
+        "g1:t215",
+        "g1:t216"
+      ],
+      "output_tensor_ids": [
+        "g1:t217"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t211",
+          "name": "Qcur-3 (view) (permuted)",
+          "shape": [
+            256,
+            1,
+            16
+          ],
+          "n_dims": 3,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            16384,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n211",
+          "view_of": "g1:t198",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t213",
+          "name": "cache_k_l3 (view) (permuted)",
+          "shape": [
+            256,
+            87296,
+            4
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048,
+            512
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n213",
+          "view_of": "g1:t1895",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t215",
+          "name": "cache_v_l3 (view) (permuted)",
+          "shape": [
+            256,
+            87296,
+            4
+          ],
+          "n_dims": 3,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2,
+            2048,
+            512
+          ],
+          "data_bytes": 178782208,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n215",
+          "view_of": "g1:t1897",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "cache_name",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t216",
+          "name": "attn_inp_kq_mask (copy)",
+          "shape": [
+            87296
+          ],
+          "n_dims": 1,
+          "ggml_type": "f16",
+          "strides_bytes": [
+            2
+          ],
+          "data_bytes": 174592,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n216",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": null,
+          "layer_id_evidence": "unresolved",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t217",
+          "name": "__fattn__-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n217",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n218",
+      "name": "attn_pregate-3",
+      "op": "RESHAPE",
+      "op_desc": "RESHAPE",
+      "op_symbol": "reshape(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t217"
+      ],
+      "output_tensor_ids": [
+        "g1:t218"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t217",
+          "name": "__fattn__-3",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            1024
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n217",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t218",
+          "name": "attn_pregate-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n218",
+          "view_of": "g1:t217",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n219",
+      "name": "Qcur_full-3 (view)",
+      "op": "VIEW",
+      "op_desc": "VIEW",
+      "op_symbol": "view(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t194"
+      ],
+      "output_tensor_ids": [
+        "g1:t219"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t194",
+          "name": "Qcur_full-3",
+          "shape": [
+            8192
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 32768,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n194",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t219",
+          "name": "Qcur_full-3 (view)",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            2048
+          ],
+          "data_bytes": 31744,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n219",
+          "view_of": "g1:t194",
+          "view_offset_bytes": 1024,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n220",
+      "name": "gate_reshaped-3",
+      "op": "CONT",
+      "op_desc": "CONT",
+      "op_symbol": "cont(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t219"
+      ],
+      "output_tensor_ids": [
+        "g1:t220"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t219",
+          "name": "Qcur_full-3 (view)",
+          "shape": [
+            256,
+            16
+          ],
+          "n_dims": 2,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4,
+            2048
+          ],
+          "data_bytes": 31744,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n219",
+          "view_of": "g1:t194",
+          "view_offset_bytes": 1024,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t220",
+          "name": "gate_reshaped-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n220",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n221",
+      "name": "gate_sigmoid-3",
+      "op": "UNARY",
+      "op_desc": "SIGMOID",
+      "op_symbol": "unary(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t220"
+      ],
+      "output_tensor_ids": [
+        "g1:t221"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t220",
+          "name": "gate_reshaped-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n220",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t221",
+          "name": "gate_sigmoid-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n221",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n222",
+      "name": "attn_gated-3",
+      "op": "MUL",
+      "op_desc": "MUL",
+      "op_symbol": "x*y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t218",
+        "g1:t221"
+      ],
+      "output_tensor_ids": [
+        "g1:t222"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t218",
+          "name": "attn_pregate-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": true,
+          "producer_node_id": "g1:n218",
+          "view_of": "g1:t217",
+          "view_offset_bytes": 0,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t221",
+          "name": "gate_sigmoid-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n221",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t222",
+          "name": "attn_gated-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n222",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n223",
+      "name": "attn_output-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1899",
+        "g1:t222"
+      ],
+      "output_tensor_ids": [
+        "g1:t223"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1899",
+          "name": "blk.3.attn_output.weight",
+          "shape": [
+            4096,
+            2560
+          ],
+          "n_dims": 2,
+          "ggml_type": "q4_K",
+          "strides_bytes": [
+            144,
+            2304
+          ],
+          "data_bytes": 5898240,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t222",
+          "name": "attn_gated-3",
+          "shape": [
+            4096
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 16384,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n222",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t223",
+          "name": "attn_output-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n223",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n224",
+      "name": "attn_residual-3",
+      "op": "ADD",
+      "op_desc": "ADD",
+      "op_symbol": "x+y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t223",
+        "g1:t191"
+      ],
+      "output_tensor_ids": [
+        "g1:t224"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t223",
+          "name": "attn_output-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n223",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t191",
+          "name": "l_out-2",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n191",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 2,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t224",
+          "name": "attn_residual-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n224",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n225",
+      "name": "norm-3",
+      "op": "RMS_NORM",
+      "op_desc": "RMS_NORM",
+      "op_symbol": "rms_norm(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 4,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t224"
+      ],
+      "output_tensor_ids": [
+        "g1:t225"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t224",
+          "name": "attn_residual-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n224",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t225",
+          "name": "norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n225",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n226",
+      "name": "attn_post_norm-3",
+      "op": "MUL",
+      "op_desc": "MUL",
+      "op_symbol": "x*y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t225",
+        "g1:t1900"
+      ],
+      "output_tensor_ids": [
+        "g1:t226"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t225",
+          "name": "norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n225",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 4,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t1900",
+          "name": "blk.3.post_attention_norm.weight",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t226",
+          "name": "attn_post_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n226",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n227",
+      "name": "ffn_gate-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1901",
+        "g1:t226"
+      ],
+      "output_tensor_ids": [
+        "g1:t227"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1901",
+          "name": "blk.3.ffn_gate.weight",
+          "shape": [
+            2560,
+            9216
+          ],
+          "n_dims": 2,
+          "ggml_type": "q4_K",
+          "strides_bytes": [
+            144,
+            1440
+          ],
+          "data_bytes": 13271040,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t226",
+          "name": "attn_post_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n226",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t227",
+          "name": "ffn_gate-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n227",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n228",
+      "name": "ffn_up-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1902",
+        "g1:t226"
+      ],
+      "output_tensor_ids": [
+        "g1:t228"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1902",
+          "name": "blk.3.ffn_up.weight",
+          "shape": [
+            2560,
+            9216
+          ],
+          "n_dims": 2,
+          "ggml_type": "q4_K",
+          "strides_bytes": [
+            144,
+            1440
+          ],
+          "data_bytes": 13271040,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t226",
+          "name": "attn_post_norm-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n226",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t228",
+          "name": "ffn_up-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n228",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n229",
+      "name": "ffn_swiglu-3",
+      "op": "GLU",
+      "op_desc": "SWIGLU",
+      "op_symbol": "glu(x)",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t227",
+        "g1:t228"
+      ],
+      "output_tensor_ids": [
+        "g1:t229"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t227",
+          "name": "ffn_gate-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n227",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t228",
+          "name": "ffn_up-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n228",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t229",
+          "name": "ffn_swiglu-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n229",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n230",
+      "name": "ffn_out-3",
+      "op": "MUL_MAT",
+      "op_desc": "MUL_MAT",
+      "op_symbol": "X*Y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t1903",
+        "g1:t229"
+      ],
+      "output_tensor_ids": [
+        "g1:t230"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t1903",
+          "name": "blk.3.ffn_down.weight",
+          "shape": [
+            9216,
+            2560
+          ],
+          "n_dims": 2,
+          "ggml_type": "q6_K",
+          "strides_bytes": [
+            210,
+            7560
+          ],
+          "data_bytes": 19353600,
+          "role": "parameter",
+          "role_evidence": "weight_name_and_allocated",
+          "is_view": false,
+          "producer_node_id": null,
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "blk_prefix",
+          "name_shared_by": 1,
+          "storage_at_capture": {
+            "buffer": "CUDA0",
+            "buffer_type": "CUDA0"
+          }
+        },
+        {
+          "id": "g1:t229",
+          "name": "ffn_swiglu-3",
+          "shape": [
+            9216
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 36864,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n229",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t230",
+          "name": "ffn_out-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n230",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    },
+    {
+      "id": "g1:n231",
+      "name": "l_out-3",
+      "op": "ADD",
+      "op_desc": "ADD",
+      "op_symbol": "x+y",
+      "flags": 16,
+      "layer_id": 3,
+      "layer_id_evidence": "name_suffix",
+      "module_id": "mod-layer-3",
+      "module_evidence": "node_layer_id",
+      "name_shared_by": 1,
+      "has_name": true,
+      "input_tensor_ids": [
+        "g1:t230",
+        "g1:t224"
+      ],
+      "output_tensor_ids": [
+        "g1:t231"
+      ],
+      "backend": {
+        "name": "CUDA0",
+        "device_id": "dev0",
+        "device_name": "CUDA0",
+        "device_type": "gpu"
+      },
+      "input_tensors": [
+        {
+          "id": "g1:t230",
+          "name": "ffn_out-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n230",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        },
+        {
+          "id": "g1:t224",
+          "name": "attn_residual-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n224",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ],
+      "output_tensors": [
+        {
+          "id": "g1:t231",
+          "name": "l_out-3",
+          "shape": [
+            2560
+          ],
+          "n_dims": 1,
+          "ggml_type": "f32",
+          "strides_bytes": [
+            4
+          ],
+          "data_bytes": 10240,
+          "role": "activation",
+          "role_evidence": "has_producer_node",
+          "is_view": false,
+          "producer_node_id": "g1:n231",
+          "view_of": null,
+          "view_offset_bytes": null,
+          "layer_id": 3,
+          "layer_id_evidence": "name_suffix",
+          "name_shared_by": 1,
+          "storage_at_capture": null
+        }
+      ]
+    }
+  ],
+  "profiling_status": {
+    "attention_core": "new CPU explicit attention uses F32 KV; not same implementation variant as captured original graph",
+    "ffn_core": "gate/up + SwiGLU + down; excluding post-attention norm and residual",
+    "projection": "complete Q/G/K/V + QK norm and RoPE macro not yet measured",
+    "automatic_M2_binding": false
+  }
+}

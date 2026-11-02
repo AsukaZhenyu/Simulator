@@ -1,0 +1,19 @@
+{
+  "schema_version": "measurement_suite_v1",
+  "description": "Portable sanity suite. Generated tensors; illustrative shapes, not a complete model.",
+  "compute_cases": [
+    {"id": "projection_f32_t1", "m": 512, "k": 512, "n": 1, "dtype": "f32"},
+    {"id": "projection_f32_t16", "m": 512, "k": 512, "n": 16, "dtype": "f32"},
+    {"id": "projection_f16_t16", "m": 512, "k": 512, "n": 16, "dtype": "f16"},
+    {"id": "ffn_up_q4k_t1", "m": 2048, "k": 512, "n": 1, "dtype": "q4_k"},
+    {"id": "ffn_down_q6k_t1", "m": 512, "k": 2048, "n": 1, "dtype": "q6_k"}
+  ],
+  "transfer_cases": [
+    {"id": "h2d_pinned_4k", "direction": "H2D", "host_memory": "pinned", "size_bytes": 4096},
+    {"id": "d2h_pinned_4k", "direction": "D2H", "host_memory": "pinned", "size_bytes": 4096},
+    {"id": "h2d_pinned_8m", "direction": "H2D", "host_memory": "pinned", "size_bytes": 8388608},
+    {"id": "d2h_pinned_8m", "direction": "D2H", "host_memory": "pinned", "size_bytes": 8388608},
+    {"id": "h2d_pageable_8m", "direction": "H2D", "host_memory": "pageable", "size_bytes": 8388608},
+    {"id": "d2h_pageable_8m", "direction": "D2H", "host_memory": "pageable", "size_bytes": 8388608}
+  ]
+}

@@ -1,0 +1,293 @@
+{
+  "format_version": "matched-mechanisms-suite-0.1",
+  "cases": [
+    {
+      "id": "ffn-h32-i64-t3-hybrid",
+      "family": "ffn",
+      "backend": "hybrid",
+      "hidden": 32,
+      "intermediate": 64,
+      "tokens": 3,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0,
+      "dtype": "f32"
+    },
+    {
+      "id": "ffn-h32-i64-t1-hybrid",
+      "family": "ffn",
+      "backend": "hybrid",
+      "hidden": 32,
+      "intermediate": 64,
+      "tokens": 1,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0,
+      "dtype": "f32"
+    },
+    {
+      "id": "ffn-h256-i512-t3-hybrid",
+      "family": "ffn",
+      "backend": "hybrid",
+      "hidden": 256,
+      "intermediate": 512,
+      "tokens": 3,
+      "history": 0,
+      "heads": 0,
+      "kv_heads": 0,
+      "head_dim": 0,
+      "dtype": "f32"
+    },
+    {
+      "id": "attention-h32-t3-hist0-cpu",
+      "family": "attention",
+      "backend": "cpu",
+      "hidden": 32,
+      "intermediate": 0,
+      "tokens": 3,
+      "history": 0,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 8,
+      "dtype": "f32"
+    },
+    {
+      "id": "attention-h32-t1-hist3-cpu",
+      "family": "attention",
+      "backend": "cpu",
+      "hidden": 32,
+      "intermediate": 0,
+      "tokens": 1,
+      "history": 3,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 8,
+      "dtype": "f32"
+    },
+    {
+      "id": "attention-h32-t3-hist0-gpu",
+      "family": "attention",
+      "backend": "gpu",
+      "hidden": 32,
+      "intermediate": 0,
+      "tokens": 3,
+      "history": 0,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 8,
+      "dtype": "f32"
+    },
+    {
+      "id": "attention-h32-t1-hist3-gpu",
+      "family": "attention",
+      "backend": "gpu",
+      "hidden": 32,
+      "intermediate": 0,
+      "tokens": 1,
+      "history": 3,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 8,
+      "dtype": "f32"
+    }
+  ],
+  "compute_protocol": {
+    "threads": 1,
+    "cpu_id": 0,
+    "device": 0,
+    "warmup": 20,
+    "samples": 51,
+    "min_warmup_ms": 500,
+    "cuda_graphs": "disabled"
+  },
+  "transfers": [
+    {
+      "id": "ce_h2d-384",
+      "mode": "ce_h2d",
+      "bytes": 384,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_d2h-384",
+      "mode": "ce_d2h",
+      "bytes": 384,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_h2d-384",
+      "mode": "sm_h2d",
+      "bytes": 384,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_d2h-384",
+      "mode": "sm_d2h",
+      "bytes": 384,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_sm_duplex-384",
+      "mode": "ce_sm_duplex",
+      "bytes": 384,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_h2d-8192",
+      "mode": "ce_h2d",
+      "bytes": 8192,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_d2h-8192",
+      "mode": "ce_d2h",
+      "bytes": 8192,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_h2d-8192",
+      "mode": "sm_h2d",
+      "bytes": 8192,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_d2h-8192",
+      "mode": "sm_d2h",
+      "bytes": 8192,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_sm_duplex-8192",
+      "mode": "ce_sm_duplex",
+      "bytes": 8192,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_h2d-32768",
+      "mode": "ce_h2d",
+      "bytes": 32768,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_d2h-32768",
+      "mode": "ce_d2h",
+      "bytes": 32768,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_h2d-32768",
+      "mode": "sm_h2d",
+      "bytes": 32768,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "sm_d2h-32768",
+      "mode": "sm_d2h",
+      "bytes": 32768,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "ce_sm_duplex-32768",
+      "mode": "ce_sm_duplex",
+      "bytes": 32768,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "empty_kernel",
+      "mode": "empty_kernel",
+      "bytes": 1,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    },
+    {
+      "id": "empty_events",
+      "mode": "empty_events",
+      "bytes": 1,
+      "device": 0,
+      "blocks": 32,
+      "threads_per_block": 256,
+      "warmup": 20,
+      "samples": 101
+    }
+  ],
+  "profile_seeds": [
+    17
+  ],
+  "heldout_seeds": [
+    29
+  ],
+  "repeats": 2,
+  "quality": {
+    "max_within_process_cv": 0.15,
+    "max_between_process_cv": 0.2,
+    "max_heldout_relative_error": 0.2
+  },
+  "bootstrap": {
+    "iterations": 1000,
+    "seed": 7
+  }
+}

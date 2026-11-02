@@ -1,0 +1,4 @@
+__pycache__/
+results/
+archive-*/
+_test_tmp/
