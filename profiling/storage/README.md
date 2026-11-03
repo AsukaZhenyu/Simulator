@@ -166,15 +166,20 @@ python profiling\storage\transfer_table.py --measurements D:\ssd-measure\laptop-
 台式机用完全相同的两条命令，只换 `--directory`/`--output`/`--platform` 标签；代码路径与
 笔记本逐字节相同。
 
-**iPhone 不能从 Windows 产出**，也不能直接跑本脚本；但它在 Darwin 上用的机制与上表 macOS
-一行**完全相同**（`F_NOCACHE` + `F_FULLFSYNC`），所以只要把同一协议写成设备上的
-Swift/Objective-C app 并沿用同一套字段，三台机器的数字就是可比的。app 必须遵循：同样的
-size 列表（4096 的倍数）、15 个计时样本 + 3 个 warmup、每个样本重新定位到 4096 对齐的随机
-偏移、读/写交替、保留全部原始纳秒、写停表于 write 返回之后、`F_FULLFSYNC` 单独记入
-`flush_ns`（不加入写耗时）。输出沿用本文件的 JSON 字段；`cache_bypass` 记为
-`f_nocache`，并把真实 API 写进额外字段（如
-`"platform_api": "F_NOCACHE"`，对目录 fd 用 `F_GLOBAL_NOCACHE` 时一并注明）。导出步骤与
-两台 Windows 机器完全相同。
+**iPhone 不能从 Windows 产出**，也不能直接跑本脚本。Darwin 上用的机制与上表 macOS 一行
+**完全相同**（`F_NOCACHE` + `F_FULLFSYNC`），所以 [device/](device/README.md) 里放了一份同
+协议的 Swift 实现：设备只产出**原始观测**（`samples_ns` 与它实际用过的偏移），统计量与
+`duration_ns` 由 `import_device_measurements.py` 在导入时用**同一份** `build_record` /
+`validate_record` 算出来——设备不自己算派生值，因为在另一台机器上算出来的数没人能核验。
+
+```powershell
+python profiling\storage\import_device_measurements.py --observations mac.json --output mac.measurements.json
+python profiling\storage\transfer_table.py --measurements mac.measurements.json --base mapping\examples\m2\storage-interface-synthetic.costs.json --output mac.costs.json
+```
+
+注意：**租一台远程 MacBook 只能拿到 Mac 那份数据，拿不到 iPhone 的**——iPhone 需要一台
+本地 Mac 加真机才能接上。如果目标是「第三台设备」，Apple Silicon Mac 本身就是统一内存的
+Darwin 设备，比 iPhone 更好比。
 
 ## 在第二台机器上跑（一次完整 campaign）
 
@@ -212,6 +217,13 @@ python profiling\storage\transfer_table.py --measurements $D\desktop-clean.json 
 - **`--sustained-after-bytes` 必须由人给**，导出器不会猜；步骤 3 与步骤 2 之间的空档越短越好。
 
 跑完把整个 `$D` 目录拷回来，不要只拷导出表——原始 `samples_ns` 是唯一能重算的东西。
+
+**Linux 机器（例如一台 Arch）**：命令完全相同，只把 PowerShell 的 `$D` 换成 shell 变量、
+`--platform` 换标签。这台机器上会走 **`O_DIRECT`**（文件系统不支持时自动退到
+`fadvise_dontneed` 并在记录里如实写，不会假装是 `O_DIRECT`）。这两条路径在此之前**只有单元
+测试，没有真机证据**，所以一台旧 Linux 机器的价值不只是「第三台」：它补的是另一个操作系统
+和另一种绕过机制。`O_DIRECT` 要求 4096 对齐，工具已经处理；8 GB 内存够用，最大尺寸 1 GiB
+时缓冲区加 backing file 约 2 GiB。跑之前 `git rev-parse HEAD` 同样要对得上。
 
 ## 无硬件测试
 
