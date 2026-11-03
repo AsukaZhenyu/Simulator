@@ -53,3 +53,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ==================== 模型权重 ====================
+# 多模型验证的权重不进仓库：单文件 0.4–9.5 GB，GitHub 单文件 100 MB、
+# 单资产 2 GB、免费 LFS 1 GB 都放不下。清单在 profiling/multimodel/models.json，
+# 字节由 profiling/multimodel/fetch_models.py 按 commit 拉取并校验 SHA-256。
+*.gguf
+*.gguf.part

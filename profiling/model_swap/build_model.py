@@ -387,6 +387,22 @@ def _layer_ffn(names: list[str]) -> str:
     return "dense"
 
 
+def _tensor_width(layers: list[dict[str, Any]], stem: str, rank: int) -> int | None:
+    """Feed-forward width read from an expert tensor's own shape.
+
+    ``ffn_gate_exps.weight`` is [hidden, width, experts] and
+    ``ffn_gate_shexp.weight`` is [hidden, width].  The first layer is enough:
+    a GGUF whose experts disagree on width would not load at all.
+    """
+    suffix = f"{stem}.weight"
+    for layer in layers:
+        for tensor in layer["tensors"]:
+            shape = tensor["shape"]
+            if tensor["name"].endswith(suffix) and len(shape) == rank:
+                return int(shape[1])
+    return None
+
+
 def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
     """Read a GGUF header/tensor directory only; never load tensor data."""
     source_path = Path(path)
@@ -465,6 +481,20 @@ def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
             }
         )
 
+    expert_width = _optional_int(value("expert_feed_forward_length"),
+                                 "expert_intermediate_size")
+    if expert_width is None:
+        # granitemoe and qwen2moe publish neither expert_feed_forward_length nor
+        # expert_shared_feed_forward_length: for a pure-MoE block
+        # feed_forward_length is the expert width, not a dense FFN.  The tensor
+        # directory still carries the exact width, so read it there instead of
+        # reporting "unknown" for a number the file states plainly.
+        expert_width = _tensor_width(layers, "ffn_gate_exps", 3)
+    shared_width = _optional_int(value("expert_shared_feed_forward_length"),
+                                 "shared_expert_intermediate_size")
+    if shared_width is None:
+        shared_width = _tensor_width(layers, "ffn_gate_shexp", 2)
+
     normalized = {
         "schema_version": METADATA_SCHEMA,
         "source": {
@@ -490,10 +520,8 @@ def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
         "full_attention_interval": value("full_attention_interval"),
         "experts": value("expert_count"),
         "top_k": value("expert_used_count"),
-        "expert_intermediate_size": value("expert_feed_forward_length"),
-        "shared_expert_intermediate_size": value(
-            "expert_shared_feed_forward_length"
-        ),
+        "expert_intermediate_size": expert_width,
+        "shared_expert_intermediate_size": shared_width,
         "vocab_size": vocab_size,
         "global_tensor_count": global_count,
         "global_weight_bytes": global_bytes,

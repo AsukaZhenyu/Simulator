@@ -1,0 +1,20 @@
+{
+  "schema": "multimodel-prompts-1",
+  "license": "Written for this repository. No third-party text, no network fetch at run time.",
+  "token_lengths_are_not_properties_of_this_file": true,
+  "note": "A prompt's token count depends on the model's tokenizer, so it is measured per model with the runtime's vocab-only mode and recorded in the campaign, never estimated from characters. Prompts are only the source of text; the cost-table key is the token count that mode reports.",
+  "prompts": [
+    {
+      "id": "p-short",
+      "text": "Name three sorting algorithms and state the worst-case running time of each."
+    },
+    {
+      "id": "p-list",
+      "text": "A workshop has twelve benches. Each bench seats four people, and two benches are reserved. How many seats remain, and write the arithmetic step by step."
+    },
+    {
+      "id": "p-expl",
+      "text": "Explain why a memory-bandwidth bound appears in matrix multiplication on a machine whose arithmetic throughput is high but whose memory bus is narrow. Keep the explanation to a few sentences and use a concrete example."
+    }
+  ]
+}

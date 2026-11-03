@@ -232,6 +232,37 @@ class MetadataEntryTests(unittest.TestCase):
                 build_model.write_model(meta, name="toy", out_dir=directory / "out")
 
 
+class ExpertWidthFallsBackToTheTensorShape(unittest.TestCase):
+    """granitemoe and qwen2moe publish no expert_feed_forward_length key.
+
+    For a pure-MoE block feed_forward_length is the expert width, so reporting
+    None would make an exact value in the tensor directory look unknown.
+    """
+
+    layers = [
+        {"tensors": [
+            {"name": "blk.0.ffn_gate_exps.weight", "shape": [1536, 512, 40]},
+            {"name": "blk.0.ffn_down_exps.weight", "shape": [512, 1536, 40]},
+        ]},
+    ]
+
+    def test_a_rank_three_expert_tensor_yields_its_width(self):
+        self.assertEqual(build_model._tensor_width(self.layers, "ffn_gate_exps", 3), 512)
+
+    def test_a_shared_expert_tensor_is_rank_two(self):
+        layers = [{"tensors": [{"name": "blk.0.ffn_gate_shexp.weight",
+                                "shape": [2048, 5632]}]}]
+        self.assertEqual(build_model._tensor_width(layers, "ffn_gate_shexp", 2), 5632)
+
+    def test_the_wrong_rank_is_not_read_as_a_width(self):
+        # ffn_down_exps is [width, hidden, experts]; treating it as a gate
+        # tensor would silently report the hidden size as the expert width.
+        self.assertIsNone(build_model._tensor_width(self.layers, "ffn_down_exps", 2))
+
+    def test_an_absent_tensor_yields_none_rather_than_zero(self):
+        self.assertIsNone(build_model._tensor_width(self.layers, "ffn_gate_shexp", 2))
+
+
 @unittest.skipUnless(GGUF.is_file(), f"local GGUF not present: {GGUF}")
 class GGUFTests(unittest.TestCase):
     def test_real_gguf_metadata_builds_a_parsable_skeleton(self):

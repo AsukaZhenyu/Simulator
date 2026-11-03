@@ -1,0 +1,179 @@
+{
+  "schema": "multimodel-models-1",
+  "verified_utc": "2026-11-03",
+  "verification": "Geometry was read from each file's GGUF header and tensor directory, not from the publisher's config.json and not from recollection. Sizes and SHA-256 are the publisher's LFS records for the pinned commit; fetch_models.py re-hashes every byte locally before a campaign starts.",
+  "files_are_not_committed": "A 4-bit GGUF is 0.4-9.5 GB. GitHub rejects files over 100 MB, release assets over 2 GB and free LFS over 1 GB, so the repository carries this manifest and each device materialises the models with fetch_models.py.",
+  "geometry_is_compared": "The geometry blocks mirror the shape of profiling/model_swap/build_model.py's .geometry.json. run.py structure re-reads each local file and requires every declared field to match (STANDARD.md R2), so a substituted or re-quantised file cannot pass as the declared model.",
+  "models": [
+    {
+      "id": "qwen3-0.6b",
+      "role": "dense",
+      "purpose": "Smallest dense case. Establishes the low end of the error curve without a family change.",
+      "repository": "unsloth/Qwen3-0.6B-GGUF",
+      "filename": "Qwen3-0.6B-Q4_K_M.gguf",
+      "revision": "50968a4468ef4233ed78cd7c3de230dd1d61a56b",
+      "bytes": 396705472,
+      "sha256": "ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "qwen3",
+        "block_count": 28,
+        "hidden_size": 1024,
+        "intermediate_size": 3072,
+        "attention": {
+          "heads": 16,
+          "kv_heads": 8,
+          "head_dim": 128,
+          "rope_dims": null,
+          "norm_epsilon": 1e-06,
+          "layer_kind_counts": {"full_causal": 28}
+        },
+        "ffn": {
+          "kind": "dense",
+          "experts": null,
+          "top_k": null,
+          "expert_intermediate_size": null,
+          "shared_expert_intermediate_size": null
+        }
+      },
+      "notes": "attn_q_norm and attn_k_norm are present (per-head QK-RMSNorm, 28 of each). Normalization is outside the timed physical block. attn_q is [1024,2048]: no interleaved gate. rope_dims is null because this GGUF does not publish rope.dimension_count."
+    },
+    {
+      "id": "qwen3-1.7b",
+      "role": "dense",
+      "purpose": "Middle dense case. Same architecture and tokenizer as 0.6B and 4B, so a size trend cannot be explained by a family change.",
+      "repository": "unsloth/Qwen3-1.7B-GGUF",
+      "filename": "Qwen3-1.7B-Q4_K_M.gguf",
+      "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+      "bytes": 1107409472,
+      "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "qwen3",
+        "block_count": 28,
+        "hidden_size": 2048,
+        "intermediate_size": 6144,
+        "attention": {
+          "heads": 16,
+          "kv_heads": 8,
+          "head_dim": 128,
+          "rope_dims": null,
+          "norm_epsilon": 1e-06,
+          "layer_kind_counts": {"full_causal": 28}
+        },
+        "ffn": {
+          "kind": "dense",
+          "experts": null,
+          "top_k": null,
+          "expert_intermediate_size": null,
+          "shared_expert_intermediate_size": null
+        }
+      },
+      "notes": "attn_q_norm and attn_k_norm are present (28 of each). attn_q is [2048,2048]."
+    },
+    {
+      "id": "qwen3-4b",
+      "role": "dense",
+      "purpose": "Largest dense case, and the only one with a 4:1 GQA ratio instead of 3:1, so the error curve also crosses a kv-head change.",
+      "repository": "Qwen/Qwen3-4B-GGUF",
+      "filename": "Qwen3-4B-Q4_K_M.gguf",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "bytes": 2497280256,
+      "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "qwen3",
+        "block_count": 36,
+        "hidden_size": 2560,
+        "intermediate_size": 9728,
+        "attention": {
+          "heads": 32,
+          "kv_heads": 8,
+          "head_dim": 128,
+          "rope_dims": null,
+          "norm_epsilon": 1e-06,
+          "layer_kind_counts": {"full_causal": 36}
+        },
+        "ffn": {
+          "kind": "dense",
+          "experts": null,
+          "top_k": null,
+          "expert_intermediate_size": null,
+          "shared_expert_intermediate_size": null
+        }
+      },
+      "notes": "attn_q_norm and attn_k_norm are present (36 of each). attn_q is [2560,4096], a plain projection with no interleaved gate, unlike Qwen3.5."
+    },
+    {
+      "id": "granite-3.0-3b-a800m",
+      "role": "moe",
+      "purpose": "MoE without a shared expert, 8 of 40 experts active. Tests the measured-FFN block on the sparser routing pattern.",
+      "repository": "bartowski/granite-3.0-3b-a800m-instruct-GGUF",
+      "filename": "granite-3.0-3b-a800m-instruct-Q4_K_M.gguf",
+      "revision": "4f4569b667018222ae70a979c5064afc69df675f",
+      "bytes": 2059356000,
+      "sha256": "aa6287bafd182d06a6d11b0d001458deec902e8c0522875fc20cde2f561ebf6d",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "granitemoe",
+        "block_count": 32,
+        "hidden_size": 1536,
+        "intermediate_size": null,
+        "attention": {
+          "heads": 24,
+          "kv_heads": 8,
+          "head_dim": 64,
+          "rope_dims": 64,
+          "norm_epsilon": 1e-06,
+          "layer_kind_counts": {"full_causal": 32}
+        },
+        "ffn": {
+          "kind": "moe",
+          "experts": 40,
+          "top_k": 8,
+          "expert_intermediate_size": 512,
+          "shared_expert_intermediate_size": null
+        }
+      },
+      "notes": "Read from the tensor directory, not the metadata: ffn_gate_exps [1536,512,40], ffn_down_exps [512,1536,40], ffn_gate_inp [1536,40]. There are no *_shexp tensors, so there is no shared expert and granularity is a pure top-8 of 40. attn_k/v are [1536,512], i.e. 3:1 GQA."
+    },
+    {
+      "id": "qwen1.5-moe-a2.7b",
+      "role": "moe",
+      "purpose": "MoE with a shared expert and only 4 of 60 experts active. Contrasts with Granite on both the shared-expert and the sparsity axis at once, so one measured-block error cannot be blamed on a single routing parameter.",
+      "repository": "RichardErkhov/Qwen_-_Qwen1.5-MoE-A2.7B-Chat-gguf",
+      "filename": "Qwen1.5-MoE-A2.7B-Chat.Q4_K_M.gguf",
+      "revision": "947580e7b3904cd4081810d0efec4520a75609c7",
+      "bytes": 9496236768,
+      "sha256": "3dcfb1032781788bf373edb49b888fcac5b6093ea0fe0edf5e23a977390b3eea",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "qwen2moe",
+        "block_count": 24,
+        "hidden_size": 2048,
+        "intermediate_size": 5632,
+        "attention": {
+          "heads": 16,
+          "kv_heads": 16,
+          "head_dim": 128,
+          "rope_dims": null,
+          "norm_epsilon": 1e-06,
+          "layer_kind_counts": {"full_causal": 24}
+        },
+        "ffn": {
+          "kind": "moe",
+          "experts": 60,
+          "top_k": 4,
+          "expert_intermediate_size": 1408,
+          "shared_expert_intermediate_size": 5632
+        }
+      },
+      "notes": "MHA (16 kv heads for 16 heads), so this model exercises no GQA path. ffn_*_exps are [*,1408,60]; ffn_*_shexp are [*,5632]. The shared expert is as wide as feed_forward_length, which is why that metadata value is not the expert width here. The publisher repository carries no license tag; upstream Qwen1.5-MoE-A2.7B is Apache-2.0."
+    }
+  ]
+}

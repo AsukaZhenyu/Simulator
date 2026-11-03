@@ -1,0 +1,17 @@
+{
+  "schema": "multimodel-shapes-1",
+  "batch": 1,
+  "why": "The cost table is keyed by (kind, device, phase, batch, tokens, visible_history). These are the keys a device must fill for every model. Batch 1 is the declared use case (personal inference, latency target); the history axis is what distinguishes prefill from decode, so it is swept rather than assumed.",
+  "prefill": [
+    {"tokens": 16},
+    {"tokens": 64},
+    {"tokens": 256}
+  ],
+  "decode": [
+    {"tokens": 1, "visible_history": 0},
+    {"tokens": 1, "visible_history": 128},
+    {"tokens": 1, "visible_history": 512},
+    {"tokens": 1, "visible_history": 1024}
+  ],
+  "not_interpolated": "A shape not listed here must be measured, not derived from a neighbour (R4). Missing keys stay null, not zero."
+}
