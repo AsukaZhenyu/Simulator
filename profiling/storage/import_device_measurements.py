@@ -34,6 +34,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+if __package__ in (None, ""):  # `python profiling/storage/import_device_measurements.py`
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:  # package import
     from .ssd_measure import (
         ALIGNMENT_BYTES, SCHEMA_VERSION, build_record, summarize_measurements,

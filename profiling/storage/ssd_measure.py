@@ -37,6 +37,11 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+if __package__ in (None, ""):  # `python profiling/storage/ssd_measure.py`
+    # Runbook compatibility: the README tells the operator to call this file
+    # directly, and that must work without an unstated PYTHONPATH.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:
     from ..profile_contract import summarize_samples
 except ImportError:  # direct script / flat sys.path execution

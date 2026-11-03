@@ -191,6 +191,11 @@ Darwin 设备，比 iPhone 更好比。
 $D = "D:\ssd-measure"     # 换成第二台机器上那块盘的目录
 $S = "4096,16384,65536,262144,1048576,1474560,4194304,5898240,13271040,16777216,19353600,33554432"
 
+# 0) 先问这个目录是不是一块盘（下面「租来的 UMA 机器」讲了它拒绝什么）
+#    --expected-commit 填**笔记本上** `git rev-parse --short HEAD` 的输出；
+#    短 SHA 与全长 SHA 都能比（前缀 ≥ 7 位）。
+python profiling\storage\preflight.py --directory $D --expected-commit <笔记本的 commit>
+
 # 1) 干净状态下的主尺寸表
 python profiling\storage\ssd_measure.py --sizes-bytes $S --directory $D --output $D\desktop-clean.json --platform desktop-windows-nvme --samples 24 --warmup 2 --cache-bypass required
 
@@ -217,6 +222,37 @@ python profiling\storage\transfer_table.py --measurements $D\desktop-clean.json 
 - **`--sustained-after-bytes` 必须由人给**，导出器不会猜；步骤 3 与步骤 2 之间的空档越短越好。
 
 跑完把整个 `$D` 目录拷回来，不要只拷导出表——原始 `samples_ns` 是唯一能重算的东西。
+
+## 租来的 UMA 机器（DGX Spark / RTX Spark）
+
+两台机器名字接近，能做的事差别很大：
+
+| | RTX Spark（N1X） | DGX Spark（GB10） |
+|---|---|---|
+| 系统 | **Windows 11 on ARM64** | Linux aarch64（DGX OS） |
+| 内存 | 128 GB LPDDR5X 统一（Grace CPU + Blackwell GPU，NVLink-C2C） | 128 GB 统一，~273 GB/s |
+| 绕过路径 | 本仓库的 **Windows 分支原样可用**（`ctypes` 在 ARM64 Windows 上仍是 64 位，`HANDLE` 是 `c_void_p`） | Linux **`O_DIRECT`** 分支 |
+| 怎么拿到 | 买（约 $2,500 起），一般不是租 | **可按小时租**，约 $0.75–0.79/h，给 root SSH + Docker |
+| 对论文的价值 | 真 UMA 硬件块，且**代码路径与笔记本逐字节相同** | 真 UMA 硬件块 + Linux/ARM64 路径 + 真 NVMe 数字 |
+
+**先跑 `preflight.py`，不要直接开测。** 租来的机器通常给的是容器，工作目录落在
+`overlay` 上——在那里测出来的数字不属于任何一块盘，而 `ssd_measure.py` 自己不会检查这一点
+（它只如实记录用到了哪个 API）。`preflight.py` 会读出 `findmnt` 的 `FSTYPE`/`SOURCE`，
+overlay / tmpfs / nfs / cifs / `fuse.*` 一律 **REFUSE**；同时它也做一次 4 KiB 的真实绕过
+试探，回答「这次 campaign 到底会拿到 `unbuffered` 还是退成 `fadvise_dontneed`」。两种
+CUDA 路径上的租机都要先确认 `$D` 在本地块设备上（`findmnt -T $D` 的 `SOURCE` 应是
+`/dev/...`）。
+
+这能拿到什么、不能拿到什么，要分开说：
+
+- **能拿到**：真实的 `memory_mode: "shared"` 硬件块（`shared_capacity_bytes` 是它自己的
+  128 GB），以及在它自己的 NVMe 上测出的 `(route, storage_bytes)` 价格。UMA 的
+  `storage-interface-synthetic-uma-prefill-3.json` 已经把「同一 layer + 同一成本表、只换
+  `hardware`」这条通路跑通了，换成真机只是换文档。
+- **不能直接拿到**：这台机器**自己的计算与搬运价格**。`.5`/`.7` 的 `entries` 来自
+  llama.cpp + CUDA 的测量战役（`profiling/steady_costs` 等），租机上一次预算内的运行
+  只能覆盖 SSD 这一层。把笔记本的表原样贴到 Spark 的 `hardware` 块上，模型照样能跑，但
+  那是在用一台机器的价格描述另一台机器——文档里必须写明，或者先在这台机器上真正测一遍。
 
 **Linux 机器（例如一台 Arch）**：命令完全相同，只把 PowerShell 的 `$D` 换成 shell 变量、
 `--platform` 换标签。这台机器上会走 **`O_DIRECT`**（文件系统不支持时自动退到
