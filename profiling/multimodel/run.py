@@ -99,12 +99,12 @@ def _write_new(path: Path, document: dict) -> None:
 def command_status(args) -> int:
     document = fetch_models.read_manifest(args.manifest)
     print(f"root: {args.root}")
-    print(f"{'id':<24} {'role':<5} {'GB':>6}  {'bytes':<10} geometry")
+    print(f"{'id':<24} {'role':<5} {'GB':>6}  bytes")
     for model in document["models"]:
         path = fetch_models.target(args.root, model)
         reason = fetch_models.verify(path, model)
         state = "ok" if reason is None else reason
-        print(f"{model['id']:<24} {model['role']:<5} {model['bytes'] / 1e9:6.2f}  {state:<10}")
+        print(f"{model['id']:<24} {model['role']:<5} {model['bytes'] / 1e9:6.2f}  {state}")
     return 0
 
 

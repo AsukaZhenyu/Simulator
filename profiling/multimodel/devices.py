@@ -185,7 +185,9 @@ def main(argv: list[str] | None = None) -> int:
     document = survey()
     text = json.dumps(document, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
     if args.out:
-        # Never overwrite a descriptor that a previous run already recorded.
+        # Never overwrite a descriptor that a previous run already recorded, but
+        # do create the directory: a device branch starts without one.
+        args.out.parent.mkdir(parents=True, exist_ok=True)
         with args.out.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(text)
         print(f"wrote {args.out}")
