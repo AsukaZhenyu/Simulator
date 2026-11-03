@@ -236,6 +236,27 @@ class TheWriteRegimeIsASecondCampaign(unittest.TestCase):
         with self.assertRaisesRegex(export.TransferTableError, "swapped"):
             self.build(sustained=measured_document(write_ns=500))
 
+    def test_an_identical_second_campaign_is_refused(self):
+        # Equal durations at every size mean no cliff was captured -- the drive
+        # recovered, or the same document was passed twice. A declared threshold
+        # would then describe a second tier that has no sample behind it.
+        with self.assertRaisesRegex(export.TransferTableError, "no second tier"):
+            self.build(sustained=measured_document(write_ns=2000))
+
+    def test_a_size_that_did_not_slow_down_is_allowed(self):
+        # Only one size has to show the cliff: a small write can stay in the
+        # drive's cache no matter how much was written before it, so 4096 keeps
+        # the burst price while 8192 shows the second tier.
+        slow = measured_document(sizes=(8192,), write_ns=11000)
+        unchanged = measured_document(sizes=(4096,), write_ns=2000)
+        mixed = dict(slow, measurements=slow["measurements"] + unchanged["measurements"],
+                     protocol={"sizes_bytes": [4096, 8192], "samples": 3, "warmup": 0})
+        table = self.build(sustained=mixed)
+        writes = {entry["storage_bytes"]: entry["sustained_duration_ns"]
+                  for entry in table["transfer_entries"]
+                  if entry["route"] == "dram_to_ssd"}
+        self.assertEqual(writes, {4096: 2000, 8192: 11000})
+
     def test_a_threshold_without_a_second_campaign_changes_nothing(self):
         with self.assertRaisesRegex(export.TransferTableError, "sustained-measurements"):
             export.build_cost_table(base_table(), measured_document(),

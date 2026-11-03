@@ -224,6 +224,7 @@ def build_cost_table(base: Any, document: dict, *, flush: str = "exclude",
                 f"the sustained campaign measured writes at {extra}, which the burst "
                 "campaign did not; one price would have no second to sit next to"
             )
+        slowed = False
         for entry in measured:
             if entry["route"] != "dram_to_ssd":
                 continue
@@ -234,7 +235,20 @@ def build_cost_table(base: Any, document: dict, *, flush: str = "exclude",
                     f"faster than the burst {entry['duration_ns']} ns it is supposed to "
                     "follow; the two campaigns were probably swapped"
                 )
+            if duration > entry["duration_ns"]:
+                slowed = True
             entry["sustained_duration_ns"] = duration
+        if not slowed:
+            # Equal prices everywhere mean no cliff was captured: either the
+            # drive had already recovered when the second campaign ran, or the
+            # same document was passed twice. Writing a threshold anyway would
+            # declare a second tier that no sample supports. A single size that
+            # did not slow down is fine -- small writes can stay in cache.
+            raise TransferTableError(
+                "the sustained campaign is not slower than the burst campaign at any "
+                "measured size, so there is no second tier to declare; check that it "
+                "ran while the drive was still filled (and is not the same file twice)"
+            )
         regime = {"after_cumulative_bytes": sustained_after_bytes}
     elif sustained_after_bytes is not None:
         raise TransferTableError(
