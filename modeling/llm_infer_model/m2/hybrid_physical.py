@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..tensor.spec import DEVICE_CPU, DEVICE_GPU, LOC_DRAM, LOC_VRAM, InvalidInput, Unsupported
+from ..tensor.spec import (
+    DEVICE_CPU, DEVICE_GPU, LOC_DRAM, LOC_SSD, LOC_VRAM, InvalidInput, Unsupported,
+)
 from .dense_contract import integer, signature as cpu_signature, validate_config
 from .dense_cuda_contract import signature as cuda_signature
 from .full_physical import (
@@ -20,6 +22,8 @@ from .full_physical import (
 )
 
 HYBRID_FORMAT_VERSION = "m2-layer-0.5"
+# Same two execution contracts, plus the disk as a place weights may start.
+STORAGE_HYBRID_FORMAT_VERSION = "m2-layer-0.7"
 CONTRACT = "ggml_hybrid_dense_materialized_macros_v1"
 
 
@@ -72,8 +76,11 @@ def parse_hybrid_physical(raw: Any) -> HybridDensePhysical:
 
 def validate_hybrid_physical_layer(layer: Any) -> None:
     physical = layer.physical
-    if not isinstance(physical, HybridDensePhysical) or layer.format_version != HYBRID_FORMAT_VERSION:
-        raise InvalidInput("hybrid physical boundary requires m2-layer-0.5 HybridDensePhysical")
+    if not isinstance(physical, HybridDensePhysical) or layer.format_version not in (
+            HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION):
+        raise InvalidInput(
+            "hybrid physical boundary requires m2-layer-0.5 or m2-layer-0.7 "
+            "HybridDensePhysical")
     checked = parse_hybrid_physical({
         "contract": physical.contract, "scope": physical.scope,
         "input_boundary": physical.input_boundary, "port_layout": physical.port_layout,
@@ -85,8 +92,14 @@ def validate_hybrid_physical_layer(layer: Any) -> None:
         "request_accounting": physical.request_accounting,
     })
     validate_full_geometry_layer(layer, checked)
-    if any(weight.initial_location not in (LOC_DRAM, LOC_VRAM) for weight in layer.weights):
-        raise Unsupported("hybrid weights require explicit dram/vram locations; SSD is not in this slice")
+    resident = (LOC_DRAM, LOC_VRAM)
+    allowed = resident + (LOC_SSD,) if layer.format_version == STORAGE_HYBRID_FORMAT_VERSION else resident
+    if any(weight.initial_location not in allowed for weight in layer.weights):
+        if layer.format_version != STORAGE_HYBRID_FORMAT_VERSION:
+            raise Unsupported(
+                "m2-layer-0.5 hybrid weights require explicit dram/vram locations; "
+                f"SSD weights require {STORAGE_HYBRID_FORMAT_VERSION}")
+        raise Unsupported(f"hybrid weights must start in {allowed}")
 
 
 def signature_for(layer: Any, kind: str, shape: Any, device: str) -> dict[str, Any]:

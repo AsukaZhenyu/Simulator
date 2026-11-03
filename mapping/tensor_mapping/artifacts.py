@@ -456,6 +456,8 @@ def m1_metrics(
         "target_locations": dict(scenario.goal.output_locations),
         "service_ns": service,
     }
+    if scenario.architecture.is_ssd_domain:
+        result["peak_ssd_bytes"] = None if evaluation is None else evaluation.peak_ssd_bytes
     if scenario.architecture.memory_mode == "shared":
         peak = None if evaluation is None else evaluation.peak_shared_bytes
         result.update(memory_mode="shared", peak_shared_bytes=peak,
@@ -542,7 +544,8 @@ def _event_to_dict(event: Event, *, m1: bool) -> dict[str, Any]:
 
 
 def _state_to_dict(
-    snapshot: StateSnapshot, action_index: int | None, *, m1: bool, shared: bool = False
+    snapshot: StateSnapshot, action_index: int | None, *, m1: bool, shared: bool = False,
+    ssd_domain: bool = False,
 ) -> dict[str, Any]:
     """One state summary, plus the action index that produced it.
 
@@ -556,9 +559,10 @@ def _state_to_dict(
     The status pairs are already sorted by id, so the dicts come out in the same
     order on every run.
 
-    There is no ``used_ssd_bytes`` beside the two domain usages: the SSD has no
-    capacity, so usage is not a number 0.2 has. What a reader needs from it --
-    which snapshots exist and whether a write has landed -- is ``ssd_status``.
+    ``used_ssd_bytes`` appears only when the scenario declares an SSD budget.
+    Without one the SSD has no capacity, so usage is not a number 0.2 has; what
+    a reader needs from it -- which snapshots exist and whether a write has
+    landed -- is ``ssd_status``, which is always present.
     """
     document = {
         "action_index": action_index,
@@ -570,6 +574,8 @@ def _state_to_dict(
     if m1:
         document["used_dram_bytes"] = snapshot.used_dram_bytes
         document["dram_status"] = dict(snapshot.dram_status)
+        if ssd_domain:
+            document["used_ssd_bytes"] = snapshot.used_ssd_bytes
         document["ssd_status"] = dict(snapshot.ssd_status)
     if shared:
         document["used_shared_bytes"] = snapshot.used_shared_bytes
@@ -635,7 +641,8 @@ def states_document(
     snapshots = () if evaluation is None else evaluation.states
     entries = [
         _state_to_dict(snapshot, None if index == 0 else index - 1, m1=scenario.is_m1,
-                       shared=scenario.architecture.memory_mode == "shared")
+                       shared=scenario.architecture.memory_mode == "shared",
+                       ssd_domain=scenario.architecture.is_ssd_domain)
         for index, snapshot in enumerate(snapshots)
     ]
     return _log_document(

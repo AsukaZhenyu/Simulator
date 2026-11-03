@@ -336,6 +336,18 @@ class State:
     SSD location, so the tuple is empty and its key is unchanged; the 0.2 parser
     forbids an SSD initial location in a 0.1 workload, so no 0.1 state can hide
     one here.
+
+    ``storage_write_debt_bytes`` is the disk's write-cache debt: bytes this
+    scenario has written since the drive was last idle, saturating at the
+    declared :class:`~llm_infer_model.tensor.spec.StorageWriteRegime` threshold.
+    It is the only piece of state that is not a copy or a status, and it earns
+    its place because the price of a write depends on it: the same
+    ``dram_to_ssd`` move is charged the burst price below the threshold and the
+    sustained price at or above it. Saturating rather than growing without bound
+    is what keeps the number of distinct states finite -- past the threshold
+    every further byte is priced identically, so no future depends on the exact
+    total. A scenario that declares no regime never touches this field, so its
+    key is the tuple it always was.
     """
 
     t: int
@@ -346,6 +358,7 @@ class State:
     ssd_status: tuple[tuple[str, str], ...] = ()
     storage_allocations: tuple[tuple[str, str, str], ...] = ()
     next_allocation_id: int = 0
+    storage_write_debt_bytes: int = 0
 
     @cached_property
     def _allocation_refs(self) -> dict[tuple[str, str], str]:
@@ -421,6 +434,12 @@ class State:
 
         Every ledger is sorted by id and the task tuple is sorted, so the key
         does not depend on insertion order.
+
+        The write debt joins the key only once it is non-zero, which it can only
+        be in a scenario that declared a write regime. Two states that have
+        written different amounts are genuinely different: the next write costs
+        the burst price in one and the sustained price in the other, or one
+        crosses the threshold sooner than the other.
         """
         base = (
             self.op_status,
@@ -436,7 +455,9 @@ class State:
             names: dict[str, int] = {}
             refs = tuple((tensor, location, names.setdefault(identity, len(names)))
                          for tensor, location, identity in sorted(self.storage_allocations))
-            return base + (refs,)
+            base = base + (refs,)
+        if self.storage_write_debt_bytes:
+            return base + (("write_debt", self.storage_write_debt_bytes),)
         return base
 
 
@@ -450,9 +471,10 @@ class StateSnapshot:
     copy_status: tuple[tuple[str, str], ...]
     used_dram_bytes: int = 0
     dram_status: tuple[tuple[str, str], ...] = ()
-    # No ``used_ssd_bytes`` beside the two above: the SSD has no capacity, so
-    # there is no usage number to report. What a reader needs is the same thing
-    # the search needs -- which copies exist and whether a write has landed.
+    # Zero unless ``ssd_capacity_bytes`` is declared. An undeclared SSD has no
+    # capacity, so there is no usage number to report -- only which copies exist
+    # and whether a write has landed, which is what ``ssd_status`` already says.
+    used_ssd_bytes: int = 0
     ssd_status: tuple[tuple[str, str], ...] = ()
     storage_allocations: tuple[tuple[str, str, str], ...] = ()
     next_allocation_id: int = 0
@@ -525,6 +547,9 @@ class EvaluationResult:
     ssd_write_bytes: int = 0
     peak_dram_bytes: int = 0
     peak_shared_bytes: int = 0
+    # Zero unless the scenario declares an SSD budget; derived from the
+    # snapshots so a failed replay reports the same peak a completed one would.
+    peak_ssd_bytes: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -564,13 +589,22 @@ def used_bytes(scenario: Scenario, state: State, domain: str) -> int:
     DRAM ledger is never consulted, and inventing ``None`` arithmetic for it
     would push the branch into every caller.
 
-    Only the two storage domains have a ledger. The SSD is not one: a copy there
-    is charged to nothing, and asking this function for its "usage" would be
-    asking for a number the design does not define (``M1_DESIGN.md`` §5).
+    The SSD has a ledger only when the architecture declares a budget for it
+    (``ssd_capacity_bytes``). Without one it is unbounded scene content, and
+    asking this function for its "usage" would be asking for a number the design
+    does not define (``M1_DESIGN.md`` §5).
+
+    The shared pool is a *memory* identity: on a UMA machine DRAM and VRAM are
+    two names for one allocation, but the disk is still its own device with its
+    own budget. Asking for the SSD's usage there must not return the memory
+    figure, or a full disk would be checked against a number that never counted
+    a single byte of it.
     """
     architecture = scenario.architecture
-    assert domain in DOMAINS or (domain == LOC_SHARED and architecture.is_shared), f"{domain!r} is not a storage domain"
-    if architecture.is_shared:
+    assert domain in architecture.storage_domains or (
+        domain == LOC_SHARED and architecture.is_shared
+    ), f"{domain!r} is not a storage domain"
+    if architecture.is_shared and domain in (*DOMAINS, LOC_SHARED):
         used = architecture.shared_runtime_reserved_bytes
         allocations: dict[str, str] = {}
         for location in DOMAINS:
@@ -1428,11 +1462,11 @@ def _m1_check_transfer(
             tensor_id=tensor_id,
         )
 
-    # Charged to the *destination*. For the two SSD directions the destination
-    # is the SSD, which has no capacity, so the check passes without a number --
-    # and, deliberately, a WRITE_SSD charges nothing to DRAM either: it reads a
-    # copy that is already resident and adds no second buffer
-    # (``M1_DESIGN.md`` §5).
+    # Charged to the *destination*. For the two SSD directions that is the SSD:
+    # a declared ``ssd_capacity_bytes`` is enforced here exactly as DRAM's and
+    # VRAM's are, and an undeclared one passes without a number -- and,
+    # deliberately, a WRITE_SSD charges nothing to DRAM either: it reads a copy
+    # that is already resident and adds no second buffer (``M1_DESIGN.md`` §5).
     _m1_check_capacity(
         scenario, state, destination, scenario.size_alloc(tensor_id, destination),
         what=f"copying {tensor_id!r} into {destination}",
@@ -1489,11 +1523,11 @@ def _m1_check_evict(
             tensor_id=tensor_id,
         )
     location = action.location
-    if location not in DOMAINS:
+    if location not in scenario.architecture.storage_domains:
         raise MappingError(
             CODE_ILLEGAL_ACTION,
             f"0.2 EVICT({tensor_id!r}) names location {location!r}; it must be one of "
-            f"{list(DOMAINS)} and there is no default",
+            f"{list(scenario.architecture.storage_domains)} and there is no default",
             t_ns=state.t,
             tensor_id=tensor_id,
         )
@@ -1559,14 +1593,16 @@ def _m1_check_evict_reachability(
 
     remaining = [
         loc
-        for loc in DOMAINS
+        for loc in scenario.architecture.storage_domains
         if loc != location and state.copy_at(tensor_id, loc) == COPY_READY
     ]
     # A RESERVED copy -- in DRAM, in VRAM or on the SSD -- is *not* a backup: it
     # is bytes committed to a transfer that has not landed, and counting it as
     # present would let the only READY value be deleted on the strength of a
-    # copy that does not exist yet (``M1_ACCEPTANCE.md`` §8).
-    if state.copy_at(tensor_id, LOC_SSD) == COPY_READY:
+    # copy that does not exist yet (``M1_ACCEPTANCE.md`` §8). ``storage_domains``
+    # already contains a budgeted SSD, so only an unbudgeted one is added here.
+    if location != LOC_SSD and not scenario.architecture.is_ssd_domain \
+            and state.copy_at(tensor_id, LOC_SSD) == COPY_READY:
         remaining.append(LOC_SSD)
 
     reachable = reachable_locations(tuple(remaining), mapspace.allowed_transfers, tensor_id)
@@ -1676,6 +1712,17 @@ def _m1_start_transfer(scenario: Scenario, state: State, action: Action) -> Stat
     duration = costs.transfer_cost(route, action.target_id)
     assert duration is not None  # the mapspace/costs agreement was checked at parse
 
+    # A write is the only transfer whose price depends on the state of the
+    # drive. ``write_duration_ns`` returns the burst price for a read, for a
+    # write below the declared threshold, and whenever no regime is declared.
+    duration_ns = costs.write_duration_ns(route, action.target_id,
+                                          state.storage_write_debt_bytes)
+    assert duration_ns is not None
+    debt = state.storage_write_debt_bytes
+    if route == ROUTE_DRAM_TO_SSD and costs.storage_write_regime is not None:
+        debt = min(debt + scenario.size_alloc(action.target_id, LOC_SSD),
+                   costs.storage_write_regime.after_cumulative_bytes)
+
     source, destination = ROUTE_ENDS[route]
     copies = dict(state.copy_status)
     dram = dict(state.dram_status)
@@ -1691,13 +1738,14 @@ def _m1_start_transfer(scenario: Scenario, state: State, action: Action) -> Stat
         RunningTask(
             resource=RESOURCE_OF_ROUTE[route],
             target_id=action.target_id,
-            remaining_ns=duration.duration_ns,
+            remaining_ns=duration_ns,
             route=route,
         ),
     )
     refs, next_id = _new_allocations(scenario, state, ((action.target_id, destination),))
     return _rebuild(state, copies=copies, dram=dram, ssd=ssd, running=running,
-                    storage_allocations=refs, next_allocation_id=next_id)
+                    storage_allocations=refs, next_allocation_id=next_id,
+                    storage_write_debt_bytes=debt)
 
 
 def _new_allocations(scenario: Scenario, state: State, targets: Iterable[tuple[str, str]]) -> tuple[tuple[tuple[str, str, str], ...], int]:
@@ -1857,6 +1905,7 @@ def advance_elapsed(
         ssd_status=tuple(sorted(ssd.items())),
         storage_allocations=state.storage_allocations,
         next_allocation_id=state.next_allocation_id,
+        storage_write_debt_bytes=state.storage_write_debt_bytes,
     )
 
 
@@ -1907,6 +1956,7 @@ def _rebuild(
     ssd: dict[str, str] | None = None,
     storage_allocations: tuple[tuple[str, str, str], ...] | None = None,
     next_allocation_id: int | None = None,
+    storage_write_debt_bytes: int | None = None,
 ) -> State:
     return State(
         t=state.t,
@@ -1917,6 +1967,9 @@ def _rebuild(
         ssd_status=tuple(sorted(ssd.items())) if ssd is not None else state.ssd_status,
         storage_allocations=state.storage_allocations if storage_allocations is None else storage_allocations,
         next_allocation_id=state.next_allocation_id if next_allocation_id is None else next_allocation_id,
+        storage_write_debt_bytes=(
+            state.storage_write_debt_bytes if storage_write_debt_bytes is None
+            else storage_write_debt_bytes),
     )
 
 
@@ -1988,7 +2041,7 @@ def _m1_candidates(scenario: Scenario) -> list[Action]:
         for device in mapspace.devices_for(operation_id):
             candidates.append(Action(ACTION_COMPUTE, operation_id, device=device))
     for tensor_id in sorted(scenario.workload.tensor_by_id):
-        for domain in DOMAINS:
+        for domain in scenario.architecture.storage_domains:
             candidates.append(Action(ACTION_EVICT, tensor_id, location=domain))
     candidates.append(Action(ACTION_ADVANCE))
     return candidates
@@ -2138,6 +2191,7 @@ def evaluate_mapping(
         ssd_write_bytes=ssd_write_bytes,
         peak_dram_bytes=peak_dram,
         peak_shared_bytes=peak if scenario.architecture.is_shared else 0,
+        peak_ssd_bytes=max((s.used_ssd_bytes for s in snapshots), default=0),
     )
 
 
@@ -2310,6 +2364,8 @@ def _snapshot(scenario: Scenario, state: State, action_index: int) -> StateSnaps
         copy_status=state.copy_status,
         used_dram_bytes=used_bytes(scenario, state, LOC_DRAM),
         dram_status=state.dram_status,
+        used_ssd_bytes=(used_bytes(scenario, state, LOC_SSD)
+                        if scenario.architecture.is_ssd_domain else 0),
         ssd_status=state.ssd_status,
         storage_allocations=state.storage_allocations,
         next_allocation_id=state.next_allocation_id,
@@ -2354,6 +2410,7 @@ def _failure(
         ssd_write_bytes=ssd_write_bytes,
         peak_dram_bytes=peak_dram,
         peak_shared_bytes=peak if scenario.architecture.is_shared else 0,
+        peak_ssd_bytes=max((s.used_ssd_bytes for s in snapshots), default=0),
     )
 
 

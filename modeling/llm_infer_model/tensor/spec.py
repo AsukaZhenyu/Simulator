@@ -68,6 +68,7 @@ __all__ = [
     "M1Costs",
     "M1Goal",
     "M1Mapspace",
+    "StorageWriteRegime",
     "TransferCost",
     "aligned_size",
     "load_workload",
@@ -512,10 +513,34 @@ class Architecture:
     shared_capacity_bytes: int | None = None
     shared_runtime_reserved_bytes: int = 0
     shared_alignment_bytes: int = 1
+    # --- Optional SSD budget. ``None`` keeps the historical machine, in which
+    # the SSD is unbounded scene content and therefore not a ledgered domain:
+    # no capacity, no alignment, no eviction. Declaring a positive number turns
+    # the SSD into a third storage domain, which is what an edge device with a
+    # finite application storage budget actually has. The switch is the capacity
+    # itself rather than a separate flag, so there is exactly one thing to read.
+    ssd_capacity_bytes: int | None = None
+    ssd_runtime_reserved_bytes: int = 0
+    ssd_alignment_bytes: int | None = None
 
     @property
     def is_shared(self) -> bool:
         return self.memory_mode == "shared"
+
+    @property
+    def is_ssd_domain(self) -> bool:
+        """Whether the SSD is a ledgered storage domain for this machine."""
+        return self.ssd_capacity_bytes is not None
+
+    @property
+    def storage_domains(self) -> tuple[str, ...]:
+        """Locations with a capacity ledger, in a fixed order.
+
+        ``DOMAINS`` remains the two *memory* domains: code that means "the
+        DRAM/VRAM pair" must not start seeing a disk. This property is the one
+        to use wherever a capacity, an eviction or an alignment is asked for.
+        """
+        return (*DOMAINS, LOC_SSD) if self.is_ssd_domain else DOMAINS
 
     def pool_of(self, location: str) -> str:
         return LOC_SHARED if self.is_shared and location in DOMAINS else location
@@ -532,9 +557,10 @@ class Architecture:
         """Bytes available in ``domain``; ``None`` means unbounded.
 
         ``None`` covers two different situations on purpose: 0.1's DRAM, which
-        has no budget at all, and the SSD, which the design gives no capacity
-        either. Neither is ever charged, so neither needs a number
-        (``M1_DESIGN.md`` §3, §5).
+        has no budget at all, and an SSD nobody declared a budget for. Neither
+        is ever charged, so neither needs a number (``M1_DESIGN.md`` §3, §5).
+        Declaring ``ssd_capacity_bytes`` is what turns the second case into a
+        real ledger.
         """
         if self.is_shared and domain in (*DOMAINS, LOC_SHARED):
             return self.shared_capacity_bytes
@@ -542,6 +568,8 @@ class Architecture:
             return self.dram_capacity_bytes
         if domain == LOC_VRAM:
             return self.vram_capacity_bytes
+        if domain == LOC_SSD:
+            return self.ssd_capacity_bytes
         return None
 
     def reserved_of(self, domain: str) -> int:
@@ -554,6 +582,8 @@ class Architecture:
             if self.vram_runtime_reserved_bytes is None:
                 return self.runtime_reserved_bytes
             return self.vram_runtime_reserved_bytes
+        if domain == LOC_SSD:
+            return self.ssd_runtime_reserved_bytes
         return 0
 
     def alignment_of(self, domain: str) -> int:
@@ -568,9 +598,13 @@ class Architecture:
             if self.vram_alignment_bytes is None:
                 return self.allocation_alignment_bytes
             return self.vram_alignment_bytes
-        # The SSD is not an allocation domain: no capacity, no alignment, no
-        # eviction. A caller asking for one is asking a question M1 does not
-        # answer, and one is the answer that changes nothing.
+        if domain == LOC_SSD:
+            # Only reachable once a budget is declared. An undeclared SSD stays
+            # unbudgeted scene content: asking for its granularity is still a
+            # question the model does not answer, and 1 changes nothing.
+            if self.ssd_alignment_bytes is None:
+                return 1
+            return self.ssd_alignment_bytes
         return 1
 
     def __post_init__(self) -> None:
@@ -623,6 +657,7 @@ class Architecture:
             ("dram", self.dram_capacity_bytes, self.dram_runtime_reserved_bytes),
             ("vram", self.vram_capacity_bytes, self.runtime_reserved_bytes
              if self.vram_runtime_reserved_bytes is None else self.vram_runtime_reserved_bytes),
+            ("ssd", self.ssd_capacity_bytes, self.ssd_runtime_reserved_bytes),
         ):
             if capacity is None:
                 continue
@@ -644,10 +679,19 @@ class Architecture:
                     f"architecture.{name}_runtime_reserved_bytes ({reserved}) exceeds "
                     f"{name}_capacity_bytes ({capacity})"
                 )
-        for name in ("dram_alignment_bytes", "vram_alignment_bytes"):
+        for name in ("dram_alignment_bytes", "vram_alignment_bytes", "ssd_alignment_bytes"):
             value = getattr(self, name)
             if value is not None and value < 1:
                 raise InvalidInput(f"architecture.{name} must be >= 1, got {value}")
+        # The SSD is a domain exactly when a budget is declared. A reserve or an
+        # alignment on an unbudgeted SSD would be a number nothing reads, and a
+        # silent one is worse than a refused one: it looks like a modelled disk.
+        if not self.is_ssd_domain and (
+                self.ssd_runtime_reserved_bytes or self.ssd_alignment_bytes is not None):
+            raise InvalidInput(
+                "ssd_runtime_reserved_bytes and ssd_alignment_bytes require "
+                "ssd_capacity_bytes; without a budget the SSD is unbounded scene content"
+            )
 
 
 @dataclass(frozen=True)
@@ -684,18 +728,56 @@ class Costs:
 
 
 @dataclass(frozen=True)
+class StorageWriteRegime:
+    """When the disk's write price stops being the burst price.
+
+    A consumer SSD absorbs writes into its cache until the cache (or the free
+    block pool behind it) runs out; after that, writes run at the media's own
+    rate and reads slow down too because garbage collection steals bandwidth.
+    The switch is *cumulative bytes written since the drive was last idle*, not
+    a per-transfer property. ``after_cumulative_bytes`` is that budget as
+    measured; the kernel charges ``sustained_duration_ns`` from the write that
+    crosses it onwards and never charges the burst price again, because a
+    serving loop has no idle window for the drive to recover in.
+    """
+
+    after_cumulative_bytes: int
+
+    def __post_init__(self) -> None:
+        _require_int(self.after_cumulative_bytes,
+                     "StorageWriteRegime.after_cumulative_bytes", minimum=1)
+
+
+@dataclass(frozen=True)
 class TransferCost:
     """Duration of one transfer along one route.
 
     Same shape as :class:`H2DCost` and deliberately a different name: in 0.2 the
     direction is part of what is being costed, and a reader who sees
     ``H2DCost`` in an M1 context would reasonably assume host-to-device.
+
+    ``sustained_duration_ns`` exists only on ``dram_to_ssd`` and only when the
+    scenario declares a :class:`StorageWriteRegime`. It is the same transfer
+    after the drive's write cache has been consumed; it must not be cheaper than
+    the burst price, because a "sustained" number that beats the cache is not a
+    sustained number.
     """
 
     duration_ns: int
+    sustained_duration_ns: int | None = None
 
     def __post_init__(self) -> None:
         _require_int(self.duration_ns, "TransferCost.duration_ns", minimum=1)
+        if self.sustained_duration_ns is not None:
+            _require_int(self.sustained_duration_ns,
+                         "TransferCost.sustained_duration_ns", minimum=1)
+            if self.sustained_duration_ns < self.duration_ns:
+                raise InvalidInput(
+                    "TransferCost.sustained_duration_ns must not be shorter than the "
+                    f"burst duration ({self.sustained_duration_ns} < {self.duration_ns}); "
+                    "a sustained price faster than the write cache means the two were "
+                    "swapped"
+                )
 
 
 @dataclass(frozen=True)
@@ -712,12 +794,32 @@ class M1Costs:
     source: str
     compute: dict[str, dict[str, ComputeCost]]
     transfer: dict[str, dict[str, TransferCost]]
+    storage_write_regime: StorageWriteRegime | None = None
 
     def compute_cost(self, operation_id: str, device: str) -> ComputeCost | None:
         return self.compute.get(operation_id, {}).get(device)
 
     def transfer_cost(self, route: str, tensor_id: str) -> TransferCost | None:
         return self.transfer.get(route, {}).get(tensor_id)
+
+    def write_duration_ns(self, route: str, tensor_id: str,
+                          cumulative_write_bytes: int) -> int | None:
+        """The price of this transfer given how much the disk has already taken.
+
+        A read is never regime-dependent. A write is charged the sustained price
+        from the moment the cumulative bytes cross the declared threshold, and
+        the burst price before it. With no declared regime there is one price
+        and this is that price.
+        """
+        cost = self.transfer_cost(route, tensor_id)
+        if cost is None:
+            return None
+        regime = self.storage_write_regime
+        if (regime is not None and route == ROUTE_DRAM_TO_SSD
+                and cost.sustained_duration_ns is not None
+                and cumulative_write_bytes >= regime.after_cumulative_bytes):
+            return cost.sustained_duration_ns
+        return cost.duration_ns
 
 
 @dataclass(frozen=True)
@@ -1861,6 +1963,9 @@ def _parse_architecture_m1(raw: Any, where: str) -> Architecture:
             "shared_capacity_bytes",
             "shared_runtime_reserved_bytes",
             "shared_alignment_bytes",
+            "ssd_capacity_bytes",
+            "ssd_runtime_reserved_bytes",
+            "ssd_alignment_bytes",
         },
         f"{where}.architecture",
     )
@@ -1905,6 +2010,14 @@ def _parse_architecture_m1(raw: Any, where: str) -> Architecture:
         ssd_io_slots=_require_int(
             block.get("ssd_io_slots", 1), f"{label}.ssd_io_slots", minimum=1
         ),
+        ssd_capacity_bytes=(None if block.get("ssd_capacity_bytes") is None else _require_int(
+            block["ssd_capacity_bytes"], f"{label}.ssd_capacity_bytes", minimum=1)),
+        ssd_runtime_reserved_bytes=_require_int(
+            block.get("ssd_runtime_reserved_bytes", 0),
+            f"{label}.ssd_runtime_reserved_bytes",
+        ),
+        ssd_alignment_bytes=(None if block.get("ssd_alignment_bytes") is None else _require_int(
+            block["ssd_alignment_bytes"], f"{label}.ssd_alignment_bytes", minimum=1)),
     )
 
 
@@ -1999,7 +2112,8 @@ def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspa
     not allow impossible to look meaningful.
     """
     block = _require_mapping(raw, f"{where}.costs")
-    _reject_unknown_keys(block, {"source", "compute", "transfer"}, f"{where}.costs")
+    _reject_unknown_keys(block, {"source", "compute", "transfer",
+                                 "storage_write_regime"}, f"{where}.costs")
     source = _require_str(block.get("source"), f"{where}.costs.source")
 
     compute_raw = _require_mapping(block.get("compute"), f"{where}.costs.compute")
@@ -2081,7 +2195,8 @@ def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspa
                 f"(allowed: {', '.join(allowed_tensors)})"
             )
         transfer[route] = {
-            tensor_id: _parse_transfer_cost(body[tensor_id], f"{label}[{tensor_id!r}]")
+            tensor_id: _parse_transfer_cost(body[tensor_id], f"{label}[{tensor_id!r}]",
+                                            route=route)
             for tensor_id in allowed_tensors if tensor_id in body
         }
 
@@ -2095,22 +2210,79 @@ def _parse_costs_m1(raw: Any, where: str, workload: Workload, mapspace: M1Mapspa
             f"{', '.join(missing_routes)}; M1 never guesses a transfer cost"
         )
 
-    return M1Costs(source=source, compute=compute, transfer=transfer)
+    return M1Costs(source=source, compute=compute, transfer=transfer,
+                   storage_write_regime=_parse_storage_write_regime(
+                       block.get("storage_write_regime"),
+                       f"{where}.costs.storage_write_regime",
+                       transfer=transfer))
 
 
-def _parse_transfer_cost(raw: Any, label: str) -> TransferCost:
+def _parse_storage_write_regime(raw: Any, label: str, *,
+                                transfer: dict[str, dict[str, TransferCost]],
+                                ) -> StorageWriteRegime | None:
+    """The threshold, and the agreement between it and the prices it governs.
+
+    A regime without a sustained price would be a declaration the kernel can
+    never act on; a sustained price without a regime would be a number the
+    kernel cannot tell when to charge. Both are refused rather than ignored,
+    because either one silently makes the table mean something else.
+    """
+    sustained = sorted(
+        route for route, entries in transfer.items()
+        for cost in entries.values() if cost.sustained_duration_ns is not None
+    )
+    if raw is None:
+        if sustained:
+            raise InvalidInput(
+                f"costs.transfer has a sustained_duration_ns on route "
+                f"{sustained[0]!r} but no costs.storage_write_regime; the kernel "
+                "cannot know when the write cache is exhausted, so it would charge "
+                "the burst price forever"
+            )
+        return None
+    body = _require_mapping(raw, label)
+    _reject_unknown_keys(body, {"after_cumulative_bytes"}, label)
+    regime = StorageWriteRegime(
+        after_cumulative_bytes=_require_int(
+            body.get("after_cumulative_bytes"), f"{label}.after_cumulative_bytes",
+            minimum=1))
+    if not sustained:
+        raise InvalidInput(
+            f"{label} says when the disk's write cache is exhausted, but no "
+            "costs.transfer.dram_to_ssd entry has a sustained_duration_ns to charge "
+            "from then on; the declared threshold changes no price"
+        )
+    return regime
+
+
+def _parse_transfer_cost(raw: Any, label: str, *, route: str) -> TransferCost:
     """One route+tensor duration.
 
     The object form, exactly as a compute entry and exactly as the 0.1 ``h2d``
     table this replaces: ``{"duration_ns": N}``. A bare integer is refused rather
     than accepted as a shorthand, so the field has one spelling on disk and a
     reader never has to work out which of the two they are looking at.
+
+    ``sustained_duration_ns`` is the second price of a write and exists on no
+    other route: the write cache being full is a property of the disk, not of
+    the copy. It is refused here rather than ignored, so a table cannot carry a
+    number that never applies to the route it is filed under.
     """
     _expect(not isinstance(raw, list), f"{label} must be a JSON object")
     item = _require_mapping(raw, label)
-    _reject_unknown_keys(item, {"duration_ns"}, label)
+    _reject_unknown_keys(item, {"duration_ns", "sustained_duration_ns"}, label)
+    sustained = item.get("sustained_duration_ns")
+    if sustained is not None and route != ROUTE_DRAM_TO_SSD:
+        raise Unsupported(
+            f"{label}.sustained_duration_ns is only meaningful on route "
+            f"{ROUTE_DRAM_TO_SSD!r}, not {route!r}; the disk's write cache has no "
+            "bearing on reads or on device-to-host copies"
+        )
     return TransferCost(
-        duration_ns=_parse_duration_ns(item.get("duration_ns"), f"{label}.duration_ns")
+        duration_ns=_parse_duration_ns(item.get("duration_ns"), f"{label}.duration_ns"),
+        sustained_duration_ns=(
+            None if sustained is None
+            else _parse_duration_ns(sustained, f"{label}.sustained_duration_ns")),
     )
 
 
@@ -2432,9 +2604,11 @@ def check_initial_capacity(scenario: Scenario) -> None:
     Called before the search starts and again before a mapping replay, so both
     entry points agree on the verdict (``DESIGN.md`` §8).
 
-    Both domains are checked in 0.2. A tensor that starts in DRAM *and* VRAM is
-    charged to both, because that is two allocations and the model says so
-    (``M1_ACCEPTANCE.md`` §8). SSD is not a domain: it has no capacity.
+    Every ledgered domain is checked in 0.2. A tensor that starts in DRAM *and*
+    VRAM is charged to both, because that is two allocations and the model says
+    so (``M1_ACCEPTANCE.md`` §8). The SSD joins the loop exactly when the
+    architecture declares a budget for it; otherwise it is unbounded scene
+    content and is never charged.
     """
     architecture = scenario.architecture
     if architecture.is_shared:
@@ -2448,8 +2622,12 @@ def check_initial_capacity(scenario: Scenario) -> None:
             raise InitialCapacityExceeded(
                 f"initial layout needs {used} bytes in shared physical storage but "
                 f"shared_capacity_bytes is {architecture.shared_capacity_bytes}")
-        return
-    for domain in DOMAINS:
+        # The SSD is not part of the UMA pool (`pool_of` keeps it separate), so
+        # a declared disk budget is still checked on its own in shared mode.
+        domains: tuple[str, ...] = (LOC_SSD,) if architecture.is_ssd_domain else ()
+    else:
+        domains = architecture.storage_domains
+    for domain in domains:
         capacity = architecture.capacity_of(domain)
         if capacity is None:
             continue  # 0.1's DRAM: unbounded, and nothing is charged to it
@@ -2623,6 +2801,12 @@ def _canonical_scenario_m1(scenario: Scenario) -> dict[str, Any]:
             "gpu_compute_slots": architecture.gpu_compute_slots,
             "pcie_copy_slots": architecture.pcie_copy_slots,
             "ssd_io_slots": architecture.ssd_io_slots,
+            # Present only when declared, so a machine without an SSD budget
+            # keeps hashing to the value every stored mapping already has.
+            **({"ssd_capacity_bytes": architecture.ssd_capacity_bytes,
+                "ssd_runtime_reserved_bytes": architecture.ssd_runtime_reserved_bytes,
+                "ssd_alignment_bytes": architecture.alignment_of(LOC_SSD)}
+               if architecture.is_ssd_domain else {}),
         },
         "goal": {
             "output_locations": [
@@ -2647,10 +2831,18 @@ def _canonical_scenario_m1(scenario: Scenario) -> dict[str, Any]:
                     "route": route,
                     "tensor_id": tensor_id,
                     "duration_ns": cost.duration_ns,
+                    **({"sustained_duration_ns": cost.sustained_duration_ns}
+                       if cost.sustained_duration_ns is not None else {}),
                 }
                 for route in sorted(costs.transfer)
                 for tensor_id, cost in sorted(costs.transfer[route].items())
             ],
+            # Same rule as the SSD budget: absent unless declared, so every
+            # scenario written before the write regime existed keeps its digest.
+            **({"storage_write_regime": {
+                    "after_cumulative_bytes":
+                        costs.storage_write_regime.after_cumulative_bytes}}
+               if costs.storage_write_regime is not None else {}),
         },
         "mapspace": {
             "allowed_devices": [

@@ -141,8 +141,9 @@ def _frontend(compiled, spec):
     if layer.kv_bytes_per_token != 8 * g["kv_heads"] * g["head_dim"]:
         raise InvalidInput("KV bytes must equal F32 K plus V for the exact GQA geometry")
     if frontend["contract"] == DENSE_FRONTEND:
-        if layer.format_version != "m2-layer-0.5" or not isinstance(layer.physical, HybridDensePhysical):
-            raise Unsupported("existing QKV frontend requires complete hybrid Dense .5")
+        if layer.format_version not in ("m2-layer-0.5", "m2-layer-0.7") \
+                or not isinstance(layer.physical, HybridDensePhysical):
+            raise Unsupported("existing QKV frontend requires complete hybrid Dense .5 or .7")
         validate_hybrid_physical_layer(layer)
         if any(layer.physical.config[name] != value for name, value in g.items()):
             raise InvalidInput("attention geometry differs from the materialized Dense frontend")

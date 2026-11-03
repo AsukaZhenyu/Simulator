@@ -15,7 +15,8 @@ from llm_infer_model.tensor.spec import (
 
 
 def documents(*, sizes=(32,), capacity=256, initial=None, mode="shared", workspace=0,
-              shared_alignment=1, reserve=0, priced=True):
+              shared_alignment=1, reserve=0, priced=True, ssd=None, ssd_alignment=None,
+              ssd_reserve=0):
     tensors, ops, compute = [], [], {}
     for i, size in enumerate(sizes):
         for prefix, role, locations in (("x", "input", ["dram"] if initial is None else initial[i]),
@@ -34,6 +35,9 @@ def documents(*, sizes=(32,), capacity=256, initial=None, mode="shared", workspa
         architecture.update(memory_mode=mode, shared_capacity_bytes=capacity,
                             shared_alignment_bytes=shared_alignment,
                             shared_runtime_reserved_bytes=reserve)
+    if ssd is not None:
+        architecture.update(ssd_capacity_bytes=ssd, ssd_alignment_bytes=ssd_alignment,
+                            ssd_runtime_reserved_bytes=ssd_reserve)
     workload = dict(schema_version="0.2", id="shared-core-workload",
         origin=dict(kind="synthetic_fixture"), tensors=tensors, operations=ops,
         outputs=[f"y{i}" for i in range(len(sizes))])
@@ -215,6 +219,32 @@ class SharedStorageCoreTests(unittest.TestCase):
                        dict(shared_capacity_bytes=64), dict(memory_mode="shared", shared_capacity_bytes=True)):
             with self.subTest(change=change), self.assertRaises(InvalidInput):
                 Architecture(vram_capacity_bytes=256, **change)
+
+
+class SharedPoolKeepsTheDiskItself(unittest.TestCase):
+    """The UMA pool is a *memory* identity; the disk is still its own device.
+
+    On a shared machine DRAM and VRAM answer with one pool figure. The SSD must
+    not: it has its own declared budget and its own copies, and answering the
+    disk question with the memory figure would check a full disk against a
+    number that never counted a byte of it.
+    """
+
+    def test_the_disk_ledger_is_not_the_pool_ledger(self):
+        value = scene(sizes=(32, 64), initial=[["ssd"], ["dram"]], ssd=128)
+        state = initial_state(value)
+        self.assertEqual(used_bytes(value, state, "shared"), 64)
+        self.assertEqual(used_bytes(value, state, "ssd"), 32)
+
+    def test_a_large_shared_pool_does_not_enlarge_the_disk(self):
+        with self.assertRaises(InitialCapacityExceeded):
+            initial_state(scene(initial=[["ssd"]], capacity=1 << 20, ssd=31))
+
+    def test_reading_a_disk_copy_charges_the_pool_and_keeps_the_disk_copy(self):
+        value = scene(sizes=(32, 64), initial=[["ssd"], ["dram"]], ssd=128)
+        state = transition(value, initial_state(value), Action("READ_SSD", "x0"))
+        self.assertEqual(used_bytes(value, state, "shared"), 96)
+        self.assertEqual(used_bytes(value, state, "ssd"), 32)
 
 
 if __name__ == "__main__":

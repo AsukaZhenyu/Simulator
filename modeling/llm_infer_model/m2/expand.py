@@ -39,7 +39,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..tensor.engine import ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_SHARE, Action
+from ..tensor.engine import (
+    ACTION_ADVANCE, ACTION_COMPUTE, ACTION_COPY, ACTION_READ_SSD, ACTION_SHARE,
+    ACTION_WRITE_SSD, Action,
+)
 from ..tensor.spec import (
     ALGORITHM_UNIFORM_COST,
     DTYPE_F32,
@@ -58,7 +61,9 @@ from .costs import M2CostTable, MacroShape, expand_costs_document, expand_transf
 from .physical import DTYPES, signature_for
 from .full_physical import FullDensePhysical, signature_for as full_signature_for
 from .cuda_physical import CudaDensePhysical, signature_for as cuda_signature_for
-from .hybrid_physical import HybridDensePhysical, signature_for as hybrid_signature_for
+from .hybrid_physical import (
+    STORAGE_HYBRID_FORMAT_VERSION, HybridDensePhysical, signature_for as hybrid_signature_for,
+)
 
 from .spec import (
     STAGE_IN,
@@ -556,6 +561,7 @@ def compile_invocation(
     physical_signature_for = (cuda_signature_for if isinstance(layer.physical, CudaDensePhysical)
                               else full_signature_for if isinstance(layer.physical, FullDensePhysical) else signature_for)
     hybrid = isinstance(layer.physical, HybridDensePhysical)
+    storage = layer.format_version == STORAGE_HYBRID_FORMAT_VERSION
     physical_signatures = ({(task.operation_id, dev): hybrid_signature_for(layer, task.kind, task.shape, dev)
                             for task in tasks for dev in invocation.devices} if hybrid else
                            {task.operation_id: physical_signature_for(layer, task.kind, task.shape) for task in tasks}
@@ -624,7 +630,11 @@ def compile_invocation(
     transfer_provenances, transfer_document = frozenset(), {}
     if hybrid:
         inventory = {tensor["id"]: tensor["storage_bytes"] for tensor in tensors}
-        for route in ("dram_to_vram", "vram_to_dram"):
+        # .7 also lets any tensor leave and return through the disk. Every pair
+        # still needs its own exact byte price; nothing here implies a bandwidth.
+        routes = (("dram_to_vram", "vram_to_dram", "ssd_to_dram", "dram_to_ssd")
+                  if storage else ("dram_to_vram", "vram_to_dram"))
+        for route in routes:
             allowed_transfers[route] = list(inventory)
         transfer_provenances, transfer_document = expand_transfer_costs(cost_table, inventory, allowed_transfers,
             shared_memory=invocation.hardware.memory_mode == "shared")
@@ -635,6 +645,14 @@ def compile_invocation(
         physical_signatures=physical_signatures, transfer_provenances=transfer_provenances,
     )
     costs_document["transfer"] = transfer_document
+    # The threshold is what turns a table of two prices into a state machine.
+    # Absent unless the table declared it, so every scenario compiled from a
+    # table that predates the write regime keeps its digest.
+    if cost_table.storage_write_regime is not None:
+        costs_document["storage_write_regime"] = {
+            "after_cumulative_bytes":
+                cost_table.storage_write_regime.after_cumulative_bytes,
+        }
 
     workload_id = f"{_M2_ID_PREFIX}:{layer.id}:{invocation.id}"
     boundary = None
@@ -682,10 +700,17 @@ def compile_invocation(
         boundary.update({
             "devices": list(invocation.devices), "cpu_threads": layer.physical.threads,
             "cuda_device": layer.physical.cuda_device, "cuda_graphs": layer.physical.cuda_graphs,
-            "execution_scope": "explicit_dram_vram_copies_and_macro_device_selection",
-            "transfer_cost_semantics": "exact_route_and_payload_bytes; synthetic_transfer",
+            "execution_scope": ("explicit_dram_vram_ssd_copies_and_macro_device_selection"
+                                if storage else
+                                "explicit_dram_vram_copies_and_macro_device_selection"),
+            "transfer_cost_semantics": "exact_route_and_payload_bytes; "
+                + "+".join(sorted(transfer_provenances)),
             "capacity_verification": "declared_budget_and_known_macro_workspace_only",
         })
+        if storage:
+            boundary.update(storage_tier="declared_budget",
+                            storage_capacity_bytes=invocation.hardware.ssd_capacity_bytes,
+                            storage_semantics="synchronous_exact_size_io; no queue depth or write amplification")
     workload_document: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION_M1,
         "id": workload_id,
@@ -709,6 +734,7 @@ def compile_invocation(
         "id": workload_id,
         "architecture": {
             **invocation.hardware.shared_document(),
+            **invocation.hardware.storage_document(),
             "dram_capacity_bytes": invocation.hardware.dram_capacity_bytes,
             "vram_capacity_bytes": invocation.hardware.vram_capacity_bytes,
             "dram_runtime_reserved_bytes": invocation.hardware.dram_runtime_reserved_bytes,
@@ -793,19 +819,36 @@ def plan_for(
                  for tensor in compiled.scenario.workload.tensors}
     actions: list[Action] = []
 
+    def transfer(kind: str, tensor_id: str, *, src: str | None = None,
+                 dst: str | None = None) -> None:
+        if src is not None and dst is not None and compiled.scenario.architecture.pool_of(src) == \
+                compiled.scenario.architecture.pool_of(dst):
+            actions.append(Action(ACTION_SHARE, tensor_id, src=src, dst=dst))
+            return
+        actions.extend((Action(kind, tensor_id, src=src, dst=dst), Action(ACTION_ADVANCE)))
+
     def materialize(tensor_id: str, destination: str) -> None:
+        # The disk is reached only through DRAM: there is no ssd→vram route, and
+        # staging is charged, not assumed free.
         if destination in locations[tensor_id]:
             return
-        sources = [domain for domain in ("dram", "vram") if domain in locations[tensor_id]]
-        if not sources:
+        if destination == "ssd":
+            materialize(tensor_id, "dram")
+            transfer(ACTION_WRITE_SSD, tensor_id)
+            locations[tensor_id].add("ssd")
+            return
+        if destination == "vram":
+            materialize(tensor_id, "dram")
+            transfer(ACTION_COPY, tensor_id, src="dram", dst="vram")
+            locations[tensor_id].add("vram")
+            return
+        if "vram" in locations[tensor_id]:
+            transfer(ACTION_COPY, tensor_id, src="vram", dst="dram")
+        elif "ssd" in locations[tensor_id]:
+            transfer(ACTION_READ_SSD, tensor_id)
+        else:
             raise InvalidInput(f"serial plan has no produced or initial source for {tensor_id!r}")
-        source = sources[0]
-        kind = (ACTION_SHARE if compiled.scenario.architecture.pool_of(source) ==
-                compiled.scenario.architecture.pool_of(destination) else ACTION_COPY)
-        actions.append(Action(kind, tensor_id, src=source, dst=destination))
-        if kind != ACTION_SHARE:
-            actions.append(Action(ACTION_ADVANCE))
-        locations[tensor_id].add(destination)
+        locations[tensor_id].add("dram")
 
     for task in compiled.tasks:
         device = selected[task.operation_id]

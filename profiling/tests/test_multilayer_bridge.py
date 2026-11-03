@@ -8,7 +8,8 @@ import unittest
 import numpy as np
 from llm_infer_model.tensor.spec import InvalidInput
 
-from profiling.highlevel_accuracy.bridge import BridgeError, export_plan, reference_ports, sha, validate_program
+from profiling.highlevel_accuracy.bridge import (BridgeError, export_plan, frontend_sha,
+                                                 reference_ports, sha, validate_program)
 from profiling.highlevel_accuracy.multilayer import build_multilayer_case
 
 
@@ -111,6 +112,24 @@ class MultilayerBridgeTests(unittest.TestCase):
         path.write_text(path.read_text()+" ",encoding="utf-8")
         with self.assertRaisesRegex(InvalidInput,"source changed"):
             export_plan(compiled)
+
+    def test_non_ascii_case_path_keeps_compile_identity(self):
+        """A checkout under a non-ASCII path must export like an ASCII one.
+
+        The compiler hashes its IR with ``ensure_ascii=False`` while the bridge
+        used the ``json`` default, so any non-ASCII directory name in the case
+        path changed the bytes on one side only and every export failed with
+        "frontend compile identity changed".
+        """
+        for name in ("ascii-case", "研一上/案例"):
+            root = Path(self.temp.name) / name
+            plan = build_multilayer_case(root, layers=2, tokens=3, history=0, hidden=8,
+                intermediate=16, heads=2, kv_heads=1, head_dim=4, devices=("cpu",)*3,
+                threads=1, attention_gate="none", qk_norm="none")
+            program = export_plan(plan.compile(), seed=818)
+            validate_program(program)
+            # The check must follow the compiler's form, not the bridge's.
+            self.assertEqual(program["frontend_sha256"], frontend_sha(program["frontend_ir"]))
 
     def test_multiround_token_gate_remains_rejected(self):
         from llm_simulator import AnalyticalCosts, Device, Hardware, Model, Scheduling, Simulator, Workload

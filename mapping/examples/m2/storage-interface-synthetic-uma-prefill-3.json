@@ -1,0 +1,44 @@
+{
+  "format_version": "m2-layer-0.7",
+  "id": "storage-interface-synthetic-uma-prefill-3",
+  "layer": "storage-interface-synthetic",
+  "layer_file": "storage-interface-synthetic.layer.json",
+  "costs_file": "storage-interface-synthetic.costs.json",
+  "phase": "prefill",
+  "devices": [
+    "cpu",
+    "gpu"
+  ],
+  "hardware": {
+    "memory_mode": "shared",
+    "shared_capacity_bytes": 2097152,
+    "shared_alignment_bytes": 1,
+    "shared_runtime_reserved_bytes": 0,
+    "dram_capacity_bytes": 2097152,
+    "vram_capacity_bytes": 2097152,
+    "ssd_capacity_bytes": 1048576,
+    "ssd_alignment_bytes": 4096,
+    "ssd_runtime_reserved_bytes": 0
+  },
+  "requests": [
+    {
+      "request_id": "r0",
+      "position_start": 0,
+      "tokens": 3,
+      "input_location": "dram",
+      "output_location": "dram"
+    }
+  ],
+  "state_in": {
+    "requests": [
+      {
+        "request_id": "r0",
+        "next_position": 0,
+        "version": 1,
+        "state_location": "dram",
+        "blocks": []
+      }
+    ]
+  },
+  "comment": "Same layer and cost table as storage-interface-synthetic-prefill-3; only the machine differs. DRAM and VRAM are two names for one 2 MiB UMA pool (dram_/vram_capacity_bytes are schema-required and ignored in shared mode), while the disk keeps its own declared 1 MiB budget. Nothing here is measured."
+}

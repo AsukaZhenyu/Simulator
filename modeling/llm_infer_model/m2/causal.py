@@ -272,7 +272,7 @@ class _DenseVisibility:
 
 def _causal_scenario(compiled: CompiledInvocation):
     """Restore static catalogue transfers without guessing an inactive cost."""
-    if compiled.layer.ffn=="dense" and compiled.layer.format_version=="m2-layer-0.5":
+    if compiled.layer.ffn=="dense" and compiled.layer.format_version in ("m2-layer-0.5","m2-layer-0.7"):
         document=deepcopy(compiled.scenario_document)
         return build_scenario(compiled.workload_document,document,where="causal_dense"),document
     if compiled.layer.format_version != "m2-layer-0.6" or compiled.layer.ffn != "moe":

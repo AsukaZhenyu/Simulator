@@ -59,6 +59,23 @@ def sha(value):
     return hashlib.sha256(canonical(value).encode()).hexdigest()
 
 
+def frontend_sha(value):
+    """Hash a frontend document exactly as ``tensor_mapping.python_frontend``.
+
+    The compiler hashes its own IR with ``_json``, which keeps non-ASCII
+    characters unescaped.  Hashing the same document here with the default
+    (escaped) form changes the bytes on one side only, so the compile-identity
+    check below reported a changed document for any case whose path or label is
+    not ASCII.  The escaped and unescaped forms of ASCII content are identical,
+    so this returns the same digest for every document recorded so far; it is
+    used only for that one check, because program digests are taken over
+    documents that may contain non-ASCII text.
+    """
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     allow_nan=False, ensure_ascii=False)
+                          .encode("utf-8")).hexdigest()
+
+
 def _require(ok, message):
     if not ok:
         raise BridgeError(message)
@@ -396,7 +413,7 @@ def validate_program(program):
     _require(digest == sha(copy), "program identity changed")
     for key, value in program["identity"].items():
         _require(sha(program[key]) == value, f"{key} identity changed")
-    _require(program["frontend_sha256"] == sha(program["frontend_ir"]), "frontend compile identity changed")
+    _require(program["frontend_sha256"] == frontend_sha(program["frontend_ir"]), "frontend compile identity changed")
     ops = {op["id"]: op for op in program["graph"]["workload"]["operations"]}
     _require(len(ops) == len(program["bindings"]), "every compiled graph operation must have one native binding")
     seen = set()

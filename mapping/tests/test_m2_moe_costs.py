@@ -176,14 +176,79 @@ class MoeTransferTests(unittest.TestCase):
 
     def test_transfer_synthetic_provenance_and_positive_duration_remain_mandatory(self):
         with self.assertRaises(Unsupported):
-            parse_cost_table(document(transfer_entries=[transfer(provenance="measured_transfer")]))
+            parse_cost_table(document(transfer_entries=[transfer(provenance="measured")]))
         with self.assertRaises(InvalidInput):
             parse_cost_table(document(transfer_entries=[transfer(duration_ns=0)]))
+
+    def test_a_measured_storage_transfer_must_declare_scope_and_bypass(self):
+        """``.6`` may carry measured transfers, but only fully attributed ones."""
+        measured = dict(provenance="measured_transfer")
+        with self.assertRaisesRegex(InvalidInput, "timing_scope"):
+            parse_cost_table(document(transfer_entries=[transfer(**measured)]))
+        with self.assertRaisesRegex(InvalidInput, "cache_policy"):
+            parse_cost_table(document(transfer_entries=[
+                transfer(timing_scope="single_aligned_io_wall", **measured)]))
+        attributed = [transfer(timing_scope="single_aligned_io_wall",
+                               cache_policy="unbuffered", **measured)]
+        with self.assertRaisesRegex(InvalidInput, "validation_only"):
+            parse_cost_table(document(transfer_entries=attributed))
+        table = parse_cost_table(document(validation_only=False, transfer_entries=attributed))
+        cost = table.lookup_transfer("ssd_to_dram", 128)
+        self.assertEqual((cost.provenance, cost.timing_scope, cost.cache_policy),
+                         ("measured_transfer", "single_aligned_io_wall", "unbuffered"))
 
     def test_unsupported_direct_ssd_vram_route_is_not_invented(self):
         for route in ("ssd_to_vram", "vram_to_ssd"):
             with self.subTest(route=route), self.assertRaises(Unsupported):
                 parse_cost_table(document(transfer_entries=[transfer(route)]))
+
+
+class WriteRegimeTests(unittest.TestCase):
+    """A write has two prices; the table must say when the second one starts."""
+
+    def priced(self, **changes):
+        write = transfer("dram_to_ssd", **changes)
+        return document(transfer_entries=[write])
+
+    def test_a_sustained_write_price_needs_the_threshold_that_selects_it(self):
+        raw = self.priced(sustained_duration_ns=95)
+        with self.assertRaisesRegex(InvalidInput, "storage_write_regime"):
+            parse_cost_table(raw)
+
+    def test_a_threshold_with_nothing_to_apply_it_to_is_refused(self):
+        raw = document(storage_write_regime={"after_cumulative_bytes": 4096})
+        with self.assertRaisesRegex(InvalidInput, "不会改变任何价格"):
+            parse_cost_table(raw)
+
+    def test_the_second_price_belongs_to_the_write_route_only(self):
+        with self.assertRaisesRegex(Unsupported, "dram_to_ssd"):
+            parse_cost_table(document(transfer_entries=[
+                transfer("ssd_to_dram", sustained_duration_ns=95)]))
+
+    def test_a_sustained_price_below_the_burst_is_a_swap_not_a_measurement(self):
+        raw = self.priced(sustained_duration_ns=18)  # burst is 19 ns
+        raw["storage_write_regime"] = {"after_cumulative_bytes": 4096}
+        with self.assertRaisesRegex(InvalidInput, "写反"):
+            parse_cost_table(raw)
+
+    def test_the_regime_reaches_the_kernel_document(self):
+        raw = self.priced(sustained_duration_ns=95)
+        raw["storage_write_regime"] = {"after_cumulative_bytes": 4294967296}
+        table = parse_cost_table(raw)
+        self.assertEqual(table.storage_write_regime.after_cumulative_bytes, 4294967296)
+        _, costs = expand_transfer_costs(table, {"weight": 128},
+                                         {"dram_to_ssd": ["weight"]})
+        self.assertEqual(costs["dram_to_ssd"]["weight"],
+                         {"duration_ns": 19, "sustained_duration_ns": 95})
+        # The read side carries one price, whatever the regime says.
+        both = parse_cost_table(document(
+            transfer_entries=[transfer("ssd_to_dram"),
+                              transfer("dram_to_ssd", sustained_duration_ns=95)],
+            storage_write_regime={"after_cumulative_bytes": 4096}))
+        _, costs = expand_transfer_costs(both, {"weight": 128},
+                                         {"ssd_to_dram": ["weight"],
+                                          "dram_to_ssd": ["weight"]})
+        self.assertEqual(costs["ssd_to_dram"]["weight"], {"duration_ns": 19})
 
 
 if __name__ == "__main__":

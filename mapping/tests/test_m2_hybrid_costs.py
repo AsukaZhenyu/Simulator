@@ -111,10 +111,30 @@ class HybridTransferParsing(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(InvalidInput):
                 parse_cost_table(cost_document(transfer_entries=[transfer_entry(provenance=value)]))
 
-    def test_measured_or_ambiguous_transfer_provenance_is_unsupported(self):
-        for value in ["measured_transfer", "synthetic", "synthetic_transfer "]:
-            with self.subTest(value=value), self.assertRaises(Unsupported):
+    def test_ambiguous_transfer_provenance_is_unsupported(self):
+        for value in ["synthetic", "synthetic_transfer ", "measured", ""]:
+            with self.subTest(value=value), self.assertRaises((Unsupported, InvalidInput)):
                 parse_cost_table(cost_document(transfer_entries=[transfer_entry(provenance=value)]))
+
+    def test_measured_transfer_must_say_what_it_measured(self):
+        measured = transfer_entry(provenance="measured_transfer", timing_scope="single_io_wall")
+        for field in ("timing_scope",):
+            broken = dict(measured)
+            del broken[field]
+            with self.subTest(missing=field), self.assertRaises(InvalidInput):
+                parse_cost_table(cost_document(transfer_entries=[broken]))
+        # DRAM↔VRAM has no page cache, so a cache policy there is noise.
+        with self.assertRaises(InvalidInput):
+            parse_cost_table(cost_document(
+                transfer_entries=[dict(measured, cache_policy="unbuffered")]))
+
+    def test_measured_transfer_table_must_declare_validation_only(self):
+        measured = [transfer_entry(provenance="measured_transfer", timing_scope="single_io_wall")]
+        with self.assertRaisesRegex(InvalidInput, "validation_only"):
+            parse_cost_table(cost_document(transfer_entries=measured))
+        table = parse_cost_table(cost_document(transfer_entries=measured, validation_only=False))
+        self.assertEqual(table.lookup_transfer("dram_to_vram", 128).timing_scope,
+                         "single_io_wall")
 
     def test_table_provenance_cannot_fill_missing_transfer_provenance(self):
         entry = transfer_entry()
@@ -136,11 +156,40 @@ class HybridTransferParsing(unittest.TestCase):
         with self.assertRaisesRegex(InvalidInput, "重复"):
             parse_cost_table(cost_document(transfer_entries=[transfer_entry(), transfer_entry(duration_ns=99)]))
 
-    def test_transfer_routes_are_limited_to_dram_vram(self):
+    def test_point_five_transfer_routes_are_limited_to_dram_vram(self):
         for route in ["dram_to_ssd", "ssd_to_dram", "ssd_to_vram", "gpu", ""]:
             exception = InvalidInput if not route else Unsupported
             with self.subTest(route=route), self.assertRaises(exception):
                 parse_cost_table(cost_document(transfer_entries=[transfer_entry(route)]))
+
+    def test_point_seven_opens_the_disk_routes_but_not_a_direct_ssd_vram_hop(self):
+        table = parse_cost_table(cost_document(
+            format_version="m2-layer-0.7",
+            transfer_entries=[transfer_entry("ssd_to_dram", duration_ns=400),
+                              transfer_entry("dram_to_ssd", duration_ns=600)]))
+        self.assertEqual(table.lookup_transfer("ssd_to_dram", 128).duration_ns, 400)
+        self.assertEqual(table.lookup_transfer("dram_to_ssd", 128).duration_ns, 600)
+        stored = parse_cost_table(cost_document(format_version="m2-layer-0.7"))
+        with self.assertRaises(Unsupported):
+            stored.lookup_transfer("ssd_to_vram", 128)
+
+    def test_measured_storage_transfer_must_declare_the_cache_policy(self):
+        warm = transfer_entry("ssd_to_dram", provenance="measured_transfer",
+                              timing_scope="single_io_wall", cache_policy="buffered")
+        with self.assertRaisesRegex(InvalidInput, "cache_policy"):
+            del_warm = dict(warm)
+            del del_warm["cache_policy"]
+            parse_cost_table(cost_document(format_version="m2-layer-0.7",
+                                           transfer_entries=[del_warm],
+                                           validation_only=True))
+        # A page-cache hit is not storage cost, so it cannot underwrite a claim.
+        with self.assertRaisesRegex(InvalidInput, "页缓存"):
+            parse_cost_table(cost_document(format_version="m2-layer-0.7",
+                                           transfer_entries=[warm], validation_only=False))
+        table = parse_cost_table(cost_document(format_version="m2-layer-0.7",
+                                               transfer_entries=[warm], validation_only=True))
+        entry = table.lookup_transfer("ssd_to_dram", 128)
+        self.assertEqual((entry.cache_policy, entry.timing_scope), ("buffered", "single_io_wall"))
 
     def test_lookup_does_not_interpolate_a_nearby_size(self):
         table = parse_cost_table(cost_document())

@@ -173,12 +173,14 @@ def _validate_scenario(scenario: Scenario) -> None:
         "dram_capacity_bytes", "dram_alignment_bytes", "vram_alignment_bytes",
         "vram_runtime_reserved_bytes",
         "shared_capacity_bytes",
+        "ssd_capacity_bytes", "ssd_alignment_bytes",
     }
     positive = {
         "dram_capacity_bytes", "vram_capacity_bytes", "allocation_alignment_bytes",
         "dram_alignment_bytes", "vram_alignment_bytes", "cpu_compute_slots",
         "gpu_compute_slots", "h2d_copy_slots", "pcie_copy_slots", "ssd_io_slots",
         "shared_capacity_bytes", "shared_alignment_bytes",
+        "ssd_capacity_bytes", "ssd_alignment_bytes",
     }
     for field in fields(Architecture):
         value = getattr(scenario.architecture, field.name)
@@ -205,6 +207,14 @@ def _validate_scenario(scenario: Scenario) -> None:
             **{name: getattr(arch, name) for name in
                ("cpu_compute_slots", "gpu_compute_slots", "pcie_copy_slots", "ssd_io_slots")},
         }
+        if arch.is_ssd_domain:
+            # A declared disk budget changes what the search may do, so it is
+            # part of the device state a replay is checked against.
+            architecture.update(
+                ssd_capacity_bytes=arch.ssd_capacity_bytes,
+                ssd_runtime_reserved_bytes=arch.ssd_runtime_reserved_bytes,
+                ssd_alignment_bytes=arch.alignment_of(LOC_SSD),
+            )
         if arch.is_shared:
             architecture.update(dram_runtime_reserved_bytes=arch.dram_runtime_reserved_bytes,
                 vram_runtime_reserved_bytes=(arch.runtime_reserved_bytes if arch.vram_runtime_reserved_bytes is None

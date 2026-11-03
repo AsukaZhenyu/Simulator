@@ -37,6 +37,7 @@ from .artifacts import action_to_dict, events_document, states_document, write_j
 
 SEARCH_SPACE = "serial_materialized_macro_device_assignments"
 HYBRID_FORMAT_VERSION = "m2-layer-0.5"
+STORAGE_HYBRID_FORMAT_VERSION = "m2-layer-0.7"
 _DEVICE_ORDER = ("cpu", "gpu")
 
 __all__ = [
@@ -102,8 +103,8 @@ class HybridSearchResult:
 
 
 def _check_scope(compiled: CompiledInvocation) -> None:
-    if compiled.layer.format_version != HYBRID_FORMAT_VERSION:
-        raise Unsupported(f"hybrid search requires {HYBRID_FORMAT_VERSION}")
+    if compiled.layer.format_version not in (HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION):
+        raise Unsupported(f"hybrid search requires {HYBRID_FORMAT_VERSION} or {STORAGE_HYBRID_FORMAT_VERSION}")
     if compiled.invocation.batch != 1:
         raise Unsupported("hybrid serial macro search currently requires batch=1")
     if compiled.layer.ffn != "dense" or compiled.layer.attention != "full_causal":

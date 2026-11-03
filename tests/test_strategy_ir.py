@@ -13,6 +13,22 @@ from llm_simulator import (
 from llm_simulator.demo import make_demo
 
 
+def caller_tempdir():
+    """A temporary directory on the caller's volume.
+
+    One test below asserts that a relative public path resolves against the
+    caller's working directory. Windows has no relative path across volumes,
+    so when the system temp directory sits on another drive (a checkout on
+    ``G:`` with ``TEMP`` on ``C:``) no relative path can name it. The caller's
+    own directory can always be addressed relatively; a run that cannot write
+    there falls back to the system temp directory.
+    """
+    try:
+        return tempfile.TemporaryDirectory(dir=os.getcwd(), prefix=".tmp-strategy-ir-")
+    except OSError:
+        return tempfile.TemporaryDirectory()
+
+
 class StrategyIRLibraryTests(unittest.TestCase):
     def test_public_scoped_strategy_drives_the_shared_runtime(self):
         original, _ = make_demo("dense")
@@ -23,7 +39,7 @@ class StrategyIRLibraryTests(unittest.TestCase):
             bandwidth_bytes_per_second=1_000_000_000, ce_bytes_per_second=1_000_000_000,
             sm_bytes_per_second=500_000_000,
             arbitration="max_min_fair", timing_scope="payload_only_no_launch_latency"), slots=[])
-        with tempfile.TemporaryDirectory() as folder:
+        with caller_tempdir() as folder:
             service_file = Path(folder) / "services.json"
             service_file.write_text(json.dumps(services), encoding="utf-8", newline="\n")
             reports = []
@@ -39,8 +55,12 @@ class StrategyIRLibraryTests(unittest.TestCase):
                                   cache=Cache(rule="lru", budget_bytes=1024 * 1024),
                                   transport=Transport(engine="ce"))
             # Relative public paths refer to the caller, not generated inputs.
+            try:
+                public = Path(os.path.relpath(service_file))
+            except ValueError:            # system temp on another volume
+                public = service_file
             with simulator.compile(scheduling=schedule, configure=configure,
-                                   services_file=Path(os.path.relpath(service_file))) as compiled:
+                                   services_file=public) as compiled:
                 self.assertIsInstance(reports[0], StrategyInspection)
                 self.assertFalse(reports[0].executable)
                 result = compiled.run()

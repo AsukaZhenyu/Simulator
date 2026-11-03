@@ -41,12 +41,14 @@ SUITES: list[tuple[str, str, str, str | None]] = [
     ("policy-no-progress", "tests", "test_policy_no_progress.py", None),
     ("shared-memory-facade", "tests", "test_shared_memory_facade.py", None),
     ("expert-recipes", "tests", "test_expert_recipes.py", None),
+    ("verdict", "tests", "test_verdict.py", None),
     ("execution-calibration", "profiling/execution_calibration/tests", "test*.py", None),
     ("batched-calibration", "profiling/batched_calibration/tests", "test*.py", None),
     ("composition-calibration", "profiling/composition_calibration/tests", "test*.py", None),
     ("accuracy-suite", "profiling/accuracy_suite/tests", "test*.py", None),
     ("chain-calibration", "profiling/chain_calibration/tests", "test*.py", None),
     ("profiling", "profiling/tests", "test*.py", None),
+    ("storage-measurement", "profiling/storage/tests", "test*.py", None),
     ("workload-accuracy", "profiling/workload_accuracy/tests", "test*.py", None),
     ("overlap-accuracy", "profiling/overlap_accuracy/tests", "test*.py", None),
     ("native-execution-transforms", "profiling/native/execution_transforms_batch", "test_*.py", None),
@@ -64,6 +66,15 @@ SUITES: list[tuple[str, str, str, str | None]] = [
     ("native-single-layer", "profiling/native/single_layer_calibration", "test_build.py", None),
     ("native-context-pair", "profiling/native/single_layer_context_pair", "test_build.py", None),
     ("native-wait-diagnosis", "profiling/native/single_layer_wait_diagnosis", "test_build.py", None),
+    ("native-event-stages", "profiling/native/event_stages", "test_build.py", None),
+    ("native-physical-stages", "profiling/native/physical_stages", "test_build.py", None),
+    ("native-steady-costs", "profiling/native/steady_costs", "test_build.py", None),
+    ("matched-mechanisms", "profiling/matched_mechanisms/tests", "test*.py", None),
+    ("reconfiguration", "profiling/reconfiguration/tests", "test*.py", None),
+    ("steady-costs", "profiling/steady_costs/tests", "test*.py", None),
+    ("strategy-calibration", "profiling/strategy_calibration/tests", "test*.py", None),
+    ("moe-policy-validation", "profiling/moe_policy_validation", "test*.py", None),
+    ("es-abstraction", "profiling/es_abstraction", "test*.py", None),
     ("modeling", "modeling/tests", "test*.py", None),
     ("mapping", "mapping/tests", "test*.py", "mapping"),
 ]
@@ -92,6 +103,13 @@ def build_env() -> dict[str, str]:
     if existing:
         parts.append(existing)
     env["PYTHONPATH"] = os.pathsep.join(parts)
+    # Children write into a pipe, so their stdout encoding is the locale's, not
+    # the terminal's: on a Chinese Windows install that is GBK while this
+    # runner decodes UTF-8, and a test that prints any non-ASCII text then
+    # crashes the runner while it echoes the mojibake back to a GBK console.
+    # Forcing UTF-8 on both ends also makes the captured report identical on
+    # every machine.
+    env["PYTHONIOENCODING"] = "utf-8"
     # Tests write nothing outside the source tree; keep bytecode out of it.
     env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
     return env
@@ -230,6 +248,11 @@ def write_report(path: Path, *, command_line: str,
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Echoing a failing suite's own output must not fail itself: a GBK console
+    # cannot encode every character a test may print.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list", action="store_true", help="print the suite names and exit")
     parser.add_argument("-k", "--filter", default="", help="run only suites whose name contains this text")

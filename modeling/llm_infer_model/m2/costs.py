@@ -28,7 +28,7 @@ import math
 from typing import Any, Iterable, Mapping, Sequence
 
 from ..units import seconds_to_ns
-from ..tensor.spec import InvalidInput, Unsupported, ROUTES
+from ..tensor.spec import InvalidInput, StorageWriteRegime, Unsupported, ROUTES
 
 __all__ = [
     "COST_SOURCE_PREFIX",
@@ -77,14 +77,26 @@ _ENTRY_KEYS = {
 }
 _TABLE_KEYS = {
     "format_version", "source", "provenance", "entries", "comment",
-    "validation_only", "transfer_entries",
+    "validation_only", "transfer_entries", "storage_write_regime",
 }
 _HYBRID_VERSION = "m2-layer-0.5"
 _MOE_VERSION = "m2-layer-0.6"
+# Dense hybrid whose weights may start on the disk. Same execution contracts as
+# .5; the storage tier is the only addition.
+_STORAGE_HYBRID_VERSION = "m2-layer-0.7"
 _TRANSFER_ROUTES = frozenset({"dram_to_vram", "vram_to_dram"})
-_MOE_TRANSFER_ROUTES = _TRANSFER_ROUTES | frozenset({"dram_to_ssd", "ssd_to_dram"})
+_STORAGE_ROUTES = frozenset({"ssd_to_dram", "dram_to_ssd"})
+_MOE_TRANSFER_ROUTES = _TRANSFER_ROUTES | _STORAGE_ROUTES
+_STORAGE_VERSIONS = frozenset({_MOE_VERSION, _STORAGE_HYBRID_VERSION})
 _TRANSFER_KEYS = {"route", "storage_bytes", "duration_ns", "provenance"}
+_SUSTAINED_KEY = "sustained_duration_ns"
+_WRITE_ROUTE = "dram_to_ssd"
+_REGIME_KEYS = {"after_cumulative_bytes"}
+_MEASURED_TRANSFER_PROVENANCE = "measured_transfer"
 _TRANSFER_PROVENANCE = "synthetic_transfer"
+# A cache-bypassing policy measures the device. Anything else measures the page
+# cache and the device together, which is why it needs a validation-only table.
+CACHE_BYPASS_POLICIES = frozenset({"unbuffered", "fadvise_dontneed", "f_nocache"})
 
 
 @dataclass(frozen=True, order=True)
@@ -136,15 +148,29 @@ class MacroCost:
 
 @dataclass(frozen=True)
 class TransferEntry:
-    """One exact route/byte-count cost; M2 .5 currently accepts synthetic data.
+    """One exact route/byte-count cost, synthetic or measured.
 
     The byte count is tensor storage size, before hardware capacity alignment.
     Copying a tensor allocates its destination separately in the core engine;
     this entry specifies duration only and does not hide a staging allocation.
+
+    A measured entry must also say *what* was measured: ``timing_scope`` (which
+    interval the clock covered) and ``cache_policy`` (whether the page cache was
+    bypassed). A policy that is not a bypass makes the number "warm file I/O",
+    not storage cost, so such a table must be declared ``validation_only``.
+
+    ``sustained_duration_ns`` is the second price of a ``dram_to_ssd`` write:
+    what the same bytes cost once the drive's write cache is exhausted. It is
+    optional even in a table that declares a regime, because the two prices are
+    measured separately and one of them may be missing; the table-level
+    declaration pins ``when`` the price changes, this field pins ``to what``.
     """
 
     duration_ns: int
     provenance: str
+    timing_scope: str | None = None
+    cache_policy: str | None = None
+    sustained_duration_ns: int | None = None
 
 
 @dataclass(frozen=True)
@@ -161,10 +187,12 @@ class M2CostTable:
     validation_only: bool = False
     transfers: dict[tuple[str, int], TransferEntry] = field(default_factory=dict)
     format_version: str | None = None
+    storage_write_regime: StorageWriteRegime | None = None
 
     @property
     def allowed_transfer_routes(self) -> frozenset[str]:
-        return _MOE_TRANSFER_ROUTES if self.format_version == _MOE_VERSION else _TRANSFER_ROUTES
+        return (_MOE_TRANSFER_ROUTES if self.format_version in _STORAGE_VERSIONS
+                else _TRANSFER_ROUTES)
 
     def lookup(
         self, kind: str, device: str, shape: MacroShape,
@@ -211,8 +239,11 @@ class M2CostTable:
                 f"已有字节数为 {available}，不插值、不按另一方向复用、不默认为 0"
             )
         _transfer_positive_int(cost.duration_ns, "transfer.duration_ns")
-        if cost.provenance != _TRANSFER_PROVENANCE:
-            raise Unsupported("M2 .5 搬运成本目前只接受 provenance='synthetic_transfer'")
+        if cost.provenance not in (_TRANSFER_PROVENANCE, _MEASURED_TRANSFER_PROVENANCE):
+            raise Unsupported(
+                "搬运成本的 provenance 只能是 'synthetic_transfer' 或 "
+                "'measured_transfer'；其余标签无法说明这个数字是模型算的还是测的"
+            )
         return cost
 
 
@@ -228,25 +259,75 @@ def _parse_transfer_entry(
     label = f"{where}.transfer_entries[{index}]"
     if not isinstance(raw, dict):
         raise InvalidInput(f"{label} 必须是 JSON 对象")
-    if set(raw) != _TRANSFER_KEYS:
-        raise InvalidInput(
-            f"{label} 必须恰好包含 {sorted(_TRANSFER_KEYS)}；"
-            f"缺失 {sorted(_TRANSFER_KEYS - set(raw))}，未知 {sorted(set(raw) - _TRANSFER_KEYS)}"
-        )
-    route = raw["route"]
+    provenance = raw.get("provenance")
+    measured = provenance == _MEASURED_TRANSFER_PROVENANCE
+    route = raw.get("route")
+    cache_policy_required = isinstance(route, str) and route in _STORAGE_ROUTES
+    expected_keys = _TRANSFER_KEYS
+    allowed_keys = _TRANSFER_KEYS
+    # Only a write has a second price. The key is *allowed* on that route, not
+    # required: a table may price only the burst phase and let the regime apply
+    # to nothing, but a sustained price filed under a read would never be
+    # charged and is refused below.
+    if route == _WRITE_ROUTE:
+        allowed_keys = allowed_keys | {_SUSTAINED_KEY}
+    if measured:
+        expected_keys = expected_keys | {"timing_scope"}
+        allowed_keys = allowed_keys | {"timing_scope"}
+        if cache_policy_required:
+            expected_keys = expected_keys | {"cache_policy"}
+            allowed_keys = allowed_keys | {"cache_policy"}
     if not isinstance(route, str) or not route:
         raise InvalidInput(f"{label}.route 必须是非空字符串")
-    allowed = _MOE_TRANSFER_ROUTES if format_version == _MOE_VERSION else _TRANSFER_ROUTES
+    if _SUSTAINED_KEY in raw and route != _WRITE_ROUTE:
+        raise Unsupported(
+            f"{label}.{_SUSTAINED_KEY} 只对 {_WRITE_ROUTE!r} 有意义："
+            "写缓存写满与否是磁盘的属性，对读和显存搬运没有第二档价格"
+        )
+    if set(raw) != expected_keys and (
+        set(raw) - allowed_keys or expected_keys - set(raw)
+    ):
+        raise InvalidInput(
+            f"{label} 必须恰好包含 {sorted(allowed_keys)}"
+            f"（provenance={provenance!r}、route={route!r}）；"
+            f"缺失 {sorted(expected_keys - set(raw))}，未知 {sorted(set(raw) - allowed_keys)}"
+        )
+    allowed = _MOE_TRANSFER_ROUTES if format_version in _STORAGE_VERSIONS else _TRANSFER_ROUTES
     if route not in allowed:
         raise Unsupported(f"{label}: {format_version} 不支持搬运路线 {route!r}")
     storage_bytes = _transfer_positive_int(raw["storage_bytes"], f"{label}.storage_bytes")
     duration_ns = _transfer_positive_int(raw["duration_ns"], f"{label}.duration_ns")
-    provenance = raw["provenance"]
+    sustained_ns = (
+        None if raw.get(_SUSTAINED_KEY) is None
+        else _transfer_positive_int(raw[_SUSTAINED_KEY], f"{label}.{_SUSTAINED_KEY}")
+    )
+    if sustained_ns is not None and sustained_ns < duration_ns:
+        raise InvalidInput(
+            f"{label}.{_SUSTAINED_KEY}={sustained_ns} 比 duration_ns={duration_ns} 还小；"
+            "写缓存之后的「稳定」价格不可能快于缓存期，两列多半写反了"
+        )
     if not isinstance(provenance, str) or not provenance.strip():
         raise InvalidInput(f"{label}.provenance 必须是非空字符串")
-    if provenance != _TRANSFER_PROVENANCE:
-        raise Unsupported(f"{label}: 目前只接受 provenance='synthetic_transfer'")
-    return (route, storage_bytes), TransferEntry(duration_ns, provenance)
+    if not measured and provenance != _TRANSFER_PROVENANCE:
+        raise Unsupported(
+            f"{label}: 只接受 provenance='synthetic_transfer' 或 'measured_transfer'"
+        )
+    if not measured:
+        return (route, storage_bytes), TransferEntry(
+            duration_ns, provenance, sustained_duration_ns=sustained_ns)
+    timing_scope = raw["timing_scope"]
+    if not isinstance(timing_scope, str) or not timing_scope.strip():
+        raise InvalidInput(f"{label}.timing_scope 必须是非空字符串")
+    cache_policy = raw.get("cache_policy")
+    if route in _STORAGE_ROUTES and (not isinstance(cache_policy, str) or not cache_policy.strip()):
+        raise InvalidInput(
+            f"{label}.cache_policy 必须声明 storage 路线绕过了什么；"
+            "不声明就没法区分设备耗时和页缓存命中"
+        )
+    return (route, storage_bytes), TransferEntry(
+        duration_ns, provenance, timing_scope=timing_scope, cache_policy=cache_policy,
+        sustained_duration_ns=sustained_ns,
+    )
 
 
 
@@ -478,11 +559,13 @@ def parse_cost_table(raw: Any, *, where: str = "<costs>") -> M2CostTable:
         version = raw["format_version"]
         if not isinstance(version, str) or not version:
             raise InvalidInput(f"{where}.format_version 必须是非空字符串")
-        if version not in {"m2-layer-0.1", "m2-layer-0.2", "m2-layer-0.3", "m2-layer-0.4", _HYBRID_VERSION, _MOE_VERSION}:
+        if version not in {"m2-layer-0.1", "m2-layer-0.2", "m2-layer-0.3", "m2-layer-0.4",
+                           _HYBRID_VERSION, _MOE_VERSION, _STORAGE_HYBRID_VERSION}:
             raise Unsupported(f"{where}.format_version 不支持 {version!r}")
-    if version not in {_HYBRID_VERSION, _MOE_VERSION} and "transfer_entries" in raw:
-        raise Unsupported(f"{where}.transfer_entries 仅用于 {_HYBRID_VERSION}/{_MOE_VERSION}")
-    if version in {_HYBRID_VERSION, _MOE_VERSION} and not isinstance(raw.get("transfer_entries"), list):
+    _TRANSFER_VERSIONS = {_HYBRID_VERSION, _MOE_VERSION, _STORAGE_HYBRID_VERSION}
+    if version not in _TRANSFER_VERSIONS and "transfer_entries" in raw:
+        raise Unsupported(f"{where}.transfer_entries 仅用于 {sorted(_TRANSFER_VERSIONS)}")
+    if version in _TRANSFER_VERSIONS and not isinstance(raw.get("transfer_entries"), list):
         raise InvalidInput(f"{where}.transfer_entries 必须显式给出 JSON 数组（可为空）")
     validation_only = raw.get("validation_only", False)
     if not isinstance(validation_only, bool):
@@ -517,10 +600,69 @@ def parse_cost_table(raw: Any, *, where: str = "<costs>") -> M2CostTable:
         if key in transfers:
             raise InvalidInput(f"{where}.transfer_entries[{index}]: {key!r} 重复")
         transfers[key] = cost
+    measured_transfers = [cost for cost in transfers.values()
+                          if cost.provenance == _MEASURED_TRANSFER_PROVENANCE]
+    if measured_transfers and "validation_only" not in raw:
+        raise InvalidInput(
+            f"{where}.validation_only must be explicitly declared for measured transfer tables"
+        )
+    # Only a storage route carries a cache policy; DRAM<->VRAM has no page cache
+    # to bypass, so an absent policy there is not a warm measurement.
+    warm = [cost for cost in measured_transfers
+            if cost.cache_policy is not None and cost.cache_policy not in CACHE_BYPASS_POLICIES]
+    if warm and not validation_only:
+        raise InvalidInput(
+            f"{where}.transfer_entries: cache_policy={warm[0].cache_policy!r} 没有绕过页缓存；"
+            "这样的数字是「文件 I/O + 页缓存」的混合耗时，只能用于 validation_only 表"
+        )
+    regime = _parse_write_regime(raw.get("storage_write_regime"),
+                                 f"{where}.storage_write_regime", transfers)
     return M2CostTable(
         source=source, entries=entries, validation_only=validation_only,
-        transfers=transfers, format_version=version,
+        transfers=transfers, format_version=version, storage_write_regime=regime,
     )
+
+
+def _parse_write_regime(
+    raw: Any, label: str, transfers: Mapping[tuple[str, int], TransferEntry],
+) -> StorageWriteRegime | None:
+    """When the disk stops absorbing writes, and the prices that depend on it.
+
+    The pair must be declared together. A threshold with no sustained price
+    changes nothing; a sustained price with no threshold can never be selected,
+    so the kernel would silently charge the burst price forever. Both are
+    refused at parse time rather than discovered in a makespan.
+    """
+    sustained = sorted(key for key, entry in transfers.items()
+                       if entry.sustained_duration_ns is not None)
+    if raw is None:
+        if sustained:
+            raise InvalidInput(
+                f"{label}: transfer_entries 里有 {sustained[0]!r} 的 "
+                f"{_SUSTAINED_KEY}，但表没有声明 storage_write_regime；"
+                "内核不知道写缓存何时耗尽，只会一直收缓存期的价格"
+            )
+        return None
+    if not isinstance(raw, dict):
+        raise InvalidInput(f"{label} 必须是 JSON 对象")
+    unknown = sorted(set(raw) - _REGIME_KEYS)
+    if unknown:
+        raise InvalidInput(f"{label}: 未知字段 {', '.join(unknown)}")
+    threshold = raw.get("after_cumulative_bytes")
+    if isinstance(threshold, bool) or not isinstance(threshold, int) or threshold < 1:
+        raise InvalidInput(
+            f"{label}.after_cumulative_bytes 必须是正整数，得到 {threshold!r}")
+    if not sustained:
+        raise InvalidInput(
+            f"{label} 声明了写缓存阈值，但 transfer_entries 里没有任何 "
+            f"{_WRITE_ROUTE} 条目带 {_SUSTAINED_KEY}；这个阈值不会改变任何价格"
+        )
+    if any(route != _WRITE_ROUTE for route, _ in sustained):
+        raise Unsupported(
+            f"{label}: 只有 {_WRITE_ROUTE!r} 能有第二档价格，"
+            f"得到 {sorted({route for route, _ in sustained})}"
+        )
+    return StorageWriteRegime(after_cumulative_bytes=threshold)
 
 
 def expand_costs_document(
@@ -606,7 +748,10 @@ def expand_transfer_costs(
                     continue  # SHARE has no physical COPY price; COPY remains unavailable.
             else:
                 cost = table.lookup_transfer(route, tensor_sizes[tensor_id])
-            transfer[route][tensor_id] = {"duration_ns": cost.duration_ns}
+            priced = {"duration_ns": cost.duration_ns}
+            if cost.sustained_duration_ns is not None:
+                priced[_SUSTAINED_KEY] = cost.sustained_duration_ns
+            transfer[route][tensor_id] = priced
             provenances.add(cost.provenance)
     return provenances, transfer
 

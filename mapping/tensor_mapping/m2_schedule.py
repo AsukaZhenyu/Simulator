@@ -23,7 +23,7 @@ from .schedule import ScheduleFacts, SchedulePolicy, make_schedule_context, repl
 
 _BOUNDARY_VERSION = "m2-reusable-boundary-0.1"
 _LEDGER_ORDER = ("dram", "vram", "ssd")
-_LAYER_VERSIONS = {"m2-layer-0.3", "m2-layer-0.4", "m2-layer-0.5", "m2-layer-0.6"}
+_LAYER_VERSIONS = {"m2-layer-0.3", "m2-layer-0.4", "m2-layer-0.5", "m2-layer-0.6", "m2-layer-0.7"}
 
 
 def _canonical(value) -> str:

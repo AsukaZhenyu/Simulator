@@ -2,9 +2,9 @@
 
 ## 当前范围
 
-本文说明 `m2-layer-0.1`～`0.6` 的单次调用格式、物化端口和成本边界。更高层的组合策略及顺序执行变换见[策略表达与编译入口](../../../mapping/README.md)；它们仍须匹配具体 lowering 的实测合同，不能由格式支持推出性能校准通过。
+本文说明 `m2-layer-0.1`～`0.7` 的单次调用格式、物化端口和成本边界。更高层的组合策略及顺序执行变换见[策略表达与编译入口](../../../mapping/README.md)；它们仍须匹配具体 lowering 的实测合同，不能由格式支持推出性能校准通过。
 
-保留 `m2-layer-0.1` 的 CPU/full causal/Dense 合成三段链。`m2-layer-0.2` 为 CPU、B=1 的物化 Q/K/V/可选 gate 输入 → Attention（含 KV 追加和 O projection）→ SwiGLU Dense FFN。`m2-layer-0.3` 为 CPU 完整声明 decoder block，`m2-layer-0.4` 为同一数学边界的单 CUDA 设备合同，见下文。0.5 接入 Dense CPU/GPU 串行设备分配；0.6 接入符号级 Full Causal MoE，范围见下文。层与 invocation 必须显式使用同一版本，旧 hidden 输入不会被重新解释成 QKV。
+保留 `m2-layer-0.1` 的 CPU/full causal/Dense 合成三段链。`m2-layer-0.2` 为 CPU、B=1 的物化 Q/K/V/可选 gate 输入 → Attention（含 KV 追加和 O projection）→ SwiGLU Dense FFN。`m2-layer-0.3` 为 CPU 完整声明 decoder block，`m2-layer-0.4` 为同一数学边界的单 CUDA 设备合同，见下文。0.5 接入 Dense CPU/GPU 串行设备分配；0.6 接入符号级 Full Causal MoE；0.7 保持 0.5 的宏合同，把磁盘变成有预算的存储层。范围见下文。层与 invocation 必须显式使用同一版本，旧 hidden 输入不会被重新解释成 QKV。
 
 0.2 是**部分 decoder block**。Q/K 已完成位置变换，QKV projection、normalization、RoPE、residual add 在该版本边界外，不算免费任务。0.3 把这些计算明确纳入三个宏任务，该 CPU 合同仍不声称复现原始 Qwen 完整路径或 Flash Attention。GPU 使用独立的 0.4 合同，不重用 CPU 成本。几何示例使用明确的 CPU 显式 Attention/F32 KV 变体，不声称复现原模型的 Flash/F16 KV 路径。
 
@@ -102,7 +102,7 @@ python -m llm_infer_model.m2 --invocation "<matched-invocation.json>" --output "
 {"route": "dram_to_vram", "storage_bytes": 64, "duration_ns": 10, "provenance": "synthetic_transfer"}
 ```
 
-搬运按 (route, storage_bytes) 精确查表；缺尺寸、错误方向、重复条目均拒绝，不插值。这一版只接受 synthetic_transfer，尚未绑定 pinned/pageable、设备身份、计时与 staging 的实测搬运合同。COPY 流量计原 storage_bytes，目标域容量按其 alignment 计占用，并保留源副本；两域 runtime_reserved_bytes 和正在运行的宏任务 scratch 仍由同一个内核计费。COMPUTE 成本已含本地访存，不能再加一遍本地带宽成本。
+搬运按 (route, storage_bytes) 精确查表；缺尺寸、错误方向、重复条目均拒绝，不插值。合成条目写 `synthetic_transfer`；这一版也接受 `measured_transfer`，但必须有 `timing_scope`，并把 `validation_only` 显式写出（规则见 0.7「实测搬运条目」；DRAM↔VRAM 没有页缓存，所以那一路不得写 `cache_policy`）。pinned/pageable、设备身份与 staging 的实测合同仍未绑定。COPY 流量计原 storage_bytes，目标域容量按其 alignment 计占用，并保留源副本；两域 runtime_reserved_bytes 和正在运行的宏任务 scratch 仍由同一个内核计费。COMPUTE 成本已含本地访存，不能再加一遍本地带宽成本。
 
 `plan_for(compiled, placements={operation_id: device})` 建立完整显式串行计划；必须给出全部宏任务，缺项不会猜设备。`run_invocation(compiled, actions=actions)` 可回放搜索计划并读回实际 READY 副本。原 0.1–0.4 的默认回放行为不变。
 
@@ -137,7 +137,7 @@ python -m tensor_mapping.m2_hybrid mapping/examples/m2/hybrid-interface-syntheti
 
 ### 成本、SSD 与缓存快照
 
-projection、attention、router、combine 的成本为 `accounting=per_request`；expert_ffn 和 shared_expert_ffn 必须明确 `accounting=per_expert_group`，tokens 为该组实际 token 数，整个组只计费一次，不再乘 batch。专家 FFN 的 visible_history 明确为 0，表示该合成成本不适用历史轴。所有宏任务成本目前只接受 synthetic_layer，搬运只接受 synthetic_transfer；缺形状、字节数或方向时拒绝，不插值。
+projection、attention、router、combine 的成本为 `accounting=per_request`；expert_ffn 和 shared_expert_ffn 必须明确 `accounting=per_expert_group`，tokens 为该组实际 token 数，整个组只计费一次，不再乘 batch。专家 FFN 的 visible_history 明确为 0，表示该合成成本不适用历史轴。所有宏任务成本目前只接受 synthetic_layer；搬运接受 synthetic_transfer，或 0.7 定义的 measured_transfer；缺形状、字节数或方向时拒绝，不插值。
 
 0.6 在 DRAM↔VRAM 外增加 DRAM↔SSD 的精确字节成本。SSD→VRAM 必须经 SSD→DRAM→VRAM 两段；输出或 KV 交付到 SSD 须先位于 DRAM，再完成 WRITE_SSD。SSD 没有容量账；DRAM/VRAM 的副本分配、alignment、runtime reserve 和运行中 workspace 仍由内核统一计费与加锁。
 
@@ -172,6 +172,90 @@ python -m tensor_mapping.m2_moe mapping/examples/m2/moe-interface-synthetic-deco
 | 被 max_candidates 截断且无解 | unknown | 未访问候选的可行性未知 |
 
 `global_schedule_optimality_proven=false` 始终保留。产物包括全部已比较候选的指标、拒绝原因、可重放 mapping/事件/状态，以及有解时的 best_mapping.json、state_out.json。summary 记录输入文件身份、route_source 与规范化 trace SHA256；这些合成实验不代表真实推理加速或准确性能预测。
+
+## 0.7 单层 Dense 的声明式存储层
+
+`m2-layer-0.7` 与 0.5 共用 `HybridDensePhysical`、同一组 CPU/CUDA 宏合同、同一套物化端口和同一份 `transfer_entries` 规则。它只改两件事：权重可以从磁盘起步，磁盘可以是一块有预算的域。0.5 的文档仍按原样解释，不从「0.7 支持磁盘」推出「0.5 也支持」。
+
+### 声明就是开关
+
+`invocation.hardware.ssd_capacity_bytes` 是唯一开关，且 0.7 必须显式给出；`ssd_alignment_bytes`、`ssd_runtime_reserved_bytes` 可选。没有它，磁盘仍是历史语义里的无界场景内容，0.7 直接拒绝，而不是悄悄退回无界。0.1–0.6 的文档不得**声明**磁盘：`ssd_capacity_bytes` 给非 `null` 值、`ssd_runtime_reserved_bytes` 非 0、或 `ssd_alignment_bytes` 非 `null` 都算声明，直接拒绝；但显式写出「没有盘」的默认值（`null`/`0`/`null`）与省略这三个键是同一台机器，照样接受——这与张量内核 `Architecture` 的判断一致，也让把 `Hardware` 数据类整份序列化出来的文档不会因为多出几个 `null` 就解析失败。
+
+有了预算，磁盘就成为内核记账的第三个存储域：初始布局按 alignment 计入容量，运行中每次写入都要放得下，可以 EVICT，`EvaluationResult.peak_ssd_bytes` 与场景产物里的 `peak_ssd_bytes` 都报告峰值。没有预算时这三件事都不存在，历史产物的字节不变。
+
+### 位置与搬运
+
+layer 权重的 `initial_location` 可以是 `ssd`，其余输入、输出、KV 与历史块位置规则同 0.6。没有 `ssd_to_vram`：SSD→VRAM 必经 SSD→DRAM→VRAM，两段各自按精确字节查价并各自计 staging。这两个域里的 staging 都是显式的 COPY/WRITE_SSD/READ_SSD 动作，不隐藏在 COMPUTE 里。
+
+`transfer_entries` 对 SSD 路线同样按 `(route, storage_bytes)` 精确查表；缺一条就拒绝整个展开，不会因为「方向对了」而复用另一条。
+
+### 实测搬运条目
+
+`provenance="measured_transfer"` 从 `.5` 起就允许进入成本表，`.6`/`.7` 的 storage 路线另有更严的要求，但都必须自报测的是什么：
+
+```json
+{"route": "ssd_to_dram", "storage_bytes": 1048576, "duration_ns": 579500,
+ "provenance": "measured_transfer", "timing_scope": "single_io_wall", "cache_policy": "unbuffered"}
+```
+
+- `timing_scope` 必填：这一条计的是哪段区间。
+- storage 路线必填 `cache_policy`；DRAM↔VRAM 不得声明（那里没有页缓存）。
+- 有 measured 搬运条目时，表的 `validation_only` 必须显式写出。
+- `cache_policy` 不在 `unbuffered` / `fadvise_dontneed` / `f_nocache` 里，说明这是「文件 I/O + 页缓存」的混合耗时，表必须是 `validation_only=true`，只能用于验证调用。
+
+这些字段只说明作者声明了什么，不构成对盘控制器缓存、队列深度或写放大的核验；测量协议见 `profiling/storage/README.md`。
+
+### 写缓存耗尽后的第二档价格
+
+消费级 SSD 的写入不是一个价格。缓存和空闲块池还吃得下时是缓冲速度，用完之后是介质本身的速度；本机实测为 2.5 GB/s 对 0.46 GB/s，**同一次搬运差 5.4 倍**。所以 `dram_to_ssd` 允许第二档价，并由表级门限说明从什么时候开始收它：
+
+```json
+{"route": "dram_to_ssd", "storage_bytes": 1073741824, "duration_ns": 398000,
+ "sustained_duration_ns": 2160000000, "provenance": "measured_transfer",
+ "timing_scope": "single_aligned_write_wall_excluding_flush", "cache_policy": "unbuffered"}
+```
+```json
+"storage_write_regime": {"after_cumulative_bytes": 42949672960}
+```
+
+- 两件事必须成对出现：有 `sustained_duration_ns` 没有门限，内核永远不知道该在哪一次切换，直接拒绝；有门限而没有任何写条目带第二档价，这个门限不改任何价格，同样拒绝。
+- 第二档价只属于 `dram_to_ssd`。写缓存是磁盘的属性，读和显存搬运没有第二档；在那些路线上声明会被拒绝，而不是被忽略。
+- `sustained_duration_ns` 不得小于 `duration_ns`；小于说明两列写反了。
+- 内核在 `State` 里记 `storage_write_debt_bytes`（本次场景累计写入，封顶在门限），**从起写时已经越过门限的那一次开始**收第二档价，场景内不回退——服务循环里没有让盘歇过来的空闲窗口。这份负债进状态指纹：写过 40 GiB 与写过 60 GiB 是两个不同的未来。
+- 没有 `storage_write_regime` 的场景行为、价格和指纹都不变。GC 压力下的读取变慢（实测 3.75 → 3.06 GB/s）不折进这个门限，它是另一个机制。
+- 门限是逐次测量的量（本机同一条命令跑出过 12 / 35 / 47 GiB），不是器件常数；导出时必须由测量方写进表里，不能由导出器猜。
+
+### 与 UMA 共存
+
+`memory_mode: "shared"` 把 DRAM 与 VRAM 变成同一块物理池的两个名字，但**磁盘不在这块池里**：
+`ssd_capacity_bytes` 仍然是它自己的预算，容量检查只数盘上的字节，不会拿内存用量去比磁盘预算。
+于是同一份 `.7` layer 与成本表可以不加改动地跑在三类机器上，差别只在 `hardware` 那一段：
+笔记本与台式机是两个分开的内存域，UMA 设备是一个共享池。
+
+`mapping/examples/m2/storage-interface-synthetic-uma-prefill-3.json` 是同一层的 UMA 调用
+（2 MiB 共享池 + 1 MiB 磁盘预算）：它与分开池版本得到相同的 `peak_ssd_bytes` 和
+`ssd_read_bytes`；makespan 可以更短，因为同一份数据的 DRAM/VRAM 两个名字之间是
+零代价的 SHARE，而分开池版本要为那次搬运付 `transfer_entries` 里的钱（示例里 7480 对
+7580 ns，差的就是一条 `dram_to_vram` 的价格）。这不改变磁盘账：盘上的字节、读写量与
+峰值两边一致。
+共享模式仍要求 `dram_capacity_bytes` / `vram_capacity_bytes` 两个键，但它们被忽略——容量由
+`shared_capacity_bytes` 决定，这里没有单独的两块内存。
+
+### 示例
+
+`mapping/examples/m2/storage-interface-synthetic.*` 是同一 Dense block 的 0.7 版本：矩阵权重从磁盘起步，norm 向量留在 DRAM，磁盘 1 MiB、4096 对齐，全部时间为合成常数。它验证模型与展开通路，不代表存储性能。
+
+```powershell
+python -m tensor_mapping.m2_hybrid mapping/examples/m2/storage-interface-synthetic-prefill-3.json --out mapping/outputs/storage-prefill
+```
+
+### 不建模的部分
+
+同步单次 I/O 的精确字节耗时之外的一切：队列深度与并发 IOPS、写放大与 FTL/GC、控制器缓存、页缓存命中率、预取与异步 I/O、掉电持久性，以及 SSD 内部条带化带来的随机/顺序差异。`ssd_io_slots` 仍是一个槽，表示一次只有一笔 I/O 在途。
+
+写缓存耗尽只建模成「一个门限 + 两档价」。不建模的是盘在两者之间的过渡（实测有一次中途掉到 594 MB/s 又回到 2.5 GB/s 再彻底掉下去），以及门限本身随盘的剩余空间和此前历史漂移的部分（同一条命令同一天跑出 12 GiB、35 GiB、47 GiB 三个门限）；这些都靠门限取测量值时的裕度来吸收。
+
+**空闲恢复也不建模，但它确实会发生，而且很快**：第 12 GiB 掉档之后约 2.5 分钟重跑，16 GiB 满速；此后 5 s、30 s 各再追 16 GiB，仍满速——掉档后 3.6 分钟内盘又吃下 48 GiB 满速写。所以「场景内不回退」只在**连续写**的服务循环里成立；离线换模型、换专家集这种中间有间隔的负载会自己回到第一档，不能拿一次掉档给整个会话定价。
 
 ## 独立的实测 MoE FFN 子图
 

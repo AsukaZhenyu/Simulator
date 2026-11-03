@@ -50,7 +50,8 @@ from .cuda_physical import (
     CUDA_FORMAT_VERSION, CudaDensePhysical, parse_cuda_physical, validate_cuda_physical_layer,
 )
 from .hybrid_physical import (
-    HYBRID_FORMAT_VERSION, HybridDensePhysical, parse_hybrid_physical, validate_hybrid_physical_layer,
+    HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION, HybridDensePhysical,
+    parse_hybrid_physical, validate_hybrid_physical_layer,
 )
 from .moe_spec import (MOE_FORMAT_VERSION, STATE_CACHE_FORMAT_VERSION, RouteTraceEntry,
                        INFORMATION_MODES, parse_route_trace, validate_moe_layer,
@@ -90,6 +91,7 @@ __all__ = [
     "FULL_FORMAT_VERSION",
     "CUDA_FORMAT_VERSION",
     "HYBRID_FORMAT_VERSION",
+    "STORAGE_HYBRID_FORMAT_VERSION",
     "MOE_FORMAT_VERSION",
     "STATE_CACHE_FORMAT_VERSION",
     "RouteTraceEntry",
@@ -143,9 +145,12 @@ __all__ = [
 
 FORMAT_VERSION = "m2-layer-0.1"
 PHYSICAL_FORMAT_VERSION = "m2-layer-0.2"
-SUPPORTED_FORMAT_VERSIONS = (FORMAT_VERSION, PHYSICAL_FORMAT_VERSION, FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION)
-_PHYSICAL_VERSIONS = (PHYSICAL_FORMAT_VERSION, FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION)
-_COMPLETE_VERSIONS = (FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION)
+SUPPORTED_FORMAT_VERSIONS = (FORMAT_VERSION, PHYSICAL_FORMAT_VERSION, FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
+_PHYSICAL_VERSIONS = (PHYSICAL_FORMAT_VERSION, FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
+_COMPLETE_VERSIONS = (FULL_FORMAT_VERSION, CUDA_FORMAT_VERSION, HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
+# Versions whose documents may start, end or hold a copy on the disk. .6 does
+# it for expert weights; .7 does it for Dense weights and the storage budget.
+SSD_LOCATION_VERSIONS = (MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
 
 PHASE_PREFILL = "prefill"
 PHASE_DECODE = "decode"
@@ -538,7 +543,8 @@ def parse_layer_document(raw: Any, *, where: str = "<layer>") -> LayerDescriptor
     if version in _PHYSICAL_VERSIONS:
         if "workspace_bytes" in block:
             raise InvalidInput(f"{where}: physical layers use workspace_limit_bytes, not legacy workspace_bytes")
-        physical = (parse_hybrid_physical(block.get("physical")) if version == HYBRID_FORMAT_VERSION
+        physical = (parse_hybrid_physical(block.get("physical"))
+                    if version in (HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
                     else parse_cuda_physical(block.get("physical")) if version == CUDA_FORMAT_VERSION
                     else parse_full_physical(block.get("physical")) if version == FULL_FORMAT_VERSION
                     else parse_physical(block.get("physical")))
@@ -575,7 +581,8 @@ def parse_layer_document(raw: Any, *, where: str = "<layer>") -> LayerDescriptor
             shape = tuple(_require_int(v, f"{item_label}.shape[{j}]", minimum=1) for j, v in enumerate(dimensions))
         elif "dtype" in item or "shape" in item:
             raise InvalidInput(f"{item_label}: physical matrix metadata requires {PHYSICAL_FORMAT_VERSION}")
-        if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION) and "initial_location" not in item:
+        if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION) \
+                and "initial_location" not in item:
             raise InvalidInput(f"{item_label}.initial_location must be explicit for hybrid execution")
         weights.append(
             WeightRef(
@@ -589,7 +596,7 @@ def parse_layer_document(raw: Any, *, where: str = "<layer>") -> LayerDescriptor
                 initial_location=_require_one_of(
                     item.get("initial_location", LOC_DRAM),
                     f"{item_label}.initial_location",
-                    (LOC_DRAM, LOC_VRAM, LOC_SSD) if version == MOE_FORMAT_VERSION else _LOCATIONS,
+                    (LOC_DRAM, LOC_VRAM, LOC_SSD) if version in SSD_LOCATION_VERSIONS else _LOCATIONS,
                 ),
             )
         )
@@ -626,7 +633,8 @@ def parse_layer_document(raw: Any, *, where: str = "<layer>") -> LayerDescriptor
                                if "workspace_limit_bytes" in block else None),
     )
     if physical is not None:
-        (validate_hybrid_physical_layer if version == HYBRID_FORMAT_VERSION
+        (validate_hybrid_physical_layer
+         if version in (HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
          else validate_cuda_physical_layer if version == CUDA_FORMAT_VERSION
          else validate_full_physical_layer if version == FULL_FORMAT_VERSION else validate_physical_layer)(layer)
     if version == MOE_FORMAT_VERSION:
@@ -1002,6 +1010,11 @@ class Hardware:
     shared_capacity_bytes: int | None = None
     shared_runtime_reserved_bytes: int = 0
     shared_alignment_bytes: int = 1
+    # m2-layer-0.7 only: a declared budget turns the disk into a ledgered domain.
+    # ``None`` keeps the historical unbounded SSD, which .7 refuses.
+    ssd_capacity_bytes: int | None = None
+    ssd_runtime_reserved_bytes: int = 0
+    ssd_alignment_bytes: int | None = None
 
     def shared_document(self) -> dict:
         if self.memory_mode == "separate":
@@ -1009,6 +1022,13 @@ class Hardware:
         return dict(memory_mode=self.memory_mode, shared_capacity_bytes=self.shared_capacity_bytes,
                     shared_runtime_reserved_bytes=self.shared_runtime_reserved_bytes,
                     shared_alignment_bytes=self.shared_alignment_bytes)
+
+    def storage_document(self) -> dict:
+        if self.ssd_capacity_bytes is None:
+            return {}
+        return dict(ssd_capacity_bytes=self.ssd_capacity_bytes,
+                    ssd_runtime_reserved_bytes=self.ssd_runtime_reserved_bytes,
+                    ssd_alignment_bytes=self.ssd_alignment_bytes)
 
 
 @dataclass(frozen=True)
@@ -1079,6 +1099,7 @@ _HARDWARE_KEYS = {
     "dram_runtime_reserved_bytes",
     "vram_runtime_reserved_bytes",
     "memory_mode", "shared_capacity_bytes", "shared_runtime_reserved_bytes", "shared_alignment_bytes",
+    "ssd_capacity_bytes", "ssd_runtime_reserved_bytes", "ssd_alignment_bytes",
 }
 _REQUEST_IN_KEYS = {"request_id", "position_start", "tokens", "input_location", "output_location"}
 
@@ -1092,7 +1113,7 @@ def _require_explicit_hybrid_locations(raw: Any, where: str, fields: tuple[str, 
         _require_one_of(entry[field], f"{where}.{field}", (LOC_DRAM, LOC_VRAM, LOC_SSD) if allow_ssd else _LOCATIONS)
 
 
-def _parse_hardware(raw: Any, where: str) -> Hardware:
+def _parse_hardware(raw: Any, where: str, *, storage: bool = False) -> Hardware:
     block = _require_mapping(raw, f"{where}.hardware")
     label = f"{where}.hardware"
     _reject_unknown_keys(block, _HARDWARE_KEYS, label)
@@ -1102,7 +1123,36 @@ def _parse_hardware(raw: Any, where: str) -> Hardware:
         shared = _require_int(shared, f"{label}.shared_capacity_bytes", minimum=1)
     elif shared is not None or block.get("shared_runtime_reserved_bytes", 0) or block.get("shared_alignment_bytes", 1) != 1:
         raise InvalidInput("separate memory cannot declare an active shared pool")
+    # Spelling the default is not declaring a disk: ``null``/0/``null`` names the
+    # same unbounded scene as omitting the keys (the M1 architecture parser takes
+    # the same view). A real budget, reserve or alignment on the other hand is a
+    # declared tier, and only .7 has one.
+    declares_ssd = (
+        block.get("ssd_capacity_bytes") is not None
+        or block.get("ssd_runtime_reserved_bytes", 0) != 0
+        or block.get("ssd_alignment_bytes") is not None
+    )
+    if not storage and declares_ssd:
+        raise InvalidInput(
+            f"{label}.ssd_capacity_bytes requires {STORAGE_HYBRID_FORMAT_VERSION}; "
+            "an unbounded disk is the historical scene, not a declared machine")
+    if storage and "ssd_capacity_bytes" not in block:
+        raise InvalidInput(
+            f"{label}.ssd_capacity_bytes must be explicit for {STORAGE_HYBRID_FORMAT_VERSION}: "
+            "the storage tier exists only as a declared budget")
+    ssd_capacity = (None if not storage
+                    else _require_int(block.get("ssd_capacity_bytes"),
+                                      f"{label}.ssd_capacity_bytes", minimum=1))
+    ssd_alignment = (None if block.get("ssd_alignment_bytes") is None
+                     else _require_int(block["ssd_alignment_bytes"],
+                                       f"{label}.ssd_alignment_bytes", minimum=1))
     return Hardware(
+        ssd_capacity_bytes=ssd_capacity,
+        ssd_alignment_bytes=ssd_alignment,
+        ssd_runtime_reserved_bytes=_require_int(
+            block.get("ssd_runtime_reserved_bytes", 0),
+            f"{label}.ssd_runtime_reserved_bytes",
+        ),
         dram_capacity_bytes=_require_int(
             block.get("dram_capacity_bytes"), f"{label}.dram_capacity_bytes", minimum=1
         ),
@@ -1160,16 +1210,18 @@ def parse_invocation_document(raw: Any, *, where: str = "<invocation>") -> Invoc
 
     if version != MOE_FORMAT_VERSION and any(key in block for key in ("route_trace", "route_source", "information_mode")):
         raise InvalidInput(f"{where}: route declarations require {MOE_FORMAT_VERSION}")
-    if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION) and "devices" not in block:
+    hybrid_versions = (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
+    if version in hybrid_versions and "devices" not in block:
         raise InvalidInput(f"{where}.devices must be explicit for hybrid execution")
     requests_raw = _require_list(block.get("requests"), f"{where}.requests")
     _expect(bool(requests_raw), f"{where}.requests 不能为空（B 至少为 1）")
     requests: list[RequestInput] = []
     seen: set[str] = set()
     for i, entry in enumerate(requests_raw):
-        if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION):
-            _require_explicit_hybrid_locations(entry, f"{where}.requests[{i}]", ("input_location", "output_location"), allow_ssd=version == MOE_FORMAT_VERSION)
-        request = _parse_request_input(entry, f"{where}.requests[{i}]", allow_ssd=version == MOE_FORMAT_VERSION)
+        hybrid = version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
+        if hybrid:
+            _require_explicit_hybrid_locations(entry, f"{where}.requests[{i}]", ("input_location", "output_location"), allow_ssd=version in SSD_LOCATION_VERSIONS)
+        request = _parse_request_input(entry, f"{where}.requests[{i}]", allow_ssd=version in SSD_LOCATION_VERSIONS)
         _expect(
             request.request_id not in seen,
             f"{where}.requests[{i}].request_id 重复：{request.request_id!r}",
@@ -1208,10 +1260,10 @@ def parse_invocation_document(raw: Any, *, where: str = "<invocation>") -> Invoc
             "省略会让「这次调用有没有历史」变成猜的"
         )
 
-    if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION):
+    if version in (HYBRID_FORMAT_VERSION, MOE_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION):
         state_document = _require_mapping(state_in_raw, f"{where}.state_in")
         for i, entry in enumerate(_require_list(state_document.get("requests"), f"{where}.state_in.requests")):
-            _require_explicit_hybrid_locations(entry, f"{where}.state_in.requests[{i}]", ("state_location",), allow_ssd=version == MOE_FORMAT_VERSION)
+            _require_explicit_hybrid_locations(entry, f"{where}.state_in.requests[{i}]", ("state_location",), allow_ssd=version in SSD_LOCATION_VERSIONS)
 
     if version == MOE_FORMAT_VERSION:
         if "weight_copies" not in _require_mapping(state_in_raw, f"{where}.state_in"):
@@ -1224,7 +1276,7 @@ def parse_invocation_document(raw: Any, *, where: str = "<invocation>") -> Invoc
             raise InvalidInput(f"{where}.state_in cache/source declarations require the MoE cache-aware boundary")
         route_source, information_mode, route_trace = None, None, ()
 
-    parsed_history = parse_state_in(state_in_raw, where=f"{where}.state_in", allow_ssd=version == MOE_FORMAT_VERSION)
+    parsed_history = parse_state_in(state_in_raw, where=f"{where}.state_in", allow_ssd=version in SSD_LOCATION_VERSIONS)
     if version == MOE_FORMAT_VERSION and parsed_history.layer is None:
         parsed_history = replace(parsed_history, layer=_require_str(block.get("layer"), f"{where}.layer"))
 
@@ -1233,7 +1285,8 @@ def parse_invocation_document(raw: Any, *, where: str = "<invocation>") -> Invoc
         layer=_require_str(block.get("layer"), f"{where}.layer"),
         phase=_require_one_of(block.get("phase"), f"{where}.phase", PHASES),
         requests=tuple(requests),
-        hardware=_parse_hardware(block.get("hardware"), where),
+        hardware=_parse_hardware(block.get("hardware"), where,
+                                 storage=version == STORAGE_HYBRID_FORMAT_VERSION),
         state_in=parsed_history,
         layer_file=(
             _require_str(block.get("layer_file"), f"{where}.layer_file")
@@ -1352,7 +1405,8 @@ def validate_invocation(
                 )
 
     if layer.physical is not None:
-        (validate_hybrid_physical_layer if layer.format_version == HYBRID_FORMAT_VERSION
+        (validate_hybrid_physical_layer
+         if layer.format_version in (HYBRID_FORMAT_VERSION, STORAGE_HYBRID_FORMAT_VERSION)
          else validate_cuda_physical_layer if layer.format_version == CUDA_FORMAT_VERSION
          else validate_full_physical_layer if layer.format_version == FULL_FORMAT_VERSION else validate_physical_layer)(layer)
         independent = (isinstance(layer.physical, (FullDensePhysical, HybridDensePhysical))

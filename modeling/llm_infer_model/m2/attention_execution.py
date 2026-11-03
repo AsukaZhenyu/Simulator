@@ -170,9 +170,9 @@ def compile_attention_subbatches(compilations: Sequence[CompiledInvocation], exe
     if len(sources)!=len(spec.invocation_files):raise InvalidInput("source count differs from explicit invocation_files")
     first=sources[0]
     for source in sources:
-        if source.layer.format_version!="m2-layer-0.5" or not isinstance(source.layer.physical,HybridDensePhysical) \
+        if source.layer.format_version not in ("m2-layer-0.5","m2-layer-0.7") or not isinstance(source.layer.physical,HybridDensePhysical) \
                 or source.layer.ffn!="dense" or source.layer.attention!="full_causal":
-            raise Unsupported("pure attention requires complete materialized hybrid Dense m2-layer-0.5")
+            raise Unsupported("pure attention requires complete materialized hybrid Dense m2-layer-0.5 or .7")
         if source.invocation.batch!=1:raise Unsupported("each source must retain its validated B=1 contract")
         if source.layer!=first.layer or source.layer.physical.config!=spec.frontend_config:
             raise InvalidInput("source layer/config differs from exact attention frontend_config")
@@ -194,7 +194,11 @@ def compile_attention_subbatches(compilations: Sequence[CompiledInvocation], exe
     if set(binding)!=set(ids):raise InvalidInput("subbatches must cover exactly every source request")
     if any(group.attention_device=="cpu" and first.invocation.phase!="decode" for group in spec.subbatches):
         raise Unsupported("NEO-style CPU attention subbatch requires decode; CPU prefill is outside this slice")
-    tensors,operations,tasks,compute,allowed,transfers,goals={},[],[],{},{},{},{}
+    tensors,operations,tasks,compute,allowed,goals={},[],[],{},{},{}
+    # The source's route membership is inherited: a .7 source can move tensors
+    # through the disk, and the derived scenario must not quietly forbid that.
+    transfers={route:list(ids) for route,ids in first.scenario.mapspace.allowed_transfers.items()}
+    for route in ("dram_to_vram","vram_to_dram","ssd_to_dram","dram_to_ssd"):transfers.setdefault(route,[])
     entries,transfer_prices={},{}
     input_history=[];appended={};new_blocks={};hidden_out={};source_boundaries=[]
     for source in sources:
@@ -281,7 +285,7 @@ def compile_attention_subbatches(compilations: Sequence[CompiledInvocation], exe
         transfer_prices[(transfer.route,transfer.storage_bytes)]=TransferEntry(transfer.duration_ns,"synthetic_transfer")
     table=M2CostTable(source=first.cost_table.source+";independent_attention_stages",entries=entries,
         validation_only=any(source.cost_table.validation_only for source in sources),
-        transfers=transfer_prices,format_version="m2-layer-0.5")
+        transfers=transfer_prices,format_version=first.layer.format_version)
     _,transfer_document=expand_transfer_costs(table,{name:t["storage_bytes"] for name,t in tensors.items()},transfers,
         shared_memory=first.scenario.architecture.memory_mode == "shared")
     workload=deepcopy(first.workload_document)

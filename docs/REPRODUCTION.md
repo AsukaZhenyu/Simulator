@@ -64,10 +64,10 @@ with:
 ```
 
 Measured on a Windows 11 laptop with Python 3.12: **about 10 minutes** in total
-for 3,928 tests (9 min 51 s in the working tree, 10 min 6 s from a `git archive`
-export of the same commit). `mapping` dominates at about 278 s (1,206 tests),
-then `profiling` at about 50 s (844 tests), `accuracy-suite` at 54 s,
-`expert-recipes` at 39 s, `modeling` at 37 s and `public-library` at 32 s; the
+for 3,929 tests (9 min 51 s in the working tree, 10 min 6 s from a `git archive`
+export of the same commit). `mapping` dominates at about 275 s (1,206 tests),
+then `profiling` at about 51 s (845 tests), `accuracy-suite` at 50 s,
+`expert-recipes` at 39 s, `modeling` at 32 s and `public-library` at 29 s; the
 other 28 suites finish under 15 s each. The heavy suites are combinatorial
 search and simulation rather than floating point, so a slower CPU stretches them
 roughly proportionally.
