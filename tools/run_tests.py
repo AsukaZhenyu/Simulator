@@ -76,6 +76,7 @@ SUITES: list[tuple[str, str, str, str | None]] = [
     ("moe-policy-validation", "profiling/moe_policy_validation", "test*.py", None),
     ("es-abstraction", "profiling/es_abstraction", "test*.py", None),
     ("modeling", "modeling/tests", "test*.py", None),
+    ("composing", "composing/tests", "test*.py", None),
     ("mapping", "mapping/tests", "test*.py", "mapping"),
 ]
 
@@ -92,13 +93,16 @@ def build_env() -> dict[str, str]:
 
     A freshly created virtual environment that never ran
     ``pip install -e ".[profiling]"`` has no ``llm_simulator``,
-    ``tensor_mapping``, ``llm_infer_model`` or ``llm_infer_profile``; pointing
-    PYTHONPATH at the four source directories makes every suite behave the same
-    installed or not, which is also what `docs/REPRODUCTION.md` tells a human to
-    reproduce by hand.
+    ``tensor_mapping``, ``llm_infer_model``, ``llm_infer_profile`` or
+    ``composing``; pointing PYTHONPATH at the source directories and at the
+    checkout root makes every suite behave the same installed or not, which is
+    also what `docs/REPRODUCTION.md` tells a human to reproduce by hand.
     """
     env = dict(os.environ)
     parts = [str(ROOT / name) for name in ("src", "mapping", "modeling", "profiling")]
+    # ``composing`` is a package at the checkout root, not inside one of the
+    # source roots, so the root itself has to be importable.
+    parts.append(str(ROOT))
     existing = env.get("PYTHONPATH")
     if existing:
         parts.append(existing)

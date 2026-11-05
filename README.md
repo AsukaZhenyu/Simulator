@@ -122,6 +122,7 @@ The convenience builder uses full-causal F32 geometry. Dense batch and decomposi
 | [modeling](modeling/README.md) | LLM state/graph expansion, common tensor runtime, capacity/resource accounting |
 | `profiling/llm_infer_profile/` | Library package imported by modeling for calibration and provenance conversion |
 | [profiling](profiling/README.md) | Measurement apparatus: native CUDA/CPU probes, calibration campaigns, cost-table export and validation |
+| [composing](composing/README.md) | Assembly layer: how priced actions add up into a request. Reads cost tables through `modeling`, never measures, never imported by `modeling` |
 | [docs](docs/CODE_LAYOUT.md) | Architecture notes and the reproduction guide |
 | [tools](tools/run_tests.py) | Runs every suite, and writes a Markdown report with `--report` |
 
@@ -133,7 +134,7 @@ One command runs every suite that CI runs:
 
 ```bash
 python -m pip install -e ".[profiling]"
-python tools/run_tests.py                        # 34 suites
+python tools/run_tests.py                        # 46 suites
 python tools/run_tests.py -k mapping             # one group
 python tools/run_tests.py --list                 # what exists
 python tools/run_tests.py --report report.md     # Markdown report of the run

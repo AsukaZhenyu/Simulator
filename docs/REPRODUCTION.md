@@ -46,7 +46,7 @@ Verify the install:
 
 ```bash
 llm-sim --version
-python -c "import llm_simulator, tensor_mapping, llm_infer_model, llm_infer_profile; print('ok')"
+python -c "import llm_simulator, tensor_mapping, llm_infer_model, llm_infer_profile, composing; print('ok')"
 ```
 
 ## Run every test suite
@@ -60,17 +60,16 @@ That is the same set of suites the `regression` job in
 with:
 
 ```
-34/34 suites passed in ...
+46/46 suites passed in ...
 ```
 
-Measured on a Windows 11 laptop with Python 3.12: **about 10 minutes** in total
-for 3,929 tests (9 min 51 s in the working tree, 10 min 6 s from a `git archive`
-export of the same commit). `mapping` dominates at about 275 s (1,206 tests),
-then `profiling` at about 51 s (845 tests), `accuracy-suite` at 50 s,
-`expert-recipes` at 39 s, `modeling` at 32 s and `public-library` at 29 s; the
-other 28 suites finish under 15 s each. The heavy suites are combinatorial
-search and simulation rather than floating point, so a slower CPU stretches them
-roughly proportionally.
+Measured on a Windows 11 laptop with Python 3.12: **about nine minutes** in total
+for 4,541 tests (537.3 s on 2026-11-05, the first run that included the
+`composing` suite). `mapping` dominates at 232 s (1,264 tests), then `profiling`
+at 71 s (1,074 tests), `accuracy-suite` at 43 s, `expert-recipes` at 33 s,
+`modeling` at 29 s and `public-library` at 27 s; the other 40 suites finish under
+15 s each. The heavy suites are combinatorial search and simulation rather than
+floating point, so a slower CPU stretches them roughly proportionally.
 
 A fresh clone with only the `profiling` extra installed reports **25 skips**, and
 none of them is a failure — each is a check whose optional prerequisite is
@@ -87,8 +86,10 @@ absent:
 
 The count depends on the machine, not on the commit: a developer tree that still
 has the built exporter, the GGML checkout or the Nsight artifact reports fewer,
-and installing the `gguf` extra removes five. No skip changes a verdict — but a
-skip is not a pass: it marks a step the run did not perform.
+and installing the `gguf` extra removes five. The 2026-11-05 full run on the
+developer laptop reported 14 skips in all (`state-response` 11, `modeling` 2,
+`profiling` 1). No skip changes a verdict — but a skip is not a pass: it marks a
+step the run did not perform.
 
 | Command | Effect |
 |---|---|
@@ -124,14 +125,14 @@ python -m unittest discover -s modeling/tests -v
 python -m unittest discover -s mapping/tests -t mapping -v
 ```
 
-`tools/run_tests.py` puts the four source directories (`src`, `mapping`,
-`modeling`, `profiling`) on `PYTHONPATH` for every suite, so it behaves the same
-whether or not you ran the editable install. When you invoke `unittest`
-yourself, either install first (then the commands above work as written) or
-carry the same paths by hand:
+`tools/run_tests.py` puts the source directories (`src`, `mapping`, `modeling`,
+`profiling`, and the checkout root itself, which holds `composing`) on
+`PYTHONPATH` for every suite, so it behaves the same whether or not you ran the
+editable install. When you invoke `unittest` yourself, either install first
+(then the commands above work as written) or carry the same paths by hand:
 
 ```bash
-PYTHONPATH=src:mapping:modeling:profiling python -m unittest discover -s modeling/tests -v
+PYTHONPATH=.:src:mapping:modeling:profiling python -m unittest discover -s modeling/tests -v
 ```
 
 On Windows the separator is `;`.
@@ -160,6 +161,7 @@ simulator.
 | Modeling | `modeling` | graph expansion, the tensor runtime, capacity accounting or cost binding changed |
 | Mapping | `mapping` | the policy frontend, IR, compiler or a causal policy changed |
 | Measurement contracts | `profiling` and the `profiling/*` suites, plus the five `native-*` suites | a measurement contract, a frozen parameter set or a provenance guard changed |
+| Assembly | `composing` | the summation rule, a declared term, the prediction documents or the acceptance check for a result that came back from another machine changed |
 
 The `native-*` suites read the probe sources and their provenance records; they
 do **not** compile CUDA code and do not need a GPU. Re-running a measurement is
@@ -188,7 +190,7 @@ Use this order; each step is cheap and fails loudly.
 
 1. `python -V` — confirm 3.10 or newer.
 2. Fresh venv, `python -m pip install -e ".[profiling]"`.
-3. `llm-sim --version` and the four-module import check above.
+3. `llm-sim --version` and the import check above.
 4. `python tools/run_tests.py -k public-library` — the fastest end-to-end signal.
 5. `python tools/run_tests.py --keep-going --report report.md` — the full
    regression set, plus the Markdown report to send back.
@@ -198,7 +200,7 @@ If step 5 fails, keep `report.md` and the console log. The report already
 carries the environment, the commit and each failing suite's full output, which
 is everything needed to work out whether the cause is the machine or the code.
 
-What a second machine should see: `34/34 suites passed`, roughly ten minutes,
+What a second machine should see: `46/46 suites passed`, roughly nine minutes,
 and 25 skips if nothing is built there (the table above). A different skip count
 is worth one line in the report — it says which optional prerequisite that
 machine happens to have — but it is not a failure.
@@ -208,7 +210,7 @@ machine happens to have — but it is not a failure.
 | Symptom | Cause and fix |
 |---|---|
 | `No module named 'llm_simulator'` | the editable install did not run in the active interpreter; reinstall with the venv's `python -m pip` |
-| `No module named 'tensor_mapping'` (or `llm_infer_model`) | running from outside the clone without installing; install editable, or set `PYTHONPATH` to `src;mapping;modeling;profiling` (POSIX: `:`) |
+| `No module named 'tensor_mapping'` (or `llm_infer_model`, `composing`) | running from outside the clone without installing; install editable, or set `PYTHONPATH` to `.;src;mapping;modeling;profiling` (POSIX: `:`) |
 | `No module named 'scipy'` or `'jinja2'` | the environment was installed without the extra; `python -m pip install -e ".[profiling]"` |
 | a suite fails only under a bare `python` | the tests must run with the interpreter that has the packages; use the venv, or use `tools/run_tests.py` |
 | demo writes into an existing directory | use new or empty directories; copied input snapshots are audit evidence, not checkpoints |

@@ -1,6 +1,6 @@
 # 代码地图与维护边界
 
-## 三个模块，一套执行规则
+## 四个模块，一套执行规则
 
 ```text
 Simulator/
@@ -33,10 +33,22 @@ Simulator/
 │   ├── tests/、cases/
 │   ├── data/                  可分发的公开路由输入与出处
 │   └── results/               本机原始测量与报告，不随仓库分发
+├── composing/                 组装层：表价怎么加成一步（不测量任何东西）
+│   ├── spec.py                形状词表；成本表经 modeling 的 parse_cost_table 读取
+│   ├── compose.py             唯一求和规则（零声明项时逐位等于历史表达式）
+│   ├── terms.py               声明项登记表，每项必须指名一个可执行旋钮
+│   ├── predict.py、compare.py、decompose.py
+│   ├── schema.py、result_check.py   文档版本与"别的机器回来的结果"接收
+│   └── tests/
 └── docs/                      当前导航和维护记录
 ```
 
-对外从 `llm_simulator` 使用统一入口；内部三个模块继续共用原有执行规则。`tensor_mapping` 与 `llm_infer_model` 导入路径保持兼容。可安装库入口见[复现与测试](REPRODUCTION.md)，源码维护工具与独立 profiling 按下面的模块边界保留。
+对外从 `llm_simulator` 使用统一入口；内部四个模块继续共用原有执行规则。`tensor_mapping` 与 `llm_infer_model` 导入路径保持兼容。可安装库入口见[复现与测试](REPRODUCTION.md)，源码维护工具与独立 profiling 按下面的模块边界保留。
+
+**组装层与其它三层的依赖是单向的**：`composing` 可以读 `modeling`（成本表物理格式、
+契约签名），`modeling` 不许 import `composing`；`composing` 也不许 import
+`profiling`——一个需要测量装置的组装就不是模型。详细规矩见
+[composing/README.md](../composing/README.md)。
 
 ## 当前策略怎样运行
 
@@ -57,6 +69,8 @@ Simulator/
 | 新模型的数学依赖或物化图 | modeling components / m2 |
 | 容量、在途任务、资源、时间规则 | modeling tensor |
 | 新的真实成本与验证合同 | profiling，独立版本和明确边界 |
+| 价格怎么加成一个请求（求和、声明项、预测/比照/归因） | composing |
+| 别的机器回来的测量结果怎么接收 | composing/result_check.py |
 | 一次性运行结果 | 对应 outputs，按需清理 |
 | 当前真实性能证据 | profiling/results，保留原始样本与来源 |
 
