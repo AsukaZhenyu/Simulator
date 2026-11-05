@@ -57,6 +57,17 @@ def cuda_native(selected, **changes):
             all_tensors_on_requested_cuda_buffer=True, cpu_fallback_used=False, node_count=1),
         device_info=dict(index=0, name="Synthetic GPU", uuid="synthetic-device-uuid",
             total_memory_bytes=1024 * 1024, compute_capability_major=8, compute_capability_minor=9))
+    # The CUDA envelope still declares an f32 K/V cache in the plain V layout.
+    cuda_mem = contract.resident_accounting(selected["config"], selected["kind"],
+                                            selected["tokens"], selected["visible_history"])
+    result.update(cuda_mem)
+    result["kv_dtype"] = "f32"
+    if selected["kind"] in ("attention", "block"):
+        length = selected["visible_history"] + selected["tokens"]
+        shape = [selected["config"]["head_dim"], length, selected["config"]["kv_heads"]]
+        for name in ("key_cache", "value_cache"):
+            result["port_accounting"][name] = {"dtype": "f32", "shape": shape,
+                "bytes": cuda_mem["kv_cache_bytes"]//2, "category": "kv_cache", "ne": shape + [1]}
     result["memory_accounting"] = dict(resident_logical_bytes=result["resident_logical_bytes"],
         resident_allocated_bytes=result["resident_logical_bytes"]+32,
         internal_allocated_buffer_bytes=96, internal_logical_tensor_bytes_sum=96,
@@ -286,7 +297,10 @@ def cuda_layer_document():
     document["id"] = "synthetic-full-cuda-dense-fixture"
     physical = document["physical"]
     physical.pop("threads")
-    physical.update(contract=contract.CONTRACT, cuda_device=0, cuda_graphs="disabled")
+    # The CUDA envelope declares an f32 K/V cache: two bytes more per element
+    # than the CPU block, so the per-token figure doubles from the CPU fixture.
+    physical.update(contract=contract.CONTRACT, kv_dtype="f32", cuda_device=0, cuda_graphs="disabled")
+    document["kv_bytes_per_token"] = 64
     for weight in document["weights"]:
         weight["initial_location"] = "vram"
     return document

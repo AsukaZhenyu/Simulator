@@ -347,6 +347,12 @@ def normalize_metadata(raw: Any, *, source: dict[str, Any]) -> dict[str, Any]:
         "global_weight_bytes": _optional_int(
             _pick(raw, "global_weight_bytes"), "global_weight_bytes", minimum=0
         ),
+        # Non-layer tensors, kept so the vocabulary-wide matrices (token
+        # embedding and LM head) can be priced with their real GGUF types.
+        "global_tensors": [
+            _normalize_tensor(item, f"global_tensors[{index}]")
+            for index, item in enumerate(raw.get("global_tensors") or [])
+        ],
         # Manual byte fallbacks for a MoE layer when no tensor directory exists.
         "expert_weight_bytes": _optional_int(
             _pick(raw, "expert_weight_bytes"), "expert_weight_bytes"
@@ -439,6 +445,7 @@ def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
     raw_layers: dict[int, list[dict[str, Any]]] = {}
     global_count = 0
     global_bytes = 0
+    global_tensors: list[dict[str, Any]] = []
     vocab_size = None
     for tensor in reader.tensors:
         name = str(tensor.name)
@@ -456,6 +463,7 @@ def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
         else:
             global_count += 1
             global_bytes += record["storage_bytes"]
+            global_tensors.append(record)
 
     block_count = int(value("block_count") or 0)
     if block_count <= 0:
@@ -525,6 +533,7 @@ def metadata_from_gguf(path: str | Path) -> dict[str, Any]:
         "vocab_size": vocab_size,
         "global_tensor_count": global_count,
         "global_weight_bytes": global_bytes,
+        "global_tensors": global_tensors,
         "layers": layers,
     }
     return normalize_metadata(normalized, source=normalized["source"])

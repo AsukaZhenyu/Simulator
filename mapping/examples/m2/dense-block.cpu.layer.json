@@ -4,7 +4,7 @@
   "provenance": "synthetic_layer",
   "hidden_size": 16,
   "hidden_bytes_per_token": 64,
-  "kv_bytes_per_token": 64,
+  "kv_bytes_per_token": 32,
   "attention": "full_causal",
   "ffn": "dense",
   "weights": [
@@ -159,13 +159,13 @@
     }
   ],
   "physical": {
-    "contract": "ggml_cpu_dense_decoder_block_v1",
+    "contract": "ggml_cpu_dense_decoder_block_v2",
     "scope": "complete_declared_decoder_block",
     "input_boundary": "hidden_activation",
     "port_layout": "materialized_stage_ports",
     "kv_allocation": "logical_blocks",
     "activation_dtype": "f32",
-    "kv_dtype": "f32",
+    "kv_dtype": "f16",
     "config": {
       "hidden": 16,
       "intermediate": 32,

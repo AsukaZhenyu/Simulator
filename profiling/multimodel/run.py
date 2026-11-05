@@ -89,6 +89,52 @@ def structure(model: dict, gguf: Path) -> dict:
             "geometry": geometry, "comparison": result}
 
 
+def command_build(args) -> int:
+    """Emit a probe suite and a physical layer descriptor for every model.
+
+    A dense checkpoint is described by the dense block contract and a sparse one
+    by the MoE contract; the choice is read from the layer's declared
+    feed-forward kind, never from the model's role label.
+    """
+    from profiling.model_swap.build_model import metadata_from_gguf
+    from profiling.multimodel import suite
+
+    manifest = fetch_models.read_manifest(args.manifest)
+    shapes = json.loads((HERE / "data" / "shapes.json").read_text(encoding="utf-8"))
+    cpu_ids = None
+    if args.cpu_mask:
+        from llm_infer_model.m2.dense_contract import signature_cpu_ids
+        cpu_ids = signature_cpu_ids([int(part) for part in args.cpu_mask.split(",")],
+                                    args.threads)
+    problems = 0
+    for model in manifest["models"]:
+        if args.only and model["id"] not in args.only:
+            continue
+        path = fetch_models.target(args.root, model)
+        reason = fetch_models.verify(path, model)
+        if reason is not None:
+            print(f"{model['id']:<24} skipped: {reason} (run fetch first)")
+            problems += 1
+            continue
+        meta = metadata_from_gguf(path)
+        description = suite.describe(meta)
+        layer = suite.layer_document(meta, description, model_id=model["id"], threads=args.threads,
+                                     residency=args.residency, cpu_ids=cpu_ids)
+        document = suite.suite_document(description, shapes, model_id=model["id"],
+                                        comment=f"Generated from {model['filename']}.")
+        try:
+            suite.validate(document, layer, args.threads)
+        except Exception as error:  # the contract raises InvalidInput, Unsupported and ValueError
+            print(f"{model['id']:<24} INVALID: {error}")
+            problems += 1
+            continue
+        _write_new(args.out / f"{model['id']}.layer.json", layer)
+        _write_new(args.out / f"{model['id']}.suite.json", document)
+        print(f"{model['id']:<24} ok  {len(document['cases'])} cases, "
+              f"{len(layer['weights'])} weights, layer {description['layer_index']}")
+    return 1 if problems else 0
+
+
 def _write_new(path: Path, document: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8", newline="\n") as stream:
@@ -151,6 +197,19 @@ def main(argv: list[str] | None = None) -> int:
     form.add_argument("--out", type=Path, required=True)
     form.add_argument("--only", action="append", default=[])
 
+    build = sub.add_parser("build", help="emit probe suites and layer descriptors")
+    build.add_argument("--out", type=Path, required=True)
+    build.add_argument("--only", action="append", default=[])
+    build.add_argument("--threads", type=int, default=2,
+                       help="thread count bound into the descriptor and the probe run")
+    build.add_argument("--residency", choices=("resident", "streaming"), default="resident",
+                       help="declared operand residency of the samples this descriptor will be "
+                            "priced with; streaming must be measured with --evict-bytes")
+    build.add_argument("--cpu-mask",
+                       help="the logical CPUs this descriptor is priced on, e.g. 2,4; when given, "
+                            "the placement becomes part of the physical signature (R13) and the "
+                            "campaign must measure with the same --cpu-mask")
+
     sub.add_parser("status", help="which models are present and verified")
 
     args = parser.parse_args(argv)
@@ -164,6 +223,8 @@ def main(argv: list[str] | None = None) -> int:
         return fetch_models.main(argv_)
     if args.command == "structure":
         return command_structure(args)
+    if args.command == "build":
+        return command_build(args)
     return command_status(args)
 
 

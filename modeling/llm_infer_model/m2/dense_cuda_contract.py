@@ -12,13 +12,19 @@ from ..tensor.spec import InvalidInput, Unsupported
 from .dense_contract import (
     CONFIG_KEYS, DTYPES, EXCLUDED, STAGES, SUITE_SCHEMA,
     float32_parameter, integer, operations, ports,
-    resident_accounting, stage_weight_roles, validate_case as validate_math_case, validate_config,
+    resident_accounting as _resident_accounting,
+    stage_weight_roles, validate_case as validate_math_case, validate_config,
     weight_shapes,
 )
 
 CONTRACT = "ggml_cuda_dense_decoder_block_v1"
 NATIVE_SCHEMA = "ggml_dense_layer_cuda_probe/1"
 VARIANTS = {stage: f"ggml_cuda_dense_materialized_{stage}_v1" for stage in STAGES}
+
+
+def resident_accounting(config: dict[str, Any], kind: str, tokens: int, history: int) -> dict[str, Any]:
+    """The CUDA envelope still declares an f32 K/V cache (4 bytes per element)."""
+    return _resident_accounting(config, kind, tokens, history, kv_element_bytes=4)
 
 
 def signature(config: dict[str, Any], kind: str, phase: str, tokens: int,

@@ -7,9 +7,14 @@ import unittest
 from pathlib import Path
 
 from llm_infer_model.tensor.spec import (
-    DTYPE_F16, DTYPE_F32, DTYPE_Q4_K, DTYPE_Q6_K,
+    DTYPE_F16, DTYPE_F32, DTYPE_Q4_K, DTYPE_Q6_K, DTYPE_Q8_0,
     InvalidInput, Unsupported, ggml_contiguous_layout, load_workload,
 )
+
+# A real GGML type the simulator deliberately does not model. Used wherever a
+# test means "this storage type is not declared", as opposed to "this stride
+# does not match its declared type".
+UNMODELED_DTYPE = "GGML_TYPE_Q5_1"
 
 
 def tensor(tensor_id, dtype, ne, role, *, resident=False):
@@ -53,35 +58,46 @@ class ContiguousStorageTests(unittest.TestCase):
     def test_exact_block_sizes_and_outer_strides(self):
         # All four dimensions matter. The reduction dimension is first, and
         # nb[0] is one block's size for K quantization, not bytes per element.
-        for dtype, block_bytes in ((DTYPE_Q4_K, 144), (DTYPE_Q6_K, 210)):
+        # Q8_0 blocks hold 32 elements rather than 256, so one 512-element row
+        # is 16 blocks of 34 bytes, not 2 blocks of 144.
+        for dtype, block_elements, block_bytes in (
+            (DTYPE_Q4_K, 256, 144), (DTYPE_Q6_K, 256, 210), (DTYPE_Q8_0, 32, 34),
+        ):
             with self.subTest(dtype=dtype):
+                row_bytes = block_bytes * (512 // block_elements)
                 nb, size = ggml_contiguous_layout(dtype, (512, 3, 2, 5))
-                self.assertEqual(nb, (block_bytes, block_bytes * 2, block_bytes * 6, block_bytes * 12))
-                self.assertEqual(size, block_bytes * 60)
+                self.assertEqual(nb, (block_bytes, row_bytes, row_bytes * 3, row_bytes * 6))
+                self.assertEqual(size, row_bytes * 6 * 5)
 
     def test_f16_and_f32_exact_extents(self):
         self.assertEqual(ggml_contiguous_layout(DTYPE_F16, (3, 5, 2, 7)), ((2, 6, 30, 60), 420))
         self.assertEqual(ggml_contiguous_layout(DTYPE_F32, (3, 5, 2, 7)), ((4, 12, 60, 120), 840))
 
     def test_quantized_rows_require_whole_blocks(self):
-        for dtype in (DTYPE_Q4_K, DTYPE_Q6_K):
-            for reduction in (1, 255, 257):
+        for dtype, block_elements in ((DTYPE_Q4_K, 256), (DTYPE_Q6_K, 256), (DTYPE_Q8_0, 32)):
+            for reduction in (1, block_elements - 1, block_elements + 1):
                 with self.subTest(dtype=dtype, reduction=reduction):
-                    with self.assertRaisesRegex(Unsupported, "ne\\[0\\] divisible by 256"):
+                    with self.assertRaisesRegex(
+                        Unsupported, f"ne\\[0\\] divisible by {block_elements}"
+                    ):
                         ggml_contiguous_layout(dtype, (reduction, 2, 1, 1))
 
     def test_reject_invalid_extents_and_unknown_dtype(self):
         for ne in ((1, 2, 3), (True, 1, 1, 1), (0, 1, 1, 1), (1.5, 1, 1, 1)):
             with self.subTest(ne=ne), self.assertRaises(InvalidInput):
                 ggml_contiguous_layout(DTYPE_F16, ne)
-        with self.assertRaises(Unsupported):
-            ggml_contiguous_layout("GGML_TYPE_Q8_0", (256, 1, 1, 1))
+        with self.assertRaisesRegex(Unsupported, "unsupported contiguous GGML storage dtype"):
+            ggml_contiguous_layout(UNMODELED_DTYPE, (256, 1, 1, 1))
 
 
 class M2StorageGateTests(unittest.TestCase):
     def test_m2_macro_preserves_real_datatypes_and_bytes(self):
+        # Q8_0 is here because a published checkpoint uses it: Qwen1.5-MoE's
+        # Q4_K_M file keeps the expert down projections in Q8_0 while gate/up
+        # stay Q4_K. One Q8_0 row of 256 elements is 8 blocks of 34 bytes.
         for origin in ("synthetic_layer", "measured_macro"):
-            for dtype, expected in ((DTYPE_F16, 1024), (DTYPE_Q4_K, 288), (DTYPE_Q6_K, 420)):
+            for dtype, expected in ((DTYPE_F16, 1024), (DTYPE_Q4_K, 288), (DTYPE_Q6_K, 420),
+                                    (DTYPE_Q8_0, 544)):
                 with self.subTest(origin=origin, dtype=dtype):
                     raw = macro_workload(dtype)
                     raw["origin"]["kind"] = origin
@@ -127,7 +143,7 @@ class M2StorageGateTests(unittest.TestCase):
                     load_document(raw)
 
     def test_reject_noncontiguous_strides_in_each_dimension(self):
-        for dtype in (DTYPE_F16, DTYPE_Q4_K, DTYPE_Q6_K):
+        for dtype in (DTYPE_F16, DTYPE_Q4_K, DTYPE_Q6_K, DTYPE_Q8_0):
             for dimension in range(4):
                 with self.subTest(dtype=dtype, dimension=dimension):
                     raw = macro_workload(dtype)
@@ -149,8 +165,15 @@ class M2StorageGateTests(unittest.TestCase):
 
     def test_unknown_dtype_and_views_are_still_unsupported(self):
         raw = macro_workload()
-        raw["tensors"][0]["dtype"] = "GGML_TYPE_Q8_0"
+        raw["tensors"][0]["dtype"] = UNMODELED_DTYPE
         with self.assertRaisesRegex(Unsupported, "unsupported M2 GGML storage dtype"):
+            load_document(raw)
+        # Q8_0 is a declared type, so its *exact* strides are checked: a document
+        # that keeps Q4_K extents after switching the dtype is refused rather
+        # than silently paying 144 bytes for a 34-byte block.
+        raw = macro_workload()
+        raw["tensors"][0]["dtype"] = DTYPE_Q8_0
+        with self.assertRaisesRegex(Unsupported, "non-contiguous GGML_TYPE_Q8_0 layout"):
             load_document(raw)
         raw = macro_workload()
         raw["tensors"][0]["view_src"] = "x"

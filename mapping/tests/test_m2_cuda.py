@@ -35,9 +35,12 @@ def cuda_layer_document(**kwargs):
     raw = full_layer_document(**kwargs)
     raw["format_version"] = CUDA_FORMAT_VERSION
     raw["id"] = "cuda-full-small"
+    # The CUDA envelope still declares an f32 K/V cache, so the layer keeps the
+    # f32 per-token byte count even though the CPU full block moved to f16.
+    raw["kv_bytes_per_token"] = 2 * 4 * raw["physical"]["config"]["kv_heads"] * raw["physical"]["config"]["head_dim"]
     physical = raw["physical"]
     physical.pop("threads")
-    physical.update(contract=CONTRACT, cuda_device=0, cuda_graphs="disabled")
+    physical.update(contract=CONTRACT, cuda_device=0, cuda_graphs="disabled", kv_dtype="f32")
     for weight in raw["weights"]:
         weight["initial_location"] = "vram"
     return raw
@@ -109,7 +112,7 @@ class CudaDenseBoundary(unittest.TestCase):
         self.assertEqual(envelope["timing_scope"], "single_completed_cuda_graph_wall_ns")
         self.assertFalse(any("thread" in key for key in envelope))
         original = cpu_signature(config, "attention", "decode", 1, 3, 2)
-        self.assertEqual(original["contract"], "ggml_cpu_dense_decoder_block_v1")
+        self.assertEqual(original["contract"], "ggml_cpu_dense_decoder_block_v2")
         self.assertEqual(original["threads_requested"], 2)
         self.assertNotIn("cuda_device", original)
         self.assertEqual(original["operations"], envelope["operations"])

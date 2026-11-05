@@ -10,7 +10,7 @@
 
 | 文件 | 作用 | 会不会随设备变 |
 |---|---|---|
-| `models.json` | 五个模型的仓库、文件名、commit、字节数、SHA-256、从 GGUF 头读出的几何 | 不变 |
+| `models.json` | 六个模型（3 dense + 3 MoE）的仓库、文件名、commit、字节数、SHA-256、从 GGUF 头读出的几何 | 不变 |
 | `fetch_models.py` | 按 manifest 下载并逐字节校验 SHA-256，可断点续传 | 不变 |
 | `run.py` | `survey` / `fetch` / `structure` / `status` 三个门加一个查看 | 不变 |
 | `devices.py` | 只靠观察写设备描述（核、内存、GPU、OS），观测不到就写 `null` | 不变 |
@@ -48,14 +48,19 @@ PYTHONPATH=. python -m profiling.multimodel.run structure --out campaigns/<date>
 
 三道门全绿之前测出来的东西不进报告。
 
-## 为什么是这五个模型
+## 为什么是这六个模型
+
+发布表固定为三个 dense + 三个 MoE（`tests/test_multimodel.py` 里按角色计数钉住，
+加第四个同族模型要改测试，不是顺手一改）。
 
 三个 dense 是同一族（qwen3）、同一分词器、同一量化档，只差规模，所以误差曲线
 的规模效应不会被"换了个族"污染。0.6B / 1.7B 是 3:1 GQA，4B 是 4:1，顺带跨过
 kv-heads 这一档。
 
-两个 MoE 在**两条轴上都不同**：Granite 没有共享专家、40 选 8；Qwen1.5-MoE 有共享
-专家、60 选 4。如果只测一个，任何误差都能被"路由太稀疏"或"有共享专家"解释掉。
+三个 MoE 在**三条轴上都不同**：Granite 没有共享专家、40 选 8、归一化 top-k；
+Qwen1.5-MoE 有共享专家、60 选 4、MHA；OLMoE 没有共享专家、64 选 8、MHA，且
+**QK-norm 是全 hidden 宽**（`qk_norm: "rms_hidden"`，llama.cpp 在 reshape 之前做）。
+如果只测一个，任何误差都能被"路由太稀疏"或"有共享专家"解释掉。
 
 **没有选进来的**（理由不是跑不动，是成本表没有那一项）：
 
@@ -90,6 +95,23 @@ llama.cpp 支持这些架构（`llama-arch.cpp` 里有 `GRANITE_HYBRID` / `AFMOE
 | 宏任务成本与物理签名校验 | `profiling/run_macro_measurements.py` + `profiling/export_m2_macros.py` |
 | MoE FFN 子图 | `profiling/run_moe_measurements.py`（**不能**填进 `m2-layer-0.6`，见 R9） |
 | 整模型请求级对照（唯一的"真实模型 → 预测 vs 墙钟"闭环） | `profiling/real_moe_validation/runtime_window_campaign.py` + `runtime_window_predict.py` |
+
+**测之前先钉住线程放置**（R13）。不给 `--cpu-mask` 时，同一份工作量在两个进程里
+可以差 1.76 倍——OS 可能把两个 worker 放到一个物理核的两个 SMT 兄弟上。先查拓扑
+再选两个不同的 `core_index`：
+
+```bash
+# SMT 兄弟的编号不一定相邻，先看这台机器
+profiling/native/build-cpu/Release/ggml-dense-layer-probe.exe --cpu-topology
+
+python profiling/run_dense_layer_measurements.py --suite <suite> \
+  --native-bin <probe-dir> --runtime-dir <ggml-dll-dir> \
+  --threads 2 --cpu-mask 2,4 --warmup 5 --samples 20 --seed 17 --output <campaign>
+```
+
+探针会先 `SetProcessAffinityMask` 再建线程池，并在计时之前回读校验每个线程的
+掩码；`cpu_affinity.verified=false` 的结果不能用。**没给掩码的测量只能进对照，
+不能进主结果。**
 
 **已知缺口，别当成已完成**：上面最后一条目前只对固定的 OLMoE 成立，而且是
 窗口价格目录、不是 `m2-layer` 成本表。**dense 一侧还没有"GGUF → 成本表 →

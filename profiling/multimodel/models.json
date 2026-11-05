@@ -1,6 +1,6 @@
 {
   "schema": "multimodel-models-1",
-  "verified_utc": "2026-11-03",
+  "verified_utc": "2026-11-04",
   "verification": "Geometry was read from each file's GGUF header and tensor directory, not from the publisher's config.json and not from recollection. Sizes and SHA-256 are the publisher's LFS records for the pinned commit; fetch_models.py re-hashes every byte locally before a campaign starts.",
   "files_are_not_committed": "A 4-bit GGUF is 0.4-9.5 GB. GitHub rejects files over 100 MB, release assets over 2 GB and free LFS over 1 GB, so the repository carries this manifest and each device materialises the models with fetch_models.py.",
   "geometry_is_compared": "The geometry blocks mirror the shape of profiling/model_swap/build_model.py's .geometry.json. run.py structure re-reads each local file and requires every declared field to match (STANDARD.md R2), so a substituted or re-quantised file cannot pass as the declared model.",
@@ -21,6 +21,7 @@
         "block_count": 28,
         "hidden_size": 1024,
         "intermediate_size": 3072,
+        "vocab_size": 151936,
         "attention": {
           "heads": 16,
           "kv_heads": 8,
@@ -55,6 +56,7 @@
         "block_count": 28,
         "hidden_size": 2048,
         "intermediate_size": 6144,
+        "vocab_size": 151936,
         "attention": {
           "heads": 16,
           "kv_heads": 8,
@@ -89,6 +91,7 @@
         "block_count": 36,
         "hidden_size": 2560,
         "intermediate_size": 9728,
+        "vocab_size": 151936,
         "attention": {
           "heads": 32,
           "kv_heads": 8,
@@ -123,6 +126,7 @@
         "block_count": 32,
         "hidden_size": 1536,
         "intermediate_size": null,
+        "vocab_size": 49155,
         "attention": {
           "heads": 24,
           "kv_heads": 8,
@@ -157,6 +161,7 @@
         "block_count": 24,
         "hidden_size": 2048,
         "intermediate_size": 5632,
+        "vocab_size": 151936,
         "attention": {
           "heads": 16,
           "kv_heads": 16,
@@ -174,6 +179,41 @@
         }
       },
       "notes": "MHA (16 kv heads for 16 heads), so this model exercises no GQA path. ffn_*_exps are [*,1408,60]; ffn_*_shexp are [*,5632]. The shared expert is as wide as feed_forward_length, which is why that metadata value is not the expert width here. The publisher repository carries no license tag; upstream Qwen1.5-MoE-A2.7B is Apache-2.0."
+    },
+    {
+      "id": "olmoe-1b-7b",
+      "role": "moe",
+      "purpose": "Densest routing of the three sparse models (8 of 64) without a shared expert, MHA instead of GQA, and the shortest stack (16 layers). It separates 'how many experts are selected' from 'how many exist' at a third architecture family.",
+      "repository": "bartowski/OLMoE-1B-7B-0924-Instruct-GGUF",
+      "filename": "OLMoE-1B-7B-0924-Instruct-Q4_K_M.gguf",
+      "revision": "7448e4317d367a3d6838fe367fe996758da6fc6e",
+      "bytes": 4213513024,
+      "sha256": "3bd9ec48045f526508956ef663c5c11dbb3ef791a06f4e10a6be88379c40e1fe",
+      "quantization": "Q4_K_M",
+      "license": "apache-2.0",
+      "geometry": {
+        "architecture": "olmoe",
+        "block_count": 16,
+        "hidden_size": 2048,
+        "intermediate_size": 1024,
+        "vocab_size": 50304,
+        "attention": {
+          "heads": 16,
+          "kv_heads": 16,
+          "head_dim": 128,
+          "rope_dims": null,
+          "norm_epsilon": 1e-05,
+          "layer_kind_counts": {"full_causal": 16}
+        },
+        "ffn": {
+          "kind": "moe",
+          "experts": 64,
+          "top_k": 8,
+          "expert_intermediate_size": 1024,
+          "shared_expert_intermediate_size": null
+        }
+      },
+      "notes": "Read from this file's header and tensor directory: ffn_gate_exps [2048,1024,64], ffn_down_exps [1024,2048,64], ffn_gate_inp [2048,64]. No *_shexp tensor, so granularity is a pure top-8 of 64. attn_q/k/v/output are all [2048,2048] and attn_q_norm/attn_k_norm are [2048], i.e. per-head RMSNorm over 128 dims: MHA with QK-norm. token_embd is q4_k and output q6_k, untied. norm_topk_prob is false in the upstream config and llama.cpp's OLMoE graph passes norm_w=false, so the selected weights are not renormalized. rope_dims is null because the GGUF publishes no rope.dimension_count."
     }
   ]
 }

@@ -19,7 +19,10 @@ from .test_m2_full import full_layer_document
 def hybrid_layer_document(*, gate="none", qk_norm="none"):
     raw = full_layer_document(gate=gate, qk_norm=qk_norm)
     raw.update(format_version=HYBRID_FORMAT_VERSION, id="hybrid-small")
-    raw["physical"].update(contract=CONTRACT, cuda_device=0, cuda_graphs="disabled")
+    # The hybrid envelope keeps the original f32 cache: the CUDA half still
+    # declares one, so the layer-level byte accounting must not halve.
+    raw["kv_bytes_per_token"] = 2 * 4 * raw["physical"]["config"]["kv_heads"] * raw["physical"]["config"]["head_dim"]
+    raw["physical"].update(contract=CONTRACT, cuda_device=0, cuda_graphs="disabled", kv_dtype="f32")
     return raw
 
 

@@ -82,9 +82,17 @@ def export_audit(case,directory,*,native=None):
                 same(request.tokens,n,'public current tokens')
                 old=invocation.state_in.requests[0].blocks
                 new=expanded.new_blocks['request0']
+                # The public Model declares an F32 K/V cache. The compiled Dense
+                # CPU block stores K and V as f16, and that physical layout is
+                # what both the retained history and the appended blocks must
+                # carry, so the audit compares against the block it compiled and
+                # only requires that the physical layout never exceeds the
+                # declared F32 size.
+                kv_bytes=desc.kv_bytes_per_token
+                same(kv_bytes<=model.kv_bytes_per_token,True,'public physical KV fits the F32 declaration')
                 same(len(old),history,'public persistent KV block count')
-                same(sum(b.storage_bytes for b in old),history*model.kv_bytes_per_token,'public KV history bytes')
-                same(sum(b.storage_bytes for b in new),n*model.kv_bytes_per_token,'public new KV bytes')
+                same(sum(b.storage_bytes for b in old),history*kv_bytes,'public KV history bytes')
+                same(sum(b.storage_bytes for b in new),n*kv_bytes,'public new KV bytes')
                 same([b.first_position for b in new],list(range(history,history+n)),'public appended positions')
                 tensors={t['id']:t for t in expanded.workload_document['tensors']}
                 same(tensors[expanded.hidden_out_ids['request0']]['storage_bytes'],n*model.hidden_bytes_per_token,'public hidden output boundary bytes')
@@ -102,8 +110,8 @@ def export_audit(case,directory,*,native=None):
                          [tuple(ids) for ids in rd['routes'][li]],'public current trace route ids')
                     weight_bytes=sum(w.storage_bytes for w in desc.weights)
                 check=dict(round=ri,layer=li,tokens=n,history_before=history,history_after=history+n,
-                           kv_used_bytes=(history+n)*model.kv_bytes_per_token,
-                           native_kv_capacity_bytes=case['max_context']*model.kv_bytes_per_token,
+                           kv_used_bytes=(history+n)*kv_bytes,
+                           native_kv_capacity_bytes=case['max_context']*kv_bytes,
                            modeled_kv_allocation='logical_used_blocks',native_kv_allocation='fixed_capacity_buffer',
                            hidden_output_bytes=n*model.hidden_bytes_per_token,task_kinds=task_kinds,
                            declared_logical_weight_bytes=weight_bytes)

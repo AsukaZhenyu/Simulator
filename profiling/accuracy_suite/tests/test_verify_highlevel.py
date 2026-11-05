@@ -40,7 +40,13 @@ def reseal(document,key):
 class OfflineHighLevelVerifierTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp=tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent)
+        # The experiment stays next to this file (same drive as the repo, as the
+        # other in-tree fixtures are), but the `.tmp-` prefix is what keeps a
+        # killed run from showing up as an untracked directory: `.gitignore`
+        # ignores `.tmp-*` for exactly this case.
+        cls.temp=tempfile.TemporaryDirectory(prefix=".tmp-accuracy-suite-highlevel-",
+                                             dir=Path(__file__).resolve().parent,
+                                             ignore_cleanup_errors=True)
         cls.root=Path(cls.temp.name);cls.experiment=cls.root/"experiment"
         prepare(cls.experiment,"smoke")
         campaign=verifier.read(cls.experiment/"campaign.json")

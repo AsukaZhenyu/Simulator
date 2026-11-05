@@ -145,11 +145,29 @@ class PairedProtocol(unittest.TestCase):
         for field,value in (("verified",False),("applied_logical_ids",[0,1])):
             bad=copy.deepcopy(native);bad["cpu_affinity"][field]=value
             with self.assertRaises(ValueError):validate_paired_binding(case,bad,args)
-        for field,value in (("mask_hex","5"),("thread_id",10),("group",1),("logical_id",True)):
+        for field,value in (("mask_hex","8"),("thread_id",10),("group",1),("logical_id",True)):
             bad=copy.deepcopy(native);bad["cpu_affinity"]["observed_threads"][1][field]=value
             with self.assertRaises(ValueError):validate_paired_binding(case,bad,args)
         command=paired_command(case,Path("probe.exe"),args)
         self.assertEqual(command[-4:],["--min-warmup-ms","500","--cpu-mask","0,2"])
+
+    def test_openmp_idle_threads_may_carry_the_process_mask(self):
+        case,native,args=fixture()
+        args.min_warmup_ms=500;args.cpu_mask=[0,2]
+        native.update(min_warmup_ms=500,warmup_rounds_requested=10,warmup_rounds_effective=20,
+                      actual_warmup_elapsed_ns=500000000,
+                      cpu_affinity=dict(requested_logical_ids=[0,2],applied_logical_ids=[0,2],strict_cpu=True,verified=True,
+                                        observed_threads=[dict(thread_id=10,group=0,mask_hex="1",logical_id=0),
+                                                          dict(thread_id=11,group=0,mask_hex="4",logical_id=2),
+                                                          dict(thread_id=12,group=0,mask_hex="5",logical_id=0)]))
+        validate_paired_binding(case,native,args)
+        # Idle threads may widen to the process mask, never past it, and a requested
+        # processor that no thread holds alone is still an unproven binding.
+        for threads in ([dict(thread_id=10,group=0,mask_hex="5",logical_id=0)],
+                        [dict(thread_id=10,group=0,mask_hex="1",logical_id=0),
+                         dict(thread_id=11,group=0,mask_hex="7",logical_id=2)]):
+            bad=copy.deepcopy(native);bad["cpu_affinity"]["observed_threads"]=threads
+            with self.assertRaises(ValueError):validate_paired_binding(case,bad,args)
 
     def test_unbound_affinity_stays_unknown(self):
         case,native,args=fixture();args.min_warmup_ms=0;args.cpu_mask=None

@@ -17,10 +17,10 @@ from llm_infer_model.m2.costs import (
     M2CostTable, MacroShape, TransferEntry, canonical_contract_hash, parse_cost_table,
 )
 from llm_infer_model.m2.dense_contract import (
-    resident_accounting, stage_weight_roles, validate_config, weight_shapes,
+    CONTRACT, KV_DTYPE, resident_accounting, stage_weight_roles, validate_config, weight_shapes,
 )
 from llm_infer_model.m2.expand import compile_invocation
-from llm_infer_model.m2.full_physical import signature_for as cpu_signature_for
+from llm_infer_model.m2.full_physical import FULL_FORMAT_VERSION, signature_for as cpu_signature_for
 from llm_infer_model.m2.hybrid_physical import signature_for as hybrid_signature_for
 from llm_infer_model.m2.moe_spec import parse_route_trace
 from llm_infer_model.m2.spec import parse_invocation_document, parse_layer_document
@@ -328,10 +328,16 @@ def _validate_routes(model, workload):
         raise ValueError(f"MoE routes must exactly cover every layer/request/token; missing={expected_count-len(seen)}")
 
 
+def _kv_bytes_per_token(model, version):
+    """Only the CPU full-block contract stores its K and V caches as f16."""
+    element_bytes = 4 if version == FULL_FORMAT_VERSION else 8
+    return element_bytes * model.kv_heads * model.head_dim
+
+
 def _layer_document(model, layer_id, version, *, independent_requests=False):
     base = dict(format_version=version, id=layer_id, provenance="synthetic_layer",
                 hidden_size=model.hidden_size, hidden_bytes_per_token=model.hidden_bytes_per_token,
-                kv_bytes_per_token=model.kv_bytes_per_token, attention="full_causal", ffn=model.kind)
+                kv_bytes_per_token=_kv_bytes_per_token(model, version), attention="full_causal", ffn=model.kind)
     if model.kind == "moe":
         hidden, kv = model.hidden_size, model.kv_heads * model.head_dim
         pack = 4 * hidden * (2 * hidden + 2 * kv)
@@ -362,9 +368,11 @@ def _layer_document(model, layer_id, version, *, independent_requests=False):
     tasks = [dict(id="proj", kind="projection", depends_on=[]),
              dict(id="attn", kind="attention", depends_on=["proj"]),
              dict(id="ffn", kind="dense_ffn", depends_on=["attn"])]
-    physical = dict(contract="ggml_hybrid_dense_materialized_macros_v1" if version == "m2-layer-0.5" else "ggml_cpu_dense_decoder_block_v1",
+    hybrid = version == "m2-layer-0.5"
+    physical = dict(contract="ggml_hybrid_dense_materialized_macros_v1" if hybrid else CONTRACT,
         scope="complete_declared_decoder_block", input_boundary="hidden_activation", port_layout="materialized_stage_ports",
-        kv_allocation="logical_blocks", activation_dtype="f32", kv_dtype="f32", config=config, threads=1,
+        kv_allocation="logical_blocks", activation_dtype="f32",
+        kv_dtype="f32" if hybrid else KV_DTYPE, config=config, threads=1,
         weight_groups={stage: {role: f"W_{role}" for role in stage_weight_roles(config, stage)}
                        for stage in ("projection", "attention", "dense_ffn")}, excluded_operations=[])
     if version == "m2-layer-0.5":
@@ -381,8 +389,11 @@ def _invocation_document(model, hardware, workload, layer, scope, phase, positio
         request = f"request{index}"
         requests.append(dict(request_id=request, position_start=position, tokens=tokens,
                              input_location="dram", output_location="dram"))
+        # `version` here is the state version counter, not the format version.
         blocks = [dict(id=f"kv:{layer.id}:{request}:{p}", first_position=p, tokens=1,
-                       storage_bytes=model.kv_bytes_per_token, locations=["dram"]) for p in range(position)]
+                       storage_bytes=_kv_bytes_per_token(model, layer.format_version),
+                       locations=["dram"])
+                  for p in range(position)]
         states.append(dict(request_id=request, next_position=position, version=version,
                            state_location="dram", blocks=blocks))
     state = dict(requests=states)

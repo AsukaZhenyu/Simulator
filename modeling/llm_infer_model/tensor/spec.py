@@ -93,6 +93,7 @@ __all__ = [
     "DTYPE_F16",
     "DTYPE_Q4_K",
     "DTYPE_Q6_K",
+    "DTYPE_Q8_0",
     "ggml_contiguous_layout",
     "LOC_DRAM",
     "LOC_VRAM",
@@ -168,6 +169,11 @@ DTYPE_I32 = "GGML_TYPE_I32"
 DTYPE_F16 = "GGML_TYPE_F16"
 DTYPE_Q4_K = "GGML_TYPE_Q4_K"
 DTYPE_Q6_K = "GGML_TYPE_Q6_K"
+# Q8_0 is a real checkpoint layout, not a modeling choice: the published
+# Qwen1.5-MoE Q4_K_M file stores its expert down projections in Q8_0 while the
+# gate and up projections stay Q4_K. 32-element blocks of one f16 scale and 32
+# int8 values.
+DTYPE_Q8_0 = "GGML_TYPE_Q8_0"
 _DTYPE_SIZE_BYTES = {DTYPE_F32: 4}
 # GGML ne[0] is the reduction/row dimension. Quantized strides use the size
 # of one 256-element block, not a rounded bytes-per-element estimate. These
@@ -178,6 +184,7 @@ _GGML_BLOCK_STORAGE = {
     DTYPE_F16: (1, 2),
     DTYPE_Q4_K: (256, 144),
     DTYPE_Q6_K: (256, 210),
+    DTYPE_Q8_0: (32, 34),
 }
 
 ROLE_INPUT = "input"

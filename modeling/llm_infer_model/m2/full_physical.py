@@ -12,7 +12,8 @@ from typing import Any
 
 from ..tensor.spec import InvalidInput, Unsupported, ggml_contiguous_layout
 from .dense_contract import (
-    CONTRACT, signature, stage_weight_roles, validate_config, weight_shapes,
+    CONTRACT, signature, signature_cpu_ids, signature_process_scope, signature_residency,
+    stage_weight_roles, validate_config, weight_shapes,
 )
 from .physical import DTYPES
 
@@ -52,9 +53,24 @@ class FullDensePhysical:
     port_layout: str = "materialized_stage_ports"
     kv_allocation: str = "logical_blocks"
     activation_dtype: str = "f32"
-    kv_dtype: str = "f32"
+    kv_dtype: str = "f16"
     excluded_operations: tuple[str, ...] = ()
     request_accounting: str = SINGLE_REQUEST_ACCOUNTING
+    # How the priced samples found their own operands. "resident" is the
+    # historical protocol (consecutive samples share caches); "streaming" is a
+    # block whose operands were evicted before each sample, which is what a real
+    # token step inside a multi-tenant machine does. A price is only valid under
+    # the regime that produced it, so the regime is part of the signature.
+    residency: str = "resident"
+    # Whether the table's entries were priced inside one probe process or one
+    # process each. Also a protocol, not a geometry, and also part of the
+    # signature.
+    process_scope: str = "per_case"
+    # The logical CPUs the measured workers were pinned to, or None when the OS
+    # chose for them. The same threads on two SMT siblings of one core and on
+    # two separate cores price the same block differently, so a pinned
+    # placement is part of the signature when a layer declares one.
+    cpu_ids: tuple[int, ...] | None = None
 
     def input_ports(self, tokens: int) -> dict[str, tuple[int, ...]]:
         return {"hidden": (self.config["hidden"], tokens, 1, 1),
@@ -76,11 +92,12 @@ def parse_full_physical(raw: Any) -> FullDensePhysical:
     keys = {"contract", "scope", "input_boundary", "port_layout", "kv_allocation",
             "activation_dtype", "kv_dtype", "config", "threads", "weight_groups",
             "excluded_operations"}
-    if set(raw) - {"request_accounting"} != keys:
-        raise InvalidInput(f"full physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys-{'request_accounting'})}")
+    optional = {"request_accounting", "residency", "process_scope", "cpu_ids"}
+    if set(raw) - optional != keys:
+        raise InvalidInput(f"full physical fields mismatch: missing={sorted(keys-set(raw))}, unknown={sorted(set(raw)-keys-optional)}")
     fixed = {"contract": CONTRACT, "scope": "complete_declared_decoder_block",
              "input_boundary": "hidden_activation", "port_layout": "materialized_stage_ports",
-             "kv_allocation": "logical_blocks", "activation_dtype": "f32", "kv_dtype": "f32"}
+             "kv_allocation": "logical_blocks", "activation_dtype": "f32", "kv_dtype": "f16"}
     for key, expected in fixed.items():
         if raw[key] != expected:
             raise Unsupported(f"physical.{key}={raw[key]!r}; declared full block requires {expected!r}")
@@ -91,8 +108,12 @@ def parse_full_physical(raw: Any) -> FullDensePhysical:
         raise InvalidInput("physical.threads must be a positive integer")
     config = validate_config(raw["config"])
     groups = parse_weight_groups(raw["weight_groups"], config)
+    cpu_ids = signature_cpu_ids(raw.get("cpu_ids"), threads)
     return FullDensePhysical(config=config, threads=threads, weight_groups=groups,
-        request_accounting=parse_request_accounting(raw.get("request_accounting", SINGLE_REQUEST_ACCOUNTING)))
+        request_accounting=parse_request_accounting(raw.get("request_accounting", SINGLE_REQUEST_ACCOUNTING)),
+        residency=signature_residency(raw.get("residency")) or "resident",
+        process_scope=signature_process_scope(raw.get("process_scope")) or "per_case",
+        cpu_ids=tuple(cpu_ids) if cpu_ids else None)
 
 
 def parse_weight_groups(raw_groups: Any, config: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -129,6 +150,9 @@ def validate_full_physical_layer(layer: Any) -> None:
         "threads": physical.threads, "weight_groups": physical.weight_groups,
         "excluded_operations": list(physical.excluded_operations),
         "request_accounting": physical.request_accounting,
+        "residency": physical.residency,
+        "process_scope": physical.process_scope,
+        "cpu_ids": list(physical.cpu_ids) if physical.cpu_ids else None,
     })
     validate_full_geometry_layer(layer, checked)
 
@@ -143,8 +167,9 @@ def validate_full_geometry_layer(layer: Any, physical: Any) -> None:
         raise Unsupported("full physical boundary currently supports full_causal + dense only")
     if layer.hidden_size != config["hidden"] or layer.hidden_bytes_per_token != config["hidden"] * 4:
         raise InvalidInput("full physical hidden geometry and bytes must match the F32 hidden input")
-    if layer.kv_bytes_per_token != 8 * config["kv_heads"] * config["head_dim"]:
-        raise InvalidInput("full physical KV bytes must match logical F32 K plus V")
+    kv_element_bytes = 4 if getattr(physical, "kv_dtype", "f16") == "f32" else 2
+    if layer.kv_bytes_per_token != 2 * kv_element_bytes * config["kv_heads"] * config["head_dim"]:
+        raise InvalidInput(f"full physical KV bytes must match logical {physical.kv_dtype} K plus V")
     if len(layer.tasks) != 3 or {task.kind for task in layer.tasks} != set(STAGES):
         raise Unsupported("full physical block requires exactly projection -> attention -> dense_ffn")
     projection, attention, ffn = (layer.tasks_of_kind(kind)[0] for kind in STAGES)
@@ -174,5 +199,8 @@ def signature_for(layer: Any, kind: str, shape: Any) -> dict[str, Any]:
         raise InvalidInput("full signature requires FullDensePhysical")
     kernel_batch = 1 if physical.request_accounting == INDEPENDENT_REQUEST_ACCOUNTING else shape.batch
     result = signature(physical.config, kind, shape.phase, shape.tokens,
-                       shape.visible_history, physical.threads, batch=kernel_batch)
+                       shape.visible_history, physical.threads, batch=kernel_batch,
+                       residency=signature_residency(physical.residency),
+                       process_scope=signature_process_scope(physical.process_scope),
+                       cpu_ids=list(physical.cpu_ids) if physical.cpu_ids else None)
     return account_request_signature(result, physical, shape.batch)

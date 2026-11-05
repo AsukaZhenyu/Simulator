@@ -51,14 +51,14 @@ def full_layer_document(*, gate="none", qk_norm="none", large=False):
                                 storage_bytes=size, initial_location="dram"))
     return dict(format_version="m2-layer-0.3", id="full-small", provenance="synthetic_layer",
                 hidden_size=config["hidden"], hidden_bytes_per_token=4*config["hidden"],
-                kv_bytes_per_token=8*config["head_dim"]*config["kv_heads"],
+                kv_bytes_per_token=4*config["head_dim"]*config["kv_heads"],
                 attention="full_causal", ffn="dense", weights=weights,
                 tasks=[dict(id="proj", kind="projection", depends_on=[]),
                        dict(id="attn", kind="attention", depends_on=["proj"]),
                        dict(id="ffn", kind="dense_ffn", depends_on=["attn"])],
                 physical=dict(contract=CONTRACT, scope="complete_declared_decoder_block",
                               input_boundary="hidden_activation", port_layout="materialized_stage_ports",
-                              kv_allocation="logical_blocks", activation_dtype="f32", kv_dtype="f32",
+                              kv_allocation="logical_blocks", activation_dtype="f32", kv_dtype="f16",
                               config=config, threads=2, weight_groups=groups, excluded_operations=[]))
 
 
@@ -119,6 +119,59 @@ class FullDenseBoundary(unittest.TestCase):
         layer = parse_layer_document(raw or full_layer_document())
         invocation = full_invocation(layer, capacity=capacity)
         return compile_invocation(layer, invocation, full_cost_table(layer, invocation))
+
+    def test_the_declared_residency_regime_is_part_of_the_macro_signature(self):
+        cold = full_layer_document()
+        cold["physical"]["residency"] = "streaming"
+        cold_layer = parse_layer_document(cold)
+        warm_layer = parse_layer_document(full_layer_document())
+        shape = MacroShape("prefill", 1, 3, 0)
+        warm = signature_for(warm_layer, "attention", shape)
+        cold_signature = signature_for(cold_layer, "attention", shape)
+        self.assertNotIn("residency_regime", warm)
+        self.assertEqual(cold_signature["residency_regime"],
+                         "streamed_cold_cache_before_each_sample")
+        self.assertEqual({k: v for k, v in cold_signature.items() if k != "residency_regime"}, warm)
+        # A table priced under one regime cannot compile a layer declaring the
+        # other: the lookup would silently fall back to whichever price existed.
+        cold_invocation = full_invocation(cold_layer)
+        with self.assertRaisesRegex(Unsupported, "physical_signature"):
+            compile_invocation(cold_layer, cold_invocation,
+                               full_cost_table(warm_layer, cold_invocation))
+        cold["physical"]["residency"] = "gpu"
+        with self.assertRaisesRegex(InvalidInput, "residency"):
+            parse_layer_document(cold)
+
+    def test_the_declared_thread_placement_is_part_of_the_macro_signature(self):
+        pinned_document = full_layer_document()
+        pinned_document["physical"]["cpu_ids"] = [2, 4]
+        pinned = parse_layer_document(pinned_document)
+        free = parse_layer_document(full_layer_document())
+        shape = MacroShape("prefill", 1, 3, 0)
+        self.assertEqual(signature_for(pinned, "attention", shape)["cpu_mask"], [2, 4])
+        self.assertEqual(signature_for(pinned, "attention", shape)["thread_placement"],
+                         "explicit_strict_cpu_mask")
+        self.assertNotIn("cpu_mask", signature_for(free, "attention", shape))
+        # A table priced at one placement cannot compile a layer declaring
+        # another: the lookup would silently reuse a price the workers that ran
+        # the same two threads on two SMT siblings never produced.
+        invocation = full_invocation(pinned)
+        with self.assertRaisesRegex(Unsupported, "不匹配"):
+            compile_invocation(pinned, invocation, full_cost_table(free, invocation))
+        other_document = full_layer_document()
+        other_document["physical"]["cpu_ids"] = [2, 6]
+        other = parse_layer_document(other_document)
+        with self.assertRaisesRegex(Unsupported, "不匹配"):
+            compile_invocation(other, invocation, full_cost_table(pinned, invocation))
+        with self.assertRaisesRegex(Unsupported, "不匹配"):
+            compile_invocation(free, full_invocation(free), full_cost_table(pinned, full_invocation(free)))
+        # A placement the probe could not have applied is refused at parse time.
+        for mask in ([2], [2, 4, 6], [2, 2], [4, 2]):
+            with self.subTest(mask=mask):
+                broken = full_layer_document()
+                broken["physical"]["cpu_ids"] = mask
+                with self.assertRaises(InvalidInput):
+                    parse_layer_document(broken)
 
     def test_projection_outputs_have_true_qkv_dimensions_and_one_producer(self):
         compiled = self.compile()
@@ -189,7 +242,8 @@ class FullDenseBoundary(unittest.TestCase):
         self.assertEqual(next_result.status, "valid")
         self.assertEqual(next_result.state_out.requests[0].next_position, 4)
         self.assertEqual(next_result.state_out.requests[0].version, 3)
-        self.assertEqual(next_result.state_out.total_kv_bytes("r0"), 256)
+        # Four tokens of K plus V at f16: 4 * (2 * 2 * 4 * 2) = 128 bytes.
+        self.assertEqual(next_result.state_out.total_kv_bytes("r0"), 128)
 
     def test_live_ports_kv_and_scratch_have_exact_capacity_boundary(self):
         raw = full_layer_document(gate="sigmoid", qk_norm="rms")
@@ -204,7 +258,7 @@ class FullDenseBoundary(unittest.TestCase):
         projection_kv = sum(tensors[f"t:full-small:r0:proj.{port}"].storage_bytes for port in ("k", "v"))
         persistent = sum(tensors[name].storage_bytes for name in compiled.block_ids)
         self.assertEqual(projection_kv, 192)
-        self.assertEqual(persistent, 192)
+        self.assertEqual(persistent, 96)
         self.assertEqual(len(compiled.scenario.workload.operations[1].extra_outputs), 3)
 
     def test_quantized_matrix_storage_and_f32_norms_are_preserved(self):
@@ -289,7 +343,7 @@ class FullDenseBoundary(unittest.TestCase):
 
     def test_aliases_padding_and_other_rope_variants_are_unsupported(self):
         for key, value in (("port_layout", "aliased_views"), ("kv_allocation", "padded_preallocation"),
-                           ("kv_dtype", "f16")):
+                           ("kv_dtype", "f32")):
             raw = full_layer_document(); raw["physical"][key] = value
             with self.assertRaises(Unsupported):
                 parse_layer_document(raw)

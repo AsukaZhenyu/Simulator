@@ -9,11 +9,12 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
 
-from profiling.multimodel import devices, fetch_models, run
+from profiling.multimodel import devices, fetch_models, run, suite
 
 HERE = Path(__file__).resolve().parents[1] / "multimodel"
 
@@ -40,7 +41,14 @@ class TheManifestDeclaresExactlyTheModelsThatCanBeRepresented(unittest.TestCase)
         self.assertEqual(self.document["schema"], "multimodel-models-1")
         ids = [entry["id"] for entry in self.document["models"]]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(len(ids), 5)
+
+    def test_the_set_is_three_dense_and_three_sparse(self):
+        # The published table is exactly this shape; a fourth model on either
+        # side is a campaign decision, not an incidental edit.
+        roles = [entry["role"] for entry in self.document["models"]]
+        self.assertEqual(roles.count("dense"), 3)
+        self.assertEqual(roles.count("moe"), 3)
+        self.assertEqual(len(roles), 6)
 
     def test_every_model_pins_a_commit_not_a_branch(self):
         for entry in self.document["models"]:
@@ -191,6 +199,130 @@ class ADeviceDescriptorCarriesFactsAndNoPrices(unittest.TestCase):
         text = json.dumps(document).lower()
         for banned in ("duration", "latency", "price", "ns\"", "throughput", "flops"):
             self.assertNotIn(banned, text)
+
+
+class TheBoundaryMatricesComeFromTheTensorDirectory(unittest.TestCase):
+    """A token step also reads the embedding and multiplies the LM head.
+
+    Neither is part of the decoder block, and their storage types cannot be
+    inferred from the quantization label: a Q4_K_M file stores them differently.
+    """
+
+    def meta(self, *, vocab=5, hidden=4, tensors=None):
+        if tensors is None:
+            tensors = [{"name": "token_embd.weight", "shape": [hidden, vocab], "dtype": "q4_k"},
+                       {"name": "output.weight", "shape": [hidden, vocab], "dtype": "q6_k"}]
+        return {"vocab_size": vocab, "hidden_size": hidden, "global_tensors": tensors}
+
+    def test_the_two_matrices_keep_their_own_storage_types(self):
+        actual = suite.boundary(self.meta())
+        self.assertEqual(actual, {"vocab": 5, "token_embd_dtype": "q4_k",
+                                  "lm_head_dtype": "q6_k", "tied_embeddings": False})
+
+    def test_a_tied_checkpoint_has_no_separate_head_tensor(self):
+        actual = suite.boundary(self.meta(tensors=[
+            {"name": "token_embd.weight", "shape": [4, 5], "dtype": "q4_k"}]))
+        self.assertTrue(actual["tied_embeddings"])
+        self.assertEqual(actual["lm_head_dtype"], "q4_k")
+
+    def test_an_unpriceable_boundary_is_an_error_not_a_default(self):
+        with self.assertRaisesRegex(ValueError, "token_embd"):
+            suite.boundary(self.meta(tensors=[]))
+        with self.assertRaisesRegex(ValueError, "geometry implies"):
+            suite.boundary(self.meta(tensors=[
+                {"name": "token_embd.weight", "shape": [4, 6], "dtype": "f32"}]))
+        with self.assertRaisesRegex(ValueError, "not one of"):
+            suite.boundary(self.meta(tensors=[
+                {"name": "token_embd.weight", "shape": [4, 5], "dtype": "q8_0"}]))
+        with self.assertRaisesRegex(ValueError, "vocabulary size"):
+            suite.boundary(self.meta(vocab=None))
+
+    def test_boundary_cases_exist_only_where_the_token_step_is_counted_once(self):
+        from llm_infer_model.m2.dense_contract import weight_shapes
+        config = dict(hidden=256, intermediate=512, heads=2, kv_heads=1, head_dim=64,
+                      attention_gate="none", qk_norm="none", rope_mode="normal",
+                      rope_dims=64, rope_base=10000, norm_epsilon=1e-5)
+        config["weight_dtypes"] = {role: "f32" for role in weight_shapes(config)}
+        description = {"config": config, "boundary": {"vocab": 5, "token_embd_dtype": "q4_k",
+                                                      "lm_head_dtype": "q6_k"}}
+        shapes = {"batch": 1, "prefill": [{"tokens": 4}],
+                  "decode": [{"tokens": 1, "visible_history": 0},
+                             {"tokens": 1, "visible_history": 64}]}
+        document = suite.suite_document(description, shapes, model_id="toy")
+        kinds = [(case["kind"], case["phase"], case["tokens"], case["visible_history"])
+                 for case in document["cases"]]
+        # Four decoder stages on all three shapes, plus two boundaries on the two
+        # shapes with no history: a cached step does not repeat the embedding.
+        self.assertEqual(len(kinds), 4 * 3 + 2 * 2)
+        self.assertIn(("embedding", "prefill", 4, 0), kinds)
+        self.assertIn(("head", "decode", 1, 0), kinds)
+        self.assertNotIn(("head", "decode", 1, 64), kinds)
+        for case in document["cases"]:
+            if case["kind"] in suite.BOUNDARY_STAGES:
+                self.assertEqual(case["config"]["vocab"], 5)
+                self.assertEqual(case["config"]["weight_dtypes"]["token_embd"], "q4_k")
+                self.assertEqual(case["config"]["weight_dtypes"]["lm_head"], "q6_k")
+                self.assertEqual(case["config"]["weight_dtypes"]["final_norm"], "f32")
+            else:
+                self.assertNotIn("vocab", case["config"])
+        suite_plan = suite.dense_contract.build_plan(document, 2)
+        self.assertEqual(len(suite_plan), len(kinds))
+
+
+class TheQKNormWidthIsReadFromTheGainVector(unittest.TestCase):
+    """OLMoE normalizes the head-concatenated projection, not each head.
+
+    Its QK-norm gain is [hidden], and llama.cpp applies it before the reshape.
+    Asking only "is there a q_norm tensor" would declare a per-head
+    normalization the checkpoint does not perform, and the descriptor would then
+    disagree with the tensor directory on the gain's shape.
+    """
+
+    def meta(self, *, q_width=None, k_width=None):
+        hidden, heads, head_dim, experts, width, vocab = 4, 2, 2, 2, 2, 4
+
+        def tensor(name, shape):
+            return {"name": f"blk.0.{name}.weight", "shape": shape, "dtype": "f32",
+                    "storage_bytes": 4 * math.prod(shape)}
+
+        tensors = [tensor("attn_norm", [hidden]), tensor("attn_q", [hidden, hidden]),
+                   tensor("attn_k", [hidden, hidden]), tensor("attn_v", [hidden, hidden]),
+                   tensor("attn_output", [hidden, hidden]),
+                   tensor("attn_q_norm", [q_width if q_width is not None else hidden]),
+                   tensor("attn_k_norm", [k_width if k_width is not None else hidden]),
+                   tensor("ffn_norm", [hidden]), tensor("ffn_gate_inp", [hidden, experts]),
+                   tensor("ffn_gate_exps", [hidden, width, experts]),
+                   tensor("ffn_up_exps", [hidden, width, experts]),
+                   tensor("ffn_down_exps", [width, hidden, experts])]
+        boundary = [{"name": "token_embd.weight", "shape": [hidden, vocab], "dtype": "f32",
+                     "storage_bytes": 4 * hidden * vocab},
+                    {"name": "output.weight", "shape": [hidden, vocab], "dtype": "f32",
+                     "storage_bytes": 4 * hidden * vocab}]
+        return {"architecture": "olmoe", "block_count": 1, "hidden_size": hidden,
+                "intermediate_size": width, "heads": heads, "kv_heads": heads,
+                "head_dim": head_dim, "rope_dims": None, "rope_base": 10000.0,
+                "norm_epsilon": 1e-5, "experts": experts, "top_k": 1,
+                "expert_intermediate_size": width, "shared_expert_intermediate_size": None,
+                "vocab_size": vocab, "global_tensors": boundary,
+                "layers": [{"index": 0, "attention": "full_causal", "ffn": "moe",
+                            "tensors": tensors}]}
+
+    def test_a_gain_of_hidden_width_is_one_normalization_per_token(self):
+        description = suite.describe(self.meta())
+        self.assertEqual(description["config"]["qk_norm"], "rms_hidden")
+        shapes = {weight["id"]: weight["shape"] for weight in description["weights"]}
+        self.assertEqual(shapes["W_q_norm"], [4])
+        self.assertEqual(shapes["W_k_norm"], [4])
+
+    def test_a_gain_of_head_width_is_still_the_per_head_normalization(self):
+        self.assertEqual(suite.describe(self.meta(q_width=2, k_width=2))["config"]["qk_norm"],
+                         "rms")
+
+    def test_any_other_width_is_refused_rather_than_rounded_to_one_of_them(self):
+        with self.assertRaisesRegex(ValueError, "QK norm gain"):
+            suite.describe(self.meta(q_width=3, k_width=3))
+        with self.assertRaisesRegex(ValueError, "different widths"):
+            suite.describe(self.meta(q_width=4, k_width=2))
 
 
 class StructureRefusesToRunWithoutTheDeclaredBytes(unittest.TestCase):

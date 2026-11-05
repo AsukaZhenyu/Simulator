@@ -21,8 +21,119 @@ def config(*, hidden=16, intermediate=32, gate="none", qk="none"):
 
 
 def case(**changes):
-    return dict(id="small", kind="block", phase="prefill", batch=1, tokens=3,
-                visible_history=0, config=config(), **changes)
+    base = dict(id="small", kind="block", phase="prefill", batch=1, tokens=3,
+                visible_history=0, config=config())
+    base.update(changes)
+    return base
+
+
+def word_config(*, hidden=16, intermediate=32, vocab=7, embd="f32", head="f32"):
+    """A configuration that also declares the two vocabulary-wide matrices."""
+    raw = config(hidden=hidden, intermediate=intermediate)
+    raw.update(vocab=vocab, token_embd_dtype=embd, lm_head_dtype=head)
+    raw["weight_dtypes"].update(final_norm="f32", lm_head=head, token_embd=embd)
+    return raw
+
+
+class DenseBoundary(unittest.TestCase):
+    """The two stages a complete token step runs outside the decoder block."""
+
+    def test_a_vocabulary_declares_both_matrices_or_neither(self):
+        self.assertNotIn("token_embd", weight_shapes(config()))
+        raw = word_config(hidden=13, vocab=5)
+        self.assertEqual(weight_shapes(raw)["token_embd"], (13, 5))
+        self.assertEqual(weight_shapes(raw)["lm_head"], (13, 5))
+        self.assertEqual(weight_shapes(raw)["final_norm"], (13,))
+        raw.pop("token_embd_dtype")
+        with self.assertRaisesRegex(InvalidInput, "both"):
+            validate_config(raw)
+        raw = word_config(); raw["weight_dtypes"].pop("token_embd")
+        with self.assertRaisesRegex(InvalidInput, "weight_dtypes"):
+            validate_config(raw)
+
+    def test_the_embedding_and_the_head_may_be_stored_in_different_types(self):
+        # A Q4_K_M checkpoint stores token_embd as q4_k and the LM head as q6_k.
+        raw = word_config(hidden=256, vocab=512, embd="q4_k", head="q6_k")
+        checked = validate_config(raw)
+        embed = resident_accounting(checked, "embedding", 4, 0)
+        head = resident_accounting(checked, "head", 4, 0)
+        self.assertEqual(embed["weight_roles_bytes"]["token_embd"], 512*144)
+        self.assertEqual(head["weight_roles_bytes"]["lm_head"], 512*210)
+        self.assertEqual(head["weight_roles_bytes"]["final_norm"], 256*4)
+        raw["lm_head_dtype"] = "q4_k"
+        with self.assertRaisesRegex(InvalidInput, "lm_head_dtype"):
+            validate_config(raw)
+
+    def test_boundary_cases_are_history_free_and_block_cases_are_vocabulary_free(self):
+        raw = case(kind="head", config=word_config())
+        self.assertEqual(validate_case(raw)["config"]["vocab"], 7)
+        raw = case(kind="embedding", config=word_config(), visible_history=3)
+        with self.assertRaisesRegex(InvalidInput, "visible_history=0"):
+            validate_case(raw)
+        with self.assertRaisesRegex(InvalidInput, "must not declare"):
+            validate_case(case(config=word_config()))
+        with self.assertRaisesRegex(InvalidInput, "must declare config.vocab"):
+            validate_case(case(kind="head"))
+
+    def test_boundary_ports_and_operations_are_the_ends_of_a_token_step(self):
+        checked = word_config(hidden=13, vocab=5)
+        inputs, outputs = ports(checked, "embedding", 3)
+        self.assertEqual(inputs, {"token_ids": {"dtype": "i32", "ne": (3, 1, 1, 1)}})
+        self.assertEqual(outputs["hidden_out"]["ne"], (13, 3, 1, 1))
+        inputs, outputs = ports(checked, "head", 3)
+        self.assertEqual(inputs["hidden"]["ne"], (13, 3, 1, 1))
+        self.assertEqual(outputs["logits"], {"dtype": "f32", "ne": (5, 3, 1, 1)})
+        self.assertEqual(operations(checked, "embedding"),
+                         ["token_embedding_lookup", "materialize_hidden"])
+        self.assertEqual(operations(checked, "head"),
+                         ["final_RMSNorm", "final_norm_scale", "lm_head_projection",
+                          "materialize_logits"])
+
+    def test_boundary_resident_bytes_have_an_independent_manual_oracle(self):
+        checked = validate_config(word_config(hidden=256, intermediate=512, vocab=512))
+        actual = resident_accounting(checked, "head", 3, 0)
+        self.assertEqual(actual["weight_bytes"], 1024 + 256*512*4)
+        self.assertEqual(actual["input_bytes"], 256*3*4)
+        self.assertEqual(actual["output_bytes"], 512*3*4)
+        self.assertEqual(actual["kv_cache_bytes"], 0)
+        self.assertEqual(actual["resident_logical_bytes"],
+                         525312 + 3072 + 6144)
+
+    def test_boundary_scopes_do_not_claim_a_decoder_block(self):
+        checked = word_config(hidden=13, vocab=5)
+        block = signature(config(), "projection", "prefill", 3, 0, 2)
+        for kind, scope in (("embedding", "resident_repeated_declared_token_embedding"),
+                            ("head", "resident_repeated_declared_final_norm_and_lm_head")):
+            actual = signature(checked, kind, "prefill", 3, 0, 2)
+            self.assertEqual(actual["scope"], scope)
+            self.assertNotEqual(actual["scope"], block["scope"])
+            self.assertEqual(actual["config"]["vocab"], 5)
+
+    def test_native_command_declares_the_vocabulary_and_both_matrix_types(self):
+        raw = case(kind="head", config=word_config(hidden=256, vocab=512, embd="q4_k",
+                                                   head="q6_k"), threads=2)
+        options = dict(zip(*[iter(native_arguments(raw, 2, 5, 17))]*2))
+        self.assertEqual(options["--vocab"], "512")
+        self.assertEqual(options["--token-embd-dtype"], "q4_k")
+        self.assertEqual(options["--lm-head-dtype"], "q6_k")
+        self.assertNotIn("--vocab", native_arguments(case(threads=2), 2, 5, 17))
+
+    def test_a_declared_residency_regime_changes_the_command_and_the_signature(self):
+        resident_args = native_arguments(case(threads=2), 2, 5, 17)
+        self.assertNotIn("--evict-bytes", resident_args)
+        cold_args = native_arguments(case(threads=2), 2, 5, 17, evict_bytes=1 << 28)
+        self.assertEqual(cold_args[cold_args.index("--evict-bytes") + 1], str(1 << 28))
+        # Everything except the declared flag must stay identical, or a regime
+        # change would silently move some other part of the protocol.
+        self.assertEqual([a for a in cold_args if a != "--evict-bytes" and a != str(1 << 28)],
+                         resident_args)
+        warm = signature(config(), "block", "prefill", 3, 0, 2)
+        cold = signature(config(), "block", "prefill", 3, 0, 2, residency="streaming")
+        self.assertNotIn("residency_regime", warm)
+        self.assertEqual(cold["residency_regime"], "streamed_cold_cache_before_each_sample")
+        self.assertEqual({k: v for k, v in cold.items() if k != "residency_regime"}, warm)
+        with self.assertRaises(InvalidInput):
+            native_arguments(case(threads=2), 2, 5, 17, evict_bytes=-1)
 
 
 class DenseContract(unittest.TestCase):
@@ -102,14 +213,15 @@ class DenseContract(unittest.TestCase):
         self.assertEqual(actual["weight_bytes"], 9344)
         self.assertEqual(actual["input_bytes"], 192+12)
         self.assertEqual(actual["output_bytes"], 192+96+96+192+192)
-        self.assertEqual(actual["kv_cache_bytes"], 192)
-        self.assertEqual(actual["resident_logical_bytes"], 10508)
+        # f16 K and V: 2 bytes per element, two caches, 3 new tokens.
+        self.assertEqual(actual["kv_cache_bytes"], 96)
+        self.assertEqual(actual["resident_logical_bytes"], 10412)
 
     def test_new_kv_input_ports_and_appended_cache_capacity_are_separate(self):
         actual = resident_accounting(config(), "attention", 3, 8)
         self.assertEqual(actual["input_ports_bytes"]["k"]+actual["input_ports_bytes"]["v"], 192)
-        self.assertEqual(actual["kv_new_bytes"], 192)
-        self.assertEqual(actual["kv_history_bytes"], 512)
+        self.assertEqual(actual["kv_new_bytes"], 96)
+        self.assertEqual(actual["kv_history_bytes"], 256)
 
     def test_no_implicit_phase_batch_or_history_equivalence(self):
         for key, value in (("batch", 2), ("visible_history", -1), ("kind", "matmul"), ("phase", "pd")):

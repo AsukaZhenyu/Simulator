@@ -81,8 +81,13 @@ def validate_paired_binding(case, native, args):
             if affinity.get("strict_cpu") is not True or affinity.get("verified") is not True or not isinstance(applied, list) or any(isinstance(value, bool) or not isinstance(value, int) for value in applied) or sorted(applied) != sorted(args.cpu_mask):
                 raise ValueError("CPU mask must be strictly applied and observed")
             observed = affinity.get("observed_threads")
-            if not isinstance(observed, list) or len(observed) != case["threads"]:
+            if not isinstance(observed, list) or not observed:
                 raise ValueError("CPU binding needs observations of every compute thread")
+            # An OpenMP runtime keeps idle pool threads that never enter a parallel
+            # region; they inherit the whole process mask. So the requirement is not
+            # "every thread holds one CPU" but "no thread escapes the request, and
+            # each requested CPU is covered by a single-CPU thread".
+            requested_bits = sum(1 << cpu for cpu in args.cpu_mask)
             ids = []
             thread_ids = []
             for thread in observed:
@@ -92,14 +97,19 @@ def validate_paired_binding(case, native, args):
                     mask = int(thread["mask_hex"], 16)
                 except (KeyError, TypeError, ValueError) as error:
                     raise ValueError("CPU binding requires an observed hexadecimal mask") from error
-                if mask != 1 << thread["logical_id"]:
-                    raise ValueError("each compute thread must have a single observed processor")
+                if mask & ~requested_bits:
+                    raise ValueError("an observed thread escapes the requested processors")
+                if mask == 1 << thread["logical_id"]:
+                    ids.append(thread["logical_id"])
+                elif mask != requested_bits:
+                    raise ValueError("a thread must hold one requested processor or the whole process mask")
                 if isinstance(thread.get("thread_id"), bool) or not isinstance(thread.get("thread_id"), int) or thread["thread_id"] <= 0:
                     raise ValueError("CPU binding needs observed positive OS thread identities")
-                ids.append(thread["logical_id"])
                 thread_ids.append(thread.get("thread_id"))
-            if sorted(ids) != sorted(args.cpu_mask) or len(set(thread_ids)) != case["threads"]:
-                raise ValueError("CPU binding must cover distinct threads and processors")
+            if sorted(ids) != sorted(args.cpu_mask):
+                raise ValueError("CPU binding must bind every requested processor to a thread")
+            if len(set(thread_ids)) < case["threads"]:
+                raise ValueError("CPU binding must observe a distinct thread per worker")
     _same(validate_config(native.get("config")), case["config"], "native config")
     _same(native.get("paired_order"), ["AB" if i % 2 == 0 else "BA" for i in range(args.samples)], "paired order")
     stages = native.get("stage_wall_ns")

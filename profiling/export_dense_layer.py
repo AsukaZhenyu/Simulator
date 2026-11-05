@@ -1,8 +1,9 @@
-"""Export exact CPU B1 Dense decoder stage evidence into physical M2 costs.
+"""Export exact CPU B1 decoder stage evidence into physical M2 costs.
 
 Only exact, complete four-stage shape groups are exported. No interpolation, history reuse, fixture replacement or hardware execution occurs.
-A successful export certifies the declared Dense stage boundary, not calibration
-of an original model implementation. --allow-unstable exports are for validation only.
+A successful export certifies the declared decoder-block boundary -- dense or
+sparse, as the layer document itself declares -- not calibration of an original
+model implementation. --allow-unstable exports are for validation only.
 """
 from __future__ import annotations
 
@@ -20,13 +21,29 @@ MODELING = Path(__file__).resolve().parents[1] / "modeling"
 if str(MODELING) not in sys.path:
     sys.path.insert(0, str(MODELING))
 
+from llm_infer_model.m2 import dense_contract
 from llm_infer_model.m2.costs import MacroShape, canonical_contract_hash, parse_cost_table
-from llm_infer_model.m2.dense_contract import (CONTRACT, build_plan, validate_case, signature, resident_accounting)
-from llm_infer_model.m2.spec import load_layer
 from llm_infer_model.m2.full_physical import validate_full_physical_layer as validate_model_layer
 from llm_infer_model.tensor.spec import InvalidInput, Unsupported
+import contracts
+from history_invariant_prices import ReplicateError, pool_history_invariant, require_replicates
 from profile_contract import summarize_samples, validate_measurement
 from run_dense_layer_measurements import native_command, validate_native_binding, measurement_signature
+
+
+def _contract(layer: Any):
+    """The contract module the layer document declares (dense or sparse)."""
+    return contracts.for_layer(layer)
+
+
+def _validate_layer(layer: Any, contract) -> None:
+    """The layer's own complete-format check, in the format it declares.
+
+    A sparse layer was already verified byte for byte by
+    ``moe_contract.load_layer_document``; it has no mapping format to check.
+    """
+    if contract is dense_contract:
+        validate_model_layer(layer)
 
 
 class ExportError(ValueError):
@@ -48,6 +65,31 @@ def _int(value: Any, label: str, minimum: int = 0) -> int:
     return value
 
 
+def _cpu_mask(value: Any, threads: int, placement: Any) -> list[int] | None:
+    """Recover the logical-CPU mask the recorded protocol passed to the probe.
+
+    The raw command is rebuilt from the manifest, so the mask has to come from the
+    same record. It stays optional: an unpinned campaign is still exportable, but
+    its entries keep the ``os_scheduler_choice_of_logical_cpus`` placement and the
+    protocol rule that only controlled placement reaches a main result.
+    """
+    if value is None:
+        if placement is not None and placement != "os_scheduler_choice_of_logical_cpus":
+            raise ExportError("manifest.protocol.thread_placement disagrees with an absent cpu_mask")
+        return None
+    if not isinstance(value, list) or any(isinstance(cpu, bool) or not isinstance(cpu, int) or cpu < 0 for cpu in value):
+        raise ExportError("manifest.protocol.cpu_mask must be a list of nonnegative logical CPU ids")
+    if len(value) != threads or len(set(value)) != len(value):
+        raise ExportError("manifest.protocol.cpu_mask must name exactly one distinct logical CPU per thread")
+    if value != sorted(value):
+        raise ExportError("manifest.protocol.cpu_mask must be sorted")
+    if any(cpu >= 64 for cpu in value):
+        raise ExportError("manifest.protocol.cpu_mask exceeds the single processor group the probe supports")
+    if placement is not None and placement != "explicit_strict_cpu_mask":
+        raise ExportError("manifest.protocol.thread_placement disagrees with a recorded cpu_mask")
+    return value
+
+
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -62,13 +104,74 @@ def _digest(value: Any, label: str) -> str:
     return value
 
 
-def model_signature(layer, kind, shape):
-    return signature(layer.physical.config, kind, shape.phase, shape.tokens,
-                     shape.visible_history, layer.physical.threads, batch=shape.batch)
+def model_signature(layer, kind, shape, config=None, *, contract=None, price_policy=None):
+    """The signature a layer document claims for this stage.
+
+    Boundary stages multiply vocabulary-wide matrices the decoder-block document
+    does not describe, so their signature comes from the measured case's own
+    declared configuration; the prediction binds it to a model by looking the
+    exact (kind, phase, tokens, history, vocab, word_dtype) key up.
+    """
+    contract = contract or _contract(layer)
+    declared_cpu_ids = getattr(layer.physical, "cpu_ids", None)
+    return contract.signature(config if config is not None else layer.physical.config, kind,
+                              shape.phase, shape.tokens, shape.visible_history,
+                              layer.physical.threads, batch=shape.batch,
+                              residency=contract.signature_residency(
+                                  getattr(layer.physical, "residency", None)),
+                              process_scope=contract.signature_process_scope(
+                                  getattr(layer.physical, "process_scope", None)),
+                              cpu_ids=(list(declared_cpu_ids) if declared_cpu_ids else None),
+                              price_policy=price_policy)
 
 
-def _resident_accounting(layer: Any, case: dict, native: dict) -> dict:
-    expected = resident_accounting(layer.physical.config, case["kind"], case["tokens"], case["visible_history"])
+def collapse_history_invariant_prices(groups: dict, durations: dict, evidence: dict,
+                                      policy: str) -> list[str]:
+    """Replace each history-invariant decode price with one pooled median.
+
+    ``groups`` maps a stage kind to its ``(entry, case id)`` members across
+    visible history. The stage does the same work at every depth, so those
+    entries are replicates of one physical task and the spread between them is
+    measurement and machine state, not a depth effect. The entries keep their
+    own keys and signatures; only the price becomes the pooled estimate, and
+    the signature says so. Raw readings stay in the entry and in the evidence.
+    """
+    label = dense_contract.PRICE_POLICIES[policy]
+    pooled_kinds = []
+    for kind in sorted(groups):
+        members = groups[kind]
+        # One depth is not a set of replicates; there is nothing to pool and the
+        # entry keeps the price it was measured at.
+        if len({entry["visible_history"] for entry, _ in members}) < 2:
+            continue
+        try:
+            require_replicates([entry for entry, _ in members], kind)
+            pooled = pool_history_invariant(
+                [(entry["visible_history"], case_id, entry["duration_ns"])
+                 for entry, case_id in members])
+        except ReplicateError as error:
+            raise ExportError(f"{kind}: {error}") from None
+        # The table itself gains no field: an entry is still a price under a
+        # signature, and the signature now says which estimator produced it.
+        # Each case's own reading stays in the evidence through sample_summary.
+        for entry, case_id in members:
+            entry["duration_ns"] = pooled["pooled_ns"]
+            durations[case_id] = pooled["pooled_ns"]
+            record = evidence[case_id]
+            record["history_invariant_price_policy"] = label
+            record["history_replicates"] = copy.deepcopy(pooled["replicates"])
+            record["history_replicate_relative_spread"] = pooled["relative_spread"]
+        pooled_kinds.append(kind)
+    return pooled_kinds
+
+
+def _stage_config(layer: Any, case: dict, contract) -> dict:
+    return case["config"] if case["kind"] in contract.BOUNDARY_STAGES else layer.physical.config
+
+
+def _resident_accounting(layer: Any, case: dict, native: dict, contract) -> dict:
+    expected = contract.resident_accounting(_stage_config(layer, case, contract), case["kind"],
+                                            case["tokens"], case["visible_history"])
     for key, value in expected.items():
         _same(native.get(key), value, "resident " + key)
     accounting = native["memory_accounting"]
@@ -84,29 +187,50 @@ def _resident_accounting(layer: Any, case: dict, native: dict) -> dict:
             "model_memory_scope": "logical_independent_resident_allocations_plus_running_macro_internal_scratch"}
 
 
-def composition_report(groups: dict, *, max_relative_error: float | None = None, allow_composition_error: bool = False) -> list[dict]:
+def composition_report(groups: dict, *, stages: tuple[str, ...] = dense_contract.STAGES,
+                       max_relative_error: float | None = None, allow_composition_error: bool = False,
+                       durations: dict[str, int] | None = None) -> list[dict]:
     """Observe additive stage error against one joint graph with matching ports.
 
-    A tolerance is a caller-supplied acceptance rule, never inferred calibration.
+    ``stages`` is the contract's own stage list, so a sparse block compares its
+    three declared stages (projection, attention, moe_ffn) against its joint
+    block exactly as a dense block does.  A tolerance is a caller-supplied
+    acceptance rule, never inferred calibration.
+
+    ``durations`` maps a case id to the exact nanosecond price the table will
+    actually export for it.  Without it the joint-block comparison would be made
+    against the raw per-case medians, which is the wrong question whenever the
+    exported price was estimated from more than one case.
     """
     if max_relative_error is not None and (isinstance(max_relative_error, bool) or not isinstance(max_relative_error, (int, float)) or not math.isfinite(max_relative_error) or max_relative_error < 0):
         raise ExportError("max_relative_error must be an explicit nonnegative finite tolerance")
     if not isinstance(allow_composition_error, bool):
         raise ExportError("allow_composition_error must be boolean")
     result = []
-    for shape, stages in sorted(groups.items()):
-        if set(stages) != {"projection", "attention", "dense_ffn", "block"}:
-            raise ExportError(f"{shape}: complete exact shape group requires projection, attention, dense_ffn and block; missing or extra stages")
-        joint = stages["block"]
-        for kind in ("projection", "attention", "dense_ffn"):
-            stage = stages[kind]
+    # The joint block names its third stage after the feed-forward it contains.
+    ffn_stage = stages[2]
+    decoder = set(stages)
+    for shape, all_stages in sorted(groups.items()):
+        # Boundary stages share a shape key with the block when both are measured
+        # at the same token count; they are not part of the joint-block claim.
+        measured = {kind: stage for kind, stage in all_stages.items() if kind in decoder}
+        # A shape group that holds only boundary stages has no joint-block
+        # composition claim to make; those groups are left out entirely.
+        if not measured:
+            continue
+        if set(measured) != decoder:
+            raise ExportError(f"{shape}: complete exact shape group requires "
+                              f"{', '.join(sorted(decoder))}; missing or extra stages")
+        joint = measured["block"]
+        for kind in stages[:3]:
+            stage = measured[kind]
             _same(stage["native_binary_sha256"], joint["native_binary_sha256"], "composition native executable")
             _same(stage["config"], joint["config"], "composition configuration")
             for port, digest in stage["stage_port_digests"].items():
                 _same(joint["stage_port_digests"].get(port), digest, f"composition materialized port {port}")
-        projection = stages["projection"]
-        attention = stages["attention"]
-        ffn = stages["dense_ffn"]
+        projection = measured["projection"]
+        attention = measured["attention"]
+        ffn = measured[ffn_stage]
         for port, digest in projection["input_port_digests"].items():
             _same(joint["input_port_digests"].get(port), digest, f"composition projection input {port}")
         for port, digest in attention["input_port_digests"].items():
@@ -114,18 +238,24 @@ def composition_report(groups: dict, *, max_relative_error: float | None = None,
             _same(upstream.get(port), digest, f"composition attention input {port}")
         for port, digest in ffn["input_port_digests"].items():
             _same(attention["stage_port_digests"].get(port), digest, f"composition FFN input {port}")
-        predicted = sum(math.ceil(stages[kind]["summary"]["median_ns"]) for kind in ("projection", "attention", "dense_ffn"))
+        def exported(stage):
+            price = math.ceil(stage["summary"]["median_ns"])
+            return price if durations is None else durations.get(stage["case_id"], price)
+
+        predicted = sum(exported(measured[kind]) for kind in stages[:3])
         observed = joint["summary"]["median_ns"]
         signed = (predicted-observed) / observed
         within = abs(signed) <= max_relative_error if max_relative_error is not None else None
         if within is False and not allow_composition_error:
             raise ExportError(f"{shape}: composition relative error {abs(signed)} exceeds explicit tolerance {max_relative_error}")
-        result.append({"shape": shape, "case_ids": {kind: stage["case_id"] for kind, stage in stages.items()},
+        result.append({"shape": shape, "case_ids": {kind: stage["case_id"] for kind, stage in measured.items()},
             "predicted_serial_stage_sum_ns": predicted, "observed_joint_block_median_ns": observed,
             "signed_relative_error": signed, "absolute_relative_error": abs(signed),
             "explicit_max_relative_error": max_relative_error, "within_explicit_tolerance": within,
-            "stage_cvs": {kind: stage["summary"]["cv"] for kind, stage in stages.items()},
+            "stage_cvs": {kind: stage["summary"]["cv"] for kind, stage in measured.items()},
             "materialized_ports_equal": True, "upstream_input_lineage_equal": True, "calibration_claimed": False,
+            "stage_prices_from": ("exported_table_durations" if durations is not None
+                                  else "raw_per_case_medians"),
             "comparison_scope": "same_declared_graph_variant_and_seed_with_timed_materialized_stage_copies"})
     return result
 
@@ -134,7 +264,8 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
                       manifest: dict, allow_unstable: bool = False,
                       source_evidence: dict | None = None,
                       max_relative_error: float | None = None,
-                      allow_composition_error: bool = False) -> tuple[dict, dict]:
+                      allow_composition_error: bool = False,
+                      price_policy: str | None = None) -> tuple[dict, dict]:
     """Return (cost table, evidence report); never write files or run hardware.
 
     raw_directory is the measurement run directory containing raw_output paths.
@@ -143,13 +274,20 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
     FFN, so one observed shape never silently supplies an unmeasured shape.
     """
     if getattr(layer, "physical", None) is None:
-        raise ExportError("export requires an explicit m2-layer-0.3 complete declared decoder descriptor")
-    validate_model_layer(layer)
+        raise ExportError("export requires an explicit complete declared decoder descriptor")
+    contract = _contract(layer)
+    _validate_layer(layer, contract)
     if not isinstance(records, list) or not records:
         raise ExportError("records must be a nonempty list")
     if not isinstance(allow_unstable, bool):
         raise ExportError("allow_unstable must be boolean")
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != "dense_layer_measurement_profile_v1" or manifest.get("contract") != CONTRACT:
+    # None is the historical own-shape estimator; anything else is a declared
+    # estimator difference and enters the signature.
+    policy = contract.signature_price_policy(price_policy)
+    invariant_kinds = set(contract.history_invariant_kinds())
+    if (not isinstance(manifest, dict)
+            or manifest.get("schema_version") != contracts.PROFILE_SCHEMAS[contract.CONTRACT]
+            or manifest.get("contract") != contract.CONTRACT):
         raise ExportError("manifest must declare the current macro measurement profile contract")
     protocol = manifest.get("protocol", {})
     for key, expected in {"backend": "CPU", "batch": 1, "sequential_execution": True,
@@ -159,21 +297,47 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
     args = SimpleNamespace(warmup=_int(protocol.get("warmup"), "warmup"),
                            samples=_int(protocol.get("samples"), "samples", 1),
                            seed=_int(protocol.get("seed"), "seed"))
+    # Absent in manifests written before the regime was declarable, which is the
+    # resident protocol: those tables keep exporting unchanged.
+    args.evict_bytes = _int(protocol.get("evict_bytes", 0), "manifest.protocol.evict_bytes")
+    declared_regime = ("streaming" if args.evict_bytes else "resident")
+    if protocol.get("residency_regime") is not None:
+        _same(protocol.get("residency_regime"), contract.RESIDENCY_REGIMES[declared_regime],
+              "manifest.protocol.residency_regime")
+    # Absent in manifests written before the scope was declarable, which is the
+    # per-case protocol: those tables keep exporting unchanged.
+    declared_scope = contract.declared_process_scope(protocol.get("process_scope"))
+    args.cpu_ids = _cpu_mask(protocol.get("cpu_mask"), threads, protocol.get("thread_placement"))
+    # A recorded mask says how the run was launched; it is an identity only when
+    # the run itself declared it one. Manifests written before the dimension
+    # existed record the mask (or nothing) without that declaration and keep
+    # exporting against the historical signature, which is exactly what lets an
+    # already published table be reproduced from its own evidence. A record
+    # that disagrees either way is refused rather than reconciled.
+    declares_mask = protocol.get("cpu_mask_in_physical_signature")
+    if declares_mask is not None and declares_mask is not True:
+        raise ExportError("manifest.protocol.cpu_mask_in_physical_signature must be true when present")
+    if declares_mask is True and args.cpu_ids is None:
+        raise ExportError("manifest declares the cpu mask as physical identity but records none")
+    placement = args.cpu_ids if declares_mask is True else None
     if protocol.get("measured_graph_untimed_compute_repetitions") != args.warmup + 1:
         raise ExportError("manifest setup/warmup count is inconsistent")
-    _same(protocol.get("upstream_setup_compute_repetitions_by_kind"), {kind: 0 if kind == "block" else 1 for kind in ("projection", "attention", "dense_ffn", "block")}, "manifest upstream preparation count")
-    _same(protocol.get("total_untimed_compute_repetitions_by_kind"), {kind: args.warmup + (1 if kind == "block" else 2) for kind in ("projection", "attention", "dense_ffn", "block")}, "manifest total untimed computation count")
-    plan = {case["id"]: case for case in build_plan(manifest.get("suite"), threads)}
+    plan = {case["id"]: case for case in contract.build_plan(manifest.get("suite"), threads)}
+    kinds = sorted({case["kind"] for case in plan.values()})
+    prepared = set(contract.STAGES[:3])
+    _same(protocol.get("upstream_setup_compute_repetitions_by_kind"), {kind: (1 if kind in prepared else 0) for kind in kinds}, "manifest upstream preparation count")
+    _same(protocol.get("total_untimed_compute_repetitions_by_kind"), {kind: args.warmup + (2 if kind in prepared else 1) for kind in kinds}, "manifest total untimed computation count")
     runtime_hashes = manifest.get("software", {}).get("runtime_sha256", {})
     if not isinstance(runtime_hashes, dict):
         raise ExportError("manifest runtime hash evidence must be an object")
     directory = Path(raw_directory).resolve()
     entries, evidence, groups = [], [], {}
+    exported_durations, invariant_groups = {}, {}
     seen = set()
     for row in records:
         if not isinstance(row, dict) or row.get("status") != "measured":
             raise ExportError("failed or incomplete records cannot be exported")
-        case = validate_case(row.get("case"))
+        case = contract.validate_case(row.get("case"))
         if row.get("case_id") != case["id"] or case["id"] not in plan:
             raise ExportError("case identity is absent from its manifest suite")
         _same(case, plan[case["id"]], "measurement case and manifest plan")
@@ -186,10 +350,23 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
         if not isinstance(signature, dict):
             raise ExportError("record lacks its physical signature")
         binary_hash = _digest(signature.get("native_binary_sha256"), "native_binary_sha256")
-        _same(signature, measurement_signature(case, binary_hash), "regenerated measurement signature")
+        _same(signature, measurement_signature(case, binary_hash, contract,
+                                               "streaming" if args.evict_bytes else None,
+                                               declared_scope, placement),
+              "regenerated measurement signature")
         selected = signature["physical_signature"]
-        expected = model_signature(layer, case["kind"], shape)
-        _same(selected, expected, "model physical signature")
+        # The estimator is an export-side declaration, not a property of the raw
+        # measurement, so the record's own signature is checked against the
+        # unchanged contract and the entry then adds the policy it was priced by.
+        base = model_signature(layer, case["kind"], shape,
+                               _stage_config(layer, case, contract), contract=contract)
+        _same(selected, base, "model physical signature")
+        case_policy = (policy if policy is not None and shape.phase == "decode"
+                       and case["kind"] in invariant_kinds else None)
+        expected = (base if case_policy is None else
+                    model_signature(layer, case["kind"], shape,
+                                    _stage_config(layer, case, contract), contract=contract,
+                                    price_policy=case_policy))
         raw_name = row.get("raw_output")
         if not isinstance(raw_name, str) or not raw_name or Path(raw_name).is_absolute():
             raise ExportError("raw_output must be a relative run-directory path")
@@ -203,7 +380,7 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
         command = raw.get("command")
         if not isinstance(command, list) or not command or not isinstance(command[0], str):
             raise ExportError("raw command is missing")
-        _same(command, native_command(case, Path(command[0]).parent, args), "raw native command")
+        _same(command, native_command(case, Path(command[0]).parent, args, contract), "raw native command")
         if runtime_hashes.get(command[0]) != binary_hash:
             raise ExportError("native binary signature hash is not bound to its manifest runtime evidence")
         if not isinstance(raw.get("stdout"), str) or not isinstance(raw.get("stderr"), str):
@@ -215,7 +392,7 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
         # These two fields are the only additions made by the Python runner.
         _same({k: v for k, v in native.items() if k not in {"expected_samples", "summary"}},
               native_raw, "raw stdout and recorded native payload")
-        validate_native_binding(case, native_raw, args)
+        validate_native_binding(case, native_raw, args, contract)
         if native.get("workspace_bytes") is None:
             raise ExportError("workspace is unknown; it cannot become zero in an M2 cost")
         _same(native.get("expected_samples"), args.samples, "runner expected samples")
@@ -233,7 +410,7 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
         if flags or unstable:
             if not allow_unstable:
                 raise ExportError(f"{case['id']}: unstable or flagged measurement (cv={summary['cv']}); only explicit --allow-unstable validation export is permitted")
-        memory = _resident_accounting(layer, case, native)
+        memory = _resident_accounting(layer, case, native, contract)
         duration = summary["median_ns"]
         # Native wall samples are integral nanoseconds. An even-count median can
         # be half a nanosecond; round upward once and record that conversion.
@@ -241,12 +418,16 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
         if duration_ns < 1:
             raise ExportError("median rounds below one nanosecond")
         if case["kind"] != "block":
-            entries.append({"kind": case["kind"], "device": "cpu", "phase": shape.phase,
+            entry = {"kind": case["kind"], "device": "cpu", "phase": shape.phase,
                 "batch": shape.batch, "tokens": shape.tokens, "visible_history": shape.visible_history,
                 "duration_ns": duration_ns, "workspace_bytes": native["workspace_bytes"],
                 "provenance": "measured_macro", "accounting": "per_request",
-                "physical_signature": selected, "contract_hash": canonical_contract_hash(selected),
-                "workspace_scope": "macro_internal_scratch", "workspace_source": native["workspace_source"]})
+                "physical_signature": expected, "contract_hash": canonical_contract_hash(expected),
+                "workspace_scope": "macro_internal_scratch", "workspace_source": native["workspace_source"]}
+            entries.append(entry)
+            exported_durations[case["id"]] = duration_ns
+            if case_policy is not None:
+                invariant_groups.setdefault(case["kind"], []).append((entry, case["id"]))
         evidence.append({"case_id": case["id"], "shape": shape.key(), "kind": case["kind"],
             "raw_output": raw_name, "raw_sha256": _sha(raw_path), "native_binary_sha256": binary_hash,
             "measurement_signature": copy.deepcopy(signature), "sample_summary": summary,
@@ -260,17 +441,27 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
             "summary": summary, "stage_port_digests": native["stage_port_digests"],
             "input_port_digests": native["input_port_digests"],
             "native_binary_sha256": binary_hash, "config": case["config"]}
-    composition = composition_report(groups, max_relative_error=max_relative_error, allow_composition_error=allow_composition_error)
+    pooled_kinds = []
+    if policy is not None:
+        pooled_kinds = collapse_history_invariant_prices(
+            invariant_groups, exported_durations,
+            {record["case_id"]: record for record in evidence}, policy)
+    composition = composition_report(groups, stages=contract.STAGES,
+                                     max_relative_error=max_relative_error,
+                                     allow_composition_error=allow_composition_error,
+                                     durations=(exported_durations if policy is not None else None))
     entries.sort(key=lambda entry: (entry["kind"], entry["phase"], entry["batch"], entry["tokens"], entry["visible_history"]))
     validation_only = allow_unstable or allow_composition_error
     source = manifest.get("profile_id")
     if not isinstance(source, str) or not source:
         raise ExportError("manifest profile_id must be a nonempty string")
+    ffn_stage = contract.STAGES[2]
+    label = "MoE" if ffn_stage == "moe_ffn" else "Dense"
     records_hash = hashlib.sha256(_json(records).encode("utf-8")).hexdigest()
     manifest_hash = hashlib.sha256(_json(manifest).encode("utf-8")).hexdigest()
     costs = {"format_version": "m2-layer-0.3",
-             "source": source + "-manifest-" + manifest_hash[:16] + "-records-" + records_hash[:16] + "-exact-dense-export",
-             "validation_only": validation_only, "entries": entries, "comment": "Exact CPU B1 declared Dense stage evidence; joint composition error is reported and calibration is not claimed. "
+             "source": source + "-manifest-" + manifest_hash[:16] + "-records-" + records_hash[:16] + "-exact-" + label.lower() + "-export",
+             "validation_only": validation_only, "entries": entries, f"comment": "Exact CPU B1 declared {label} stage evidence; joint composition error is reported and calibration is not claimed. "
              + ("validation_only=true; explicit measurement or composition acceptance waiver used." if validation_only else "No measurement or composition acceptance waiver used.")}
     parsed = parse_cost_table(costs)
     for entry in entries:
@@ -280,7 +471,12 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
               "validation_only": validation_only, "allow_unstable": allow_unstable,
               "allow_composition_error": allow_composition_error, "max_relative_error": max_relative_error,
               "calibration_claimed": False, "complete_declared_block_variant": True, "hardware_measurement_performed": False,
-              "boundary": "CPU B1 complete declared pre-norm Dense block with timed materialized stage ports",
+              "history_invariant_price_policy": (None if policy is None else dense_contract.PRICE_POLICIES[policy]),
+              "history_invariant_stages": sorted(pooled_kinds),
+              # The exporter's contract, not the layer's format version, decides which
+              # third stage the joint block should contain.
+              "contract": contract.CONTRACT, "decoder_stages": list(contract.STAGES),
+              "boundary": f"CPU B1 complete declared pre-norm {label} block with timed materialized stage ports",
               "excluded_operations": ["allocation", "quantization", "io", "external_concurrency"],
               "limitations": ["deterministic generated inputs and weights, not pretrained contents",
                   "isolated resident CPU timings, not concurrent or cold-start timings",
@@ -305,6 +501,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-relative-error", type=float, help="explicit acceptance tolerance for stage-sum versus joint-block median; omitted means report only")
     parser.add_argument("--allow-composition-error", action="store_true", help="validation-only export despite an explicitly requested composition tolerance failure")
     parser.add_argument("--phase", choices=("prefill", "decode"), help="explicitly select one phase; omitted records are listed in the evidence report")
+    parser.add_argument("--history-invariant-price", choices=("own_shape", "median_of_history_replicates"),
+        default="own_shape", help="how a decode price is estimated for a stage that reads no history: "
+        "each shape keeps its own median (default, the historical tables) or one pooled median over the "
+        "depth replicates, which declares itself in the signature")
     args = parser.parse_args(argv)
     output = args.output.resolve()
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
@@ -312,7 +512,7 @@ def main(argv: list[str] | None = None) -> int:
     measurements = args.measurements.resolve()
     layer_path = args.layer.resolve()
     manifest_path = measurements.parent / "manifest.json"
-    layer = load_layer(layer_path)
+    layer = contracts.load_layer(layer_path)
     all_records = _load(measurements)
     if not isinstance(all_records, list):
         raise ExportError("measurements must contain a JSON array")
@@ -324,6 +524,7 @@ def main(argv: list[str] | None = None) -> int:
     costs, report = export_cost_table(layer, records, raw_directory=measurements.parent,
         manifest=_load(manifest_path), allow_unstable=args.allow_unstable,
         max_relative_error=args.max_relative_error, allow_composition_error=args.allow_composition_error,
+        price_policy=args.history_invariant_price,
         source_evidence={"measurements": str(measurements), "measurements_sha256": _sha(measurements),
             "layer": str(layer_path), "layer_sha256": _sha(layer_path),
             "manifest": str(manifest_path), "manifest_sha256": _sha(manifest_path)})
@@ -339,7 +540,8 @@ def main(argv: list[str] | None = None) -> int:
         with (output / filename).open("x", encoding="utf-8", newline="\n") as stream:
             json.dump(document, stream, ensure_ascii=False, indent=2, allow_nan=False)
             stream.write("\n")
-    print(f"Exported {len(costs['entries'])} exact Dense stage costs to {output}; validation_only={report['validation_only']}; calibration_claimed=false")
+    print(f"Exported {len(costs['entries'])} exact {report['contract']} stage costs to {output}; "
+          f"validation_only={report['validation_only']}; calibration_claimed=false")
     return 0
 
 

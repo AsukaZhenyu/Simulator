@@ -32,10 +32,25 @@
 ```powershell
 cmake -S profiling/native -B "<new-CPU-build-directory>" -DGGML_SOURCE_DIR="<GGML source>" -DGGML_BUILD_DIR="<existing build>" -DMEASURE_ENABLE_CUDA=OFF
 cmake --build "<new-CPU-build-directory>" --config Release --target ggml-dense-layer-probe
-python profiling/run_dense_layer_measurements.py --suite profiling/cases/dense_layer_cpu_smoke.json --native-bin "<CPU-probe-directory>" --runtime-dir "<matching GGML DLL directory>" --threads 2 --warmup 5 --samples 20 --seed 17 --output profiling/results/my-dense-smoke
+python profiling/run_dense_layer_measurements.py --suite profiling/cases/dense_layer_cpu_smoke.json --native-bin "<CPU-probe-directory>" --runtime-dir "<matching GGML DLL directory>" --threads 2 --cpu-mask 2,4 --warmup 5 --samples 20 --seed 17 --output profiling/results/my-dense-smoke
 ```
 
+`--cpu-mask` 必须显式给出，且每线程一个逻辑 CPU。不给时 worker 落在哪里由 OS
+决定：在 16 核 32 线程的机器上，同一份工作量在不同进程间可以差 1.76 倍（两个
+物理核 vs 一个核的两个 SMT 兄弟）。先用 `ggml-dense-layer-probe --cpu-topology`
+查 `core_index`，再挑两个**不同物理核**的编号；探针会在建池之前
+`SetProcessAffinityMask`，并在计时之前回读每个线程的掩码，
+`cpu_affinity.verified` 为 false 的结果不可用。换线程数时须同步改掩码长度。
+
 Linux 单配置构建需显式设置 `CMAKE_BUILD_TYPE=Release`，`--native-bin` 指向实际 executable 目录。共享库位置用 `--runtime-dir` 传入，不能假定系统自动找到。`--dry-run` 只输出计划，不测硬件；测量共享 `profiling/.measurement.lock`，输出目录必须为空，失败也保存 raw。
+
+### 一个进程测一张表（`--process-scope`）
+
+默认 `per_case`：每个用例一个新进程，命令行就是单独跑这一条时的命令行。进程在启动时带着的机器状态（频率、频率爬坡、另一个静态链接的线程池落在哪）属于**那个进程**，于是表内每一条都各自继承一份，条目之间的比值也就带着这份差异。
+
+`per_suite` 把整张表放进同一个探针进程，按 manifest 的 `case_order` 顺序执行：探针以 `--cases-from-stdin` 启动，每行一个 tab 分隔的参数列表，每条记录后跟一行 `#case <序号> <返回码>`，某条失败不终止后续。驱动逐条喂入（写完一条才读它的结果，因此写端不会在等测量时把管道灌满），并把每条记录拆回原来的 `raw/NNN.json` 形态，所以 `command`、`stdout`、`validate_native_binding` 与导出的读法完全不变。每条用例仍然各自建数据、各自 warmup、各自计时，只有**进程**是共享的。
+
+进程范围是协议而不是几何：`physical_signature` 里只有非默认值才写 `measurement_process_scope`，所以旧表的签名逐字节不变，两种测法的价格也不会互相冒用。`manifest.protocol` 另外记录 `process_scope`、`process_groups` 与 `per_process_timeout_s`；导出时会从 manifest 重新生成签名并核对。
 
 真实几何套件为 `cases/dense_layer_qwen35_geometry.json`；对应模型描述符为 `mapping/examples/m2/qwen35-geometry.declared-block.cpu.layer.json`。小尺寸对应 `dense-block.cpu.layer.json`。这两个描述符显式绑定 threads=2；改线程时须同步修改物理描述符并重新测量。
 
