@@ -113,7 +113,7 @@ class PriceProvenanceTests(unittest.TestCase):
 
 
 class RunnerBuildTests(unittest.TestCase):
-    def test_print_shows_the_two_commands_and_runs_nothing(self):
+    def test_print_still_validates_the_checkout(self):
         script = HERE.parent / "native" / "build_ir_runner.py"
         llama = Path(tempfile.gettempdir()) / "not-a-llama-checkout"
         done = subprocess.run([sys.executable, str(script), "--print", "--llama", str(llama)],

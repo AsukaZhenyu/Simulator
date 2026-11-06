@@ -21,6 +21,11 @@ python profiling/native/build_ir_runner.py --llama PATH     # or reuse an existi
 python profiling/native/build_ir_runner.py --fetch --no-cuda
 ```
 
+CUDA is taken from `nvcc` on `PATH`. `--no-cuda` builds a CPU-only executor (the runner
+then refuses GPU nodes); `--cuda` refuses to continue rather than quietly building a
+CPU-only one, because `GGML_CUDA=ON` needs a CUDA language at configure time and cannot
+be left on by default on a machine that has no toolkit.
+
 The script prints the binary path and the two variables the driver reads:
 
 ```bash

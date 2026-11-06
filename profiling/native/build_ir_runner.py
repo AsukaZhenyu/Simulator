@@ -26,9 +26,10 @@ What it does, in order:
 The binary is then selected at run time through ``IR_RUNNER``; nothing in this
 repository hard-codes a path to it.
 
-CUDA is optional.  Without it the runner still executes CPU nodes and refuses
-the GPU ones; keep ``--no-cuda`` explicit when that is what you want, so a
-missing CUDA is never mistaken for a machine that has none.
+CUDA is optional.  ``GGML_CUDA=ON`` makes ggml configure a CUDA language, so it
+cannot be left on for a machine that has no toolkit: CUDA is used when ``nvcc``
+is on PATH, ``--no-cuda`` turns it off, and ``--cuda`` refuses to continue if the
+toolkit is missing rather than silently building a CPU-only executor.
 """
 from __future__ import annotations
 
@@ -129,6 +130,9 @@ def main(argv=None) -> int:
                         help=f"clone {PINNED_URL} at tag {PINNED_TAG} into {FETCH_DIR.name}/ first")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT,
                         help="CMake tree for the runner (default: profiling/native/build-ir)")
+    parser.add_argument("--cuda", action="store_true",
+                        help="require the CUDA toolkit; refuse to build without it "
+                             "(default: on iff nvcc is on PATH)")
     parser.add_argument("--no-cuda", action="store_true",
                         help="configure CUDA off; the runner then refuses GPU nodes")
     parser.add_argument("--clean", action="store_true", help="delete the runner's build tree first")
@@ -136,7 +140,15 @@ def main(argv=None) -> int:
                         help="print the commands without running them")
     args = parser.parse_args(argv)
 
-    cuda = not args.no_cuda
+    if args.cuda and args.no_cuda:
+        raise SystemExit("pass either --cuda or --no-cuda, not both")
+    cuda = args.cuda or (not args.no_cuda and have("nvcc"))
+    if args.cuda and not have("nvcc"):
+        raise SystemExit("--cuda was asked for, but nvcc is not on PATH; the configure "
+                         "step would fail in ggml's CUDA project.  Drop --cuda to build "
+                         "a CPU-only executor.")
+    print(f"CUDA: {'on (nvcc found)' if cuda else 'off'}"
+          + ("" if cuda or args.no_cuda else " (no nvcc on PATH)"), flush=True)
     if args.fetch and args.llama:
         raise SystemExit("pass either --fetch or --llama, not both")
     if args.fetch:
