@@ -7,9 +7,11 @@ human to run the same thing. A suite is a directory, an optional file pattern
 and an optional top-level directory; PYTHONPATH is set for every suite so that
 the checkout works with or without an editable install.
 
-No suite requires a GPU, CUDA, model weights or network access. The
-measurement apparatus that would need them is kept with the paper, not in this
-repository.
+No suite requires a GPU, CUDA, model weights or network access. The apparatus that
+does need them -- the IR executor, its ggml build, and the corpus it runs -- ships
+here too (``profiling/ir_ggml/``, ``profiling/native/build_ir_runner.py``), but it is
+invoked explicitly rather than from this table: building ggml takes minutes and needs
+a toolchain, and a regression run must not depend on either.
 
 Usage:
     python tools/run_tests.py                # everything

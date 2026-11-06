@@ -1,0 +1,72 @@
+{
+ "schema": "ir-ggml-price-provenance/v1",
+ "note": "Frozen per-action prices, measured on the campaign machine (RTX 4070 Laptop, two pinned CPU threads, cpu_mask 2,4). They are inputs to the IR->ggml comparison, not outputs of this repository: a fresh clone on other hardware should read A1 as the device-to-device ratio against these, never as 1.0.",
+ "tables": {
+  "granite-3.0-3b-a800m": {
+   "path": "granite-3.0-3b-a800m/costs.json",
+   "sha256": "8dfb4157c5b3cdfd05ab4b36a8483f21d403480b292abc695f6359e65a7231c4",
+   "bytes": 85615,
+   "export_source": "granite-3.0-3b-a800m-pinned-r3-manifest-246cc332316c9567-records-39602132f30db19a-exact-moe-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-moe-v1/granite-3.0-3b-a800m-pinned-export"
+  },
+  "olmoe-1b-7b": {
+   "path": "olmoe-1b-7b/costs.json",
+   "sha256": "d2fc96203ec868770a572b8b1233457169247f525af6f7ca7c8715126f3f6cc8",
+   "bytes": 91355,
+   "export_source": "olmoe-1b-7b-pinned-r2-manifest-21bf012a5d8e20de-records-16fa8a90d5aedbc1-exact-moe-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-moe-olmo/olmoe-1b-7b-pinned-r2-export"
+  },
+  "qwen1.5-moe-a2.7b": {
+   "path": "qwen1.5-moe-a2.7b/costs.json",
+   "sha256": "1e7270c67738408b2e7b902ef1428b018e09e66a5caf551733e37e15f9d92f7c",
+   "bytes": 93776,
+   "export_source": "qwen1.5-moe-a2.7b-pinned-r5-manifest-4f34ce9a903cddaf-records-d651cc0bbf5f08c9-exact-moe-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-moe-v1/qwen1.5-moe-a2.7b-pinned-export"
+  },
+  "qwen3-0.6b": {
+   "path": "qwen3-0.6b/costs.json",
+   "sha256": "523710cd51b572b4fa503d470119de4da577631ba3762f82f2f03a38540f8eee",
+   "bytes": 79717,
+   "export_source": "qwen3-0.6b-pinned-manifest-ab4c6a28c930cb14-records-42b4ae26ef1d0e17-exact-dense-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-0.6b-pinned-export"
+  },
+  "qwen3-1.7b": {
+   "path": "qwen3-1.7b/costs.json",
+   "sha256": "85b9711da806558c10ccf19e46f8fe9c3d103b654da01db9236102e0de399165",
+   "bytes": 79730,
+   "export_source": "qwen3-1.7b-pinned-manifest-40df11982574a754-records-ae8c65872abd57cc-exact-dense-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-1.7b-pinned-export"
+  },
+  "qwen3-4b": {
+   "path": "qwen3-4b/costs.json",
+   "sha256": "e0329252eb5f8f11969d5f9915d034e4b41fdaedacae1b66ecc53f4c7eabb67c",
+   "bytes": 79740,
+   "export_source": "qwen3-4b-pinned-manifest-ab5de37d72cee682-records-49d7ac9603a02862-exact-dense-export",
+   "entries": 29,
+   "devices": [
+    "cpu"
+   ],
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-4b-pinned-export"
+  }
+ }
+}

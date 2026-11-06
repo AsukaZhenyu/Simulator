@@ -167,6 +167,13 @@ The `native-*` suites read the probe sources and their provenance records; they
 do **not** compile CUDA code and do not need a GPU. Re-running a measurement is
 a separate, explicit step — see [profiling/README.md](../profiling/README.md).
 
+The one measurement apparatus that compiles anything is the IR executor:
+[profiling/ir_ggml/README.md](../profiling/ir_ggml/README.md) builds `ggml-ir-runner`
+against a pinned llama.cpp, unpacks the 800-policy E/S corpus, instantiates it on a
+model geometry and compares the measured run against the frozen price table. It is
+not in the table above because it needs a C++ toolchain, a ggml build and (for the
+GPU half) a CUDA device; the `profiling` suite covers its Python and its data.
+
 None of these suites measures hardware. A green run means the simulator is
 internally consistent with the references those suites encode; it says nothing
 about how close a prediction is to a real machine.

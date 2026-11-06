@@ -29,7 +29,8 @@ Simulator/
 │   ├── matched_mechanisms/    端口、搬运与组合机制实验
 │   ├── strategy_calibration/  完整声明Dense边界校准
 │   ├── reconfiguration/       资源回收/重载实验
-│   ├── native/                对应原生测量程序
+│   ├── ir_ggml/               IR 策略编成 ggml 图真实计时：800 条 E/S 语料、冻结价表、A1/A2
+│   ├── native/                对应原生测量程序（含 ir_runner.cpp 与 build_ir_runner.py）
 │   ├── tests/、cases/
 │   ├── data/                  可分发的公开路由输入与出处
 │   └── results/               本机原始测量与报告，不随仓库分发
@@ -38,6 +39,8 @@ Simulator/
 │   ├── compose.py             唯一求和规则（零声明项时逐位等于历史表达式）
 │   ├── terms.py               声明项登记表，每项必须指名一个可执行旋钮
 │   ├── predict.py、compare.py、decompose.py
+│   ├── variability.py         一个点估计旁边的带：一次运行散开多远、是不是双峰
+│   ├── pairs.py               同一预测的两次墙钟并排：比值、分不开的行、超带清单
 │   ├── schema.py、result_check.py   文档版本与"别的机器回来的结果"接收
 │   └── tests/
 └── docs/                      当前导航和维护记录
@@ -69,7 +72,10 @@ Simulator/
 | 新模型的数学依赖或物化图 | modeling components / m2 |
 | 容量、在途任务、资源、时间规则 | modeling tensor |
 | 新的真实成本与验证合同 | profiling，独立版本和明确边界 |
+| 一条声明策略怎么编成真图、跑了多久 | profiling/ir_ggml，语料、实例化与 A1/A2 对照 |
 | 价格怎么加成一个请求（求和、声明项、预测/比照/归因） | composing |
+| 一个价格旁边要多宽的带才算同一台机器的同一状态 | composing/variability.py |
+| 同一个预测的两次墙钟怎么并排读 | composing/pairs.py |
 | 别的机器回来的测量结果怎么接收 | composing/result_check.py |
 | 一次性运行结果 | 对应 outputs，按需清理 |
 | 当前真实性能证据 | profiling/results，保留原始样本与来源 |

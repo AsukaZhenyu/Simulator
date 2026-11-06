@@ -23,6 +23,14 @@ modeling/llama_pipeline_kv.bin
 /docs/maintenance/
 # 测量原始产物留在本机，不入库；可分发的输入 trace 放 profiling/data/
 /profiling/**/results/
+# IR→ggml 的再生输入：语料由 corpus_es.py 从 corpus_es.json.gz 展开，cases*/ 由
+# instantiate.py 按模型几何重写，两者都能一条命令重建，只留生成器与压缩包。
+/profiling/ir_ggml/cases/
+/profiling/ir_ggml/cases-es/
+/profiling/ir_ggml/cases-v4/
+/profiling/ir_ggml/cases-v4-moe/
+# build_ir_runner.py --fetch 抓到本地的 llama.cpp 快照（b8705），几百 MB
+/profiling/native/_llama/
 
 # ==================== Python ====================
 __pycache__/

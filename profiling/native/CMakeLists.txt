@@ -61,6 +61,19 @@ if(MEASURE_GGML_SHARED)
 endif()
 target_link_libraries(ggml-dense-layer-probe PRIVATE
     "${MEASURE_GGML_cpu_LIBRARY}" "${MEASURE_GGML_base_LIBRARY}" Threads::Threads)
+# IR -> ggml executor for the two-dimension evaluation; links both backends when present.
+add_executable(ggml-ir-runner ir_runner.cpp)
+target_compile_features(ggml-ir-runner PRIVATE cxx_std_17)
+target_include_directories(ggml-ir-runner PRIVATE "${MEASURE_GGML_INCLUDE}")
+if(MEASURE_GGML_SHARED)
+    target_compile_definitions(ggml-ir-runner PRIVATE GGML_SHARED GGML_BACKEND_SHARED)
+endif()
+target_link_libraries(ggml-ir-runner PRIVATE
+    "${MEASURE_GGML_cpu_LIBRARY}" "${MEASURE_GGML_base_LIBRARY}" Threads::Threads)
+if(MSVC)
+    target_compile_options(ggml-ir-runner PRIVATE /W3 /EHsc)
+endif()
+
 # Static CPU builds can need their original OpenMP dependency at the final link.
 if(NOT MEASURE_GGML_SHARED)
     find_package(OpenMP QUIET COMPONENTS CXX)
@@ -82,8 +95,28 @@ if(MEASURE_ENABLE_CUDA)
     find_library(MEASURE_GGML_cuda_LIBRARY NAMES ggml-cuda
         PATHS ${ggml_library_paths} PATH_SUFFIXES Release RelWithDebInfo NO_DEFAULT_PATH)
     if(CUDAToolkit_FOUND AND MEASURE_GGML_cuda_LIBRARY AND EXISTS "${MEASURE_GGML_INCLUDE}/ggml-cuda.h")
+        target_compile_definitions(ggml-ir-runner PRIVATE GGML_USE_CUDA=1)
+        target_link_libraries(ggml-ir-runner PRIVATE "${MEASURE_GGML_cuda_LIBRARY}" CUDA::cudart)
+        if(NOT MEASURE_GGML_SHARED)
+            target_link_libraries(ggml-ir-runner PRIVATE CUDA::cublas CUDA::cublasLt)
+        endif()
         target_compile_definitions(ggml-compute-probe PRIVATE MEASURE_HAVE_CUDA=1)
         target_link_libraries(ggml-compute-probe PRIVATE "${MEASURE_GGML_cuda_LIBRARY}")
+        # Transfer price at the same abstraction level as the stage probes: one ggml
+        # copy between backends, timed with both backends synchronized around it.
+        add_executable(ggml-copy-probe ggml_copy_probe.cpp)
+        target_compile_features(ggml-copy-probe PRIVATE cxx_std_17)
+        target_include_directories(ggml-copy-probe PRIVATE "${MEASURE_GGML_INCLUDE}")
+        if(MEASURE_GGML_SHARED)
+            target_compile_definitions(ggml-copy-probe PRIVATE GGML_SHARED GGML_BACKEND_SHARED)
+        endif()
+        target_compile_definitions(ggml-copy-probe PRIVATE GGML_USE_CUDA=1)
+        target_link_libraries(ggml-copy-probe PRIVATE
+            "${MEASURE_GGML_cpu_LIBRARY}" "${MEASURE_GGML_base_LIBRARY}"
+            "${MEASURE_GGML_cuda_LIBRARY}" CUDA::cudart Threads::Threads)
+        if(MSVC)
+            target_compile_options(ggml-copy-probe PRIVATE /W3 /EHsc)
+        endif()
         # Independent complete CUDA decoder probe; CPU diagnostics are frozen.
         add_executable(ggml-dense-layer-cuda-probe dense_layer_cuda_probe.cpp)
         target_compile_features(ggml-dense-layer-cuda-probe PRIVATE cxx_std_17)
