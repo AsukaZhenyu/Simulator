@@ -20,13 +20,18 @@ from __future__ import annotations
 
 import math
 
+from .variability import DEFAULT_BAND
+
 DECODE_ORDER = ("tg128", "tg512", "tg1024")
 HISTORY = {"tg128": 128, "tg512": 512, "tg1024": 1024}
 # How far one process sits from another on this machine, measured directly as
 # the fast/slow flip inside a single llama-bench row (MoE report §6.1:
 # 49.89/49.39/50.36/49.41 vs 42.33 ms).  A row that would have to sit further
 # out than this is not explained by process state, so the fit is flagged.
-STATE_BAND = 0.15
+# One constant, not two: this is the same band `variability` reports beside a
+# point estimate, and a decomposition that used a different number would be
+# answering with a threshold no comparison file states.
+STATE_BAND = DEFAULT_BAND
 # A row whose own repetitions spread wider than this is not a point estimate.
 MAX_CV = 0.15
 
@@ -65,7 +70,14 @@ def decompose(prediction: dict, comparison: dict,
     wanted = list(shapes or DECODE_ORDER)
     report = {"schema_version": "dense_endtoend_decomposition_v1",
               "unit": "decode_ms_vs_visible_history",
-              "state_band": state_band, "max_cv": max_cv, "models": {}, "not_measured": []}
+              "state_band": state_band, "max_cv": max_cv,
+              # Carried, not reinterpreted: the grouping is what decides who
+              # pays each process's first-decode cost, and so what slope this
+              # fit is a slope of.  A comparison written before the field
+              # existed says nothing here, which is not "it did not matter".
+              "decode_grouping": comparison.get("decode_grouping"),
+              "warmup": comparison.get("warmup"),
+              "models": {}, "not_measured": []}
     for model_id, entry in prediction["models"].items():
         observed = (comparison.get("models") or {}).get(model_id)
         if not observed:
@@ -181,6 +193,17 @@ def decompose(prediction: dict, comparison: dict,
 
 
 def show(report: dict) -> None:
+    grouping = report.get("decode_grouping")
+    if grouping == "one_process_per_shape":
+        # Not a warning about this run: a warning about the protocol.  One
+        # process per depth means every depth pays its own first-decode cost,
+        # which lands hardest on the shallowest point and lowers the slope
+        # (2026-11-05 B2: 6.525 us/KVtok per-shape against 8.481 grouped on
+        # the same three depths, same table).
+        print("\nprotocol: one process per shape -- every depth paid its own first "
+              "decode, so this slope is biased low (see B2, REPORT section 8)")
+    elif grouping:
+        print(f"\nprotocol: {grouping}")
     for model_id, row in report["models"].items():
         if "shapes_used" not in row:
             # Every measured row moved more inside its own repetitions than a

@@ -12,9 +12,10 @@ def prediction(shapes_ns, layers=2):
     return {"models": {"m": {"layers": layers, "shapes": shapes}}}
 
 
-def comparison(observed, cv=None):
+def comparison(observed, cv=None, grouping="one_process_per_model_decode"):
     cv = cv or {}
-    return {"models": {"m": {name: {"observed_ns": value, "observed_cv": cv.get(name, 0.01)}
+    return {"decode_grouping": grouping,
+            "models": {"m": {name: {"observed_ns": value, "observed_cv": cv.get(name, 0.01)}
                              for name, value in observed.items()}}}
 
 
@@ -148,6 +149,52 @@ class DecomposeTests(unittest.TestCase):
         self.assertIn("no slope", out.getvalue())
         for name in HISTORY:
             self.assertIn(name, out.getvalue())
+
+    def test_the_state_band_is_the_one_variability_reports(self):
+        # Two constants with the same value drift apart on the first edit that
+        # touches one of them; the decomposition must be judging against the
+        # same band a comparison file prints beside each row.
+        from composing import decompose as decompose_module
+        from composing import variability
+        self.assertIs(decompose_module.STATE_BAND, variability.DEFAULT_BAND)
+
+    def test_the_grouping_its_slope_came_from_is_carried_and_shown(self):
+        from composing.decompose import show
+        import io
+        from contextlib import redirect_stdout
+        table = line(1_000_000, 10_000)
+        report = decompose(prediction(table),
+                           comparison(table, grouping="one_process_per_shape"))
+        self.assertEqual(report["decode_grouping"], "one_process_per_shape")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            show(report)
+        # One process per depth charges every depth its own first decode and
+        # reports a lower slope; the print has to say so, not just carry a string.
+        self.assertIn("biased low", out.getvalue())
+
+
+class DecomposeCommandTests(unittest.TestCase):
+    def test_merging_two_groupings_into_one_fit_is_refused(self):
+        # --comparison exists to put one model's rows beside another's; letting
+        # two protocols in would fit one slope across rows that answered
+        # different questions, and the file would not even say which.
+        import json
+        import pathlib
+        import tempfile
+        from composing.__main__ import main
+        table = line(1_000_000, 10_000)
+        with tempfile.TemporaryDirectory() as raw:
+            base = pathlib.Path(raw)
+            (base / "predicted.json").write_text(json.dumps(prediction(table)), encoding="utf-8")
+            (base / "comparison.json").write_text(
+                json.dumps(comparison(table, grouping="one_process_per_shape")), encoding="utf-8")
+            other = base / "other.json"
+            other.write_text(json.dumps(comparison(table, grouping="one_process_per_model_decode")),
+                             encoding="utf-8")
+            with self.assertRaises(ValueError) as caught:
+                main(["decompose", "--e2e", str(base), "--comparison", str(other)])
+        self.assertIn("decode_grouping", str(caught.exception))
 
 
 if __name__ == "__main__":

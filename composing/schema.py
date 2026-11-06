@@ -16,7 +16,13 @@ from __future__ import annotations
 
 PREDICTION = "dense_endtoend_prediction_v2"
 MEASUREMENT = "dense_endtoend_measurement_v1"
-COMPARISON = "dense_endtoend_comparison_v2"
+# v3 adds, beside each row's point estimate, the spread of the repetitions that
+# produced it and a session record of which rows were wider than the state band.
+# A v2 comparison (no ``observation`` block) says nothing about its band, which
+# is not the same claim as "the band was zero", so it is a different version
+# rather than an older spelling of this one.  Archived v2 files stay readable by
+# ``decompose``, which reads the rows and does not validate a version.
+COMPARISON = "dense_endtoend_comparison_v3"
 DECOMPOSITION = "dense_endtoend_decomposition_v1"
 RESULT_MANIFEST = "composing_result_manifest_v1"
 
@@ -92,7 +98,19 @@ def validate_comparison(document, *, where: str = "comparison.json") -> dict:
         raise ValueError(f"{where}.models must be an object")
     for model_id, rows in models.items():
         for config, row in rows.items():
-            for key in ("predicted_ns", "observed_ns", "signed_relative_error"):
+            for key in ("predicted_ns", "observed_ns", "signed_relative_error",
+                        "observation"):
                 if key not in row:
                     raise ValueError(f"{where}: {model_id}/{config} lacks {key!r}")
+    if "session" not in document:
+        raise ValueError(f"{where}: no session record; the band the rows were taken "
+                         "inside is part of what a comparison claims")
+    # A comparison whose decode rows came from one process per depth and one
+    # that grouped the depths are not the same measurement: the per-shape
+    # protocol charges every depth its own first-decode cost and reports a
+    # lower slope (2026-11-05 B2).  Like the band, a missing grouping is not
+    # the same claim as "the grouping did not matter".
+    if not document.get("decode_grouping"):
+        raise ValueError(f"{where}: no decode grouping; the slope of a decode run "
+                         "depends on which depths shared a process")
     return document

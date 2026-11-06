@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from . import schema
+from . import schema, variability
 from .spec import SHAPES, dump_json, sha256_file
 
 # Every one of these is part of what a wall clock means.  A file that omits one
@@ -105,8 +105,18 @@ def inspect_result(directory: Path, *, prediction: Path | None = None,
                     problems.append(f"{model_id}/{config}: row reports n_depth="
                                     f"{measured_by.get('n_depth')}, shape is {expected_depth}")
             per_config[config] = {"avg_ns": row.get("avg_ns"), "samples": len(samples),
-                                  "observed_cv": _cv(samples)}
+                                  "observed_cv": _cv(samples),
+                                  "observation": (variability.summarise(
+                                      samples, where=f"{model_id}/{config}") if samples else None)}
         models[model_id] = per_config
+
+    # A result arriving from another machine is read for two things: whether it
+    # is the result it claims to be, and how wide its own clock was.  The second
+    # one travels with the rows, because it cannot be recomputed here.
+    session = variability.session_summary(
+        {f"{model_id}/{config}": row["observation"]
+         for model_id, rows in models.items()
+         for config, row in rows.items() if row["observation"]})
 
     return {"schema_version": schema.RESULT_MANIFEST, "ok": not problems,
             "result_directory": str(directory.resolve()),
@@ -124,6 +134,7 @@ def inspect_result(directory: Path, *, prediction: Path | None = None,
                             "models_directory": document.get("models_directory"),
                             "bench_protocol": document.get("bench_protocol"),
                             "measured_at_utc": document.get("measured_at_utc")},
+            "session": session,
             "models": models, "problems": problems}
 
 
