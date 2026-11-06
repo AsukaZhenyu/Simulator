@@ -174,7 +174,12 @@ def export_cost_table(layer: Any, records: list[dict], *, raw_directory: str | P
     args = SimpleNamespace(warmup=_int(protocol.get("warmup"), "warmup"),
                            samples=_int(protocol.get("samples"), "samples", 3),
                            seed=_int(protocol.get("seed"), "seed"),
-                           cuda_device=cuda_device, cuda_graphs=cuda_graphs)
+                           cuda_device=cuda_device, cuda_graphs=cuda_graphs,
+                           # A manifest written before `--inner-repetitions` existed
+                           # timed one execution per sample, which is what 1 means.
+                           inner_repetitions=_int(protocol.get("inner_repetitions", 1),
+                                                  "inner_repetitions", 1),
+                           cpu_mask=protocol.get("cpu_mask"))
     if protocol.get("measured_graph_untimed_compute_repetitions") != args.warmup + 1:
         raise ExportError("manifest setup/warmup count is inconsistent")
     _same(protocol.get("upstream_setup_compute_repetitions_by_kind"), {kind: 0 if kind == "block" else 1 for kind in ("projection", "attention", "dense_ffn", "block")}, "manifest upstream preparation count")

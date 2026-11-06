@@ -63,6 +63,27 @@ struct Options {
     // needed here because the graph runs on the threadpool workers, not on the
     // main thread. Additive JSON key; default output is unchanged.
     bool thread_cycles = false;
+    // Declared stack height: the same decoder block executed L times inside one
+    // graph.  A layer measured alone cannot say whether its price is the price
+    // it pays inside a 28-layer loop: the per-shot fixed cost (graph setup,
+    // thread wake, first touch) is paid once per compute here and once per
+    // layer in the loop, and the operands of the other layers evict this one's.
+    // Every layer of the stack reads the same block input, because the cost of
+    // these operations does not depend on activation values; what the height
+    // changes is residency and amortization, which is what the knob is for.
+    // Layers beyond the first keep their own weights, KV cache and ports, so
+    // the stack holds the bytes L distinct layers would hold.
+    int64_t repeat_layers = 1;
+    // Physical layout of the K cache.  `head_major` is the historical probe
+    // layout: one contiguous plane per KV head, so adjacent positions of the
+    // same head are head_dim elements apart.  `position_major` is the layout
+    // llama.cpp stores (llama-kv-cache.cpp merges the head dim into dim 0 and
+    // reads through view_4d with nb1 = one head row and nb2 = a whole GQA row),
+    // so adjacent positions are n_embd_k_gqa elements apart and the eight KV
+    // heads are interleaved inside each row.  Same bytes, same ops, different
+    // stride: the knob exists to measure whether an attention price transfers
+    // between the two.
+    std::string key_cache_layout = "head_major";
 };
 static int64_t integer(const std::string &text) {
     size_t n = 0;
@@ -124,6 +145,10 @@ static Options parse(int argc, char **argv) {
             o.min_warmup_ms = integer(v);
         else if (key == "--evict-bytes")
             o.evict_bytes = integer(v);
+        else if (key == "--repeat-layers")
+            o.repeat_layers = integer(v);
+        else if (key == "--key-cache-layout")
+            o.key_cache_layout = v;
         else if (key == "--thread-cycles") {
             const auto t = integer(v);
             if (t != 0 && t != 1)
@@ -232,6 +257,23 @@ static Options parse(int argc, char **argv) {
             "requires explicit threads/warmup/samples/seed, samples in 3..10000");
     if (o.evict_bytes < 0 || o.evict_bytes > (int64_t{1} << 34))
         throw std::runtime_error("--evict-bytes must be 0..17179869184");
+    // Only a complete block is a thing a model repeats.  The projection,
+    // attention and feed-forward stages are partitions of one block, never
+    // layers, so a stack of one of them would be a number nobody asked for.
+    if (o.repeat_layers < 1 || o.repeat_layers > 64)
+        throw std::runtime_error("--repeat-layers must be 1..64");
+    if (o.repeat_layers > 1 && o.stage != "block")
+        throw std::runtime_error("--repeat-layers > 1 measures a stack of complete decoder "
+                                 "blocks (--stage block) only");
+    // The layout variant prices the same attention on the stride llama.cpp uses.
+    // Only the isolated attention stage declares it: the projection stage fixes
+    // the shape of the new-key port, and a joint block would have to change both
+    // at once, which is a different experiment than the one it exists for.
+    if (o.key_cache_layout != "head_major" && o.key_cache_layout != "position_major")
+        throw std::runtime_error("--key-cache-layout must be head_major or position_major");
+    if (o.key_cache_layout == "position_major" && o.stage != "attention")
+        throw std::runtime_error("--key-cache-layout position_major is measured on "
+                                 "--stage attention only");
     // The paired diagnostic alternates two paths over one resident graph to
     // separate serial from joint launch cost. Flushing between the arms would
     // change both of them and destroy exactly the comparison it exists to make,
@@ -328,6 +370,31 @@ static float stored(const Options &o, float v) {
     return kv_cache_type(o) == GGML_TYPE_F16
                ? ggml_fp16_to_fp32(ggml_fp32_to_fp16(v))
                : v;
+}
+// One flat index into the key cache as the declared layout holds it.  The
+// historical layout keeps a [head_dim, positions, kv head] tensor, so a row is
+// one position of one head.  The position-major layout keeps a
+// [head_dim * kv_heads, positions] tensor, so a row is a whole position with the
+// KV heads packed head-major inside it -- which is what llama.cpp's cpy_k builds
+// (llama-kv-cache.cpp merges dims 0 and 1) and what its get_k view reads.
+static size_t key_index(const Options &o, int64_t j, int64_t t, int64_t h, int64_t positions) {
+    if (o.key_cache_layout == "position_major")
+        return static_cast<size_t>(j + o.head_dim * h) +
+               static_cast<size_t>(o.head_dim * o.kv_heads) * static_cast<size_t>(t);
+    return static_cast<size_t>(j + o.head_dim * (t + positions * h));
+}
+// Rewrite a host buffer from the logical [head_dim, positions, kv head] order the
+// writer and the scalar reference use into the order the declared tensor holds.
+// The default layout is the logical order, so this is a copy there.
+static std::vector<float> in_key_layout(const Options &o, const std::vector<float> &logical,
+                                        int64_t positions) {
+    std::vector<float> physical(logical.size());
+    for (int64_t h = 0; h < o.kv_heads; ++h)
+        for (int64_t t = 0; t < positions; ++t)
+            for (int64_t j = 0; j < o.head_dim; ++j)
+                physical[key_index(o, j, t, h, positions)] =
+                    logical[static_cast<size_t>(j + o.head_dim * (t + positions * h))];
+    return physical;
 }
 static size_t product(std::initializer_list<int64_t> dims) {
     size_t result = 1;
@@ -833,6 +900,10 @@ struct Stage {
     Session s;
     ggml_cgraph *graph = nullptr;
     std::map<std::string, ggml_tensor *> tensors, weights, ports;
+    // One entry per layer of the declared stack; the maps above keep naming the
+    // last layer, which is the one a record reports and digests.
+    std::map<std::string, std::vector<ggml_tensor *>> weight_stack;
+    int64_t layers = 1;
     std::map<std::string, std::pair<int, int>> node_ranges;
     size_t input_bytes = 0, output_bytes = 0, weight_bytes = 0, kv_bytes = 0, internal_bytes = 0,
            cpu_work = 0, logical_internal = 0;
@@ -873,10 +944,18 @@ static std::vector<std::string> roles_for(const Options &o, const std::string &s
     }
     return roles;
 }
+// One tensor per layer of the stack.  Layer 0 keeps the historical name, so a
+// single-layer record is the record it always was; the suffix is a stack
+// height, not a layer index of any checkpoint.
+static std::string layer_name(const std::string &name, int64_t layer) {
+    return layer == 0 ? name : name + "#" + std::to_string(layer);
+}
 static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
-                                          const std::string &stage) {
+                                          const std::string &stage,
+                                          int64_t layers = 1) {
     auto p = std::make_unique<Stage>();
     auto &s = p->s;
+    p->layers = layers;
     const int64_t e = static_cast<int64_t>(product({o.head_dim, o.heads})),
                   length = o.history + o.q;
     s.backend = ggml_backend_cpu_init();
@@ -928,27 +1007,39 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
         throw std::runtime_error("threadpool initialization failed");
     ggml_backend_cpu_set_n_threads(s.backend, o.threads);
     ggml_backend_cpu_set_threadpool(s.backend, s.pool);
-    s.resident = ggml_init({ggml_tensor_overhead() * 64, nullptr, true});
-    s.ctx = ggml_init({ggml_tensor_overhead() * 512 +
-                           ggml_graph_overhead_custom(512, false) * (o.stage == "paired" ? 4 : 1),
+    // The resident context holds one tensor of each kind per layer, plus the
+    // scatter offsets, so its overhead grows with the stack height.  At a height
+    // of one both sizes are the historical ones.
+    s.resident = ggml_init({ggml_tensor_overhead() * (64 + 32 * (layers - 1)), nullptr, true});
+    s.ctx = ggml_init({ggml_tensor_overhead() * 512 * layers +
+                           ggml_graph_overhead_custom(512 * layers, false) *
+                               (o.stage == "paired" ? 4 : 1),
                        nullptr, true});
     if (!s.resident || !s.ctx)
         throw std::runtime_error("tensor metadata allocation failed");
+    std::map<std::string, std::vector<ggml_tensor *>> stack;
     auto add = [&](const std::string &name, int64_t a, int64_t b, int64_t c, bool output,
                    bool cache = false, ggml_type type = GGML_TYPE_F32) {
-        auto *t = type == GGML_TYPE_F32 ? input(s.resident, name.c_str(), a, b, c)
-                                        : typed_input(s.resident, name.c_str(), type, a, b, c);
-        p->tensors[name] = t;
-        if (cache)
-            p->kv_bytes = add_bytes(p->kv_bytes, ggml_nbytes(t));
-        else if (output) {
-            p->output_bytes = add_bytes(p->output_bytes, ggml_nbytes(t));
-            p->ports[name] = t;
-            ggml_set_output(t);
-        } else
-            p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(t));
-        return t;
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            const std::string full = layer_name(name, layer);
+            auto *t = type == GGML_TYPE_F32 ? input(s.resident, full.c_str(), a, b, c)
+                                            : typed_input(s.resident, full.c_str(), type, a, b, c);
+            stack[name].push_back(t);
+            // The named maps keep the last layer: the port a record reports and
+            // the cache a digest is read back from are one layer's.
+            p->tensors[name] = t;
+            if (cache)
+                p->kv_bytes = add_bytes(p->kv_bytes, ggml_nbytes(t));
+            else if (output) {
+                p->output_bytes = add_bytes(p->output_bytes, ggml_nbytes(t));
+                p->ports[name] = t;
+                ggml_set_output(t);
+            } else
+                p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(t));
+        }
+        return stack[name].back();
     };
+    auto at = [&](const std::string &name, int64_t layer) { return stack.at(name).at(layer); };
     const bool projection = stage == "projection" || stage == "block",
                attention = stage == "attention" || stage == "block",
                ffn = stage == "dense_ffn" || stage == "moe_ffn" || stage == "block",
@@ -956,24 +1047,38 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     if (projection || attention || head)
         add("hidden_input", o.hidden, o.q, 1, false);
     if (embedding) {
-        auto *ids = ggml_new_tensor_1d(s.resident, GGML_TYPE_I32, o.q);
-        ggml_set_name(ids, "token_ids");
-        ggml_set_input(ids);
-        p->tensors["token_ids"] = ids;
-        p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(ids));
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            const std::string full = layer_name("token_ids", layer);
+            auto *ids = ggml_new_tensor_1d(s.resident, GGML_TYPE_I32, o.q);
+            ggml_set_name(ids, full.c_str());
+            ggml_set_input(ids);
+            stack["token_ids"].push_back(ids);
+            p->tensors["token_ids"] = ids;
+            p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(ids));
+        }
     }
     if (head)
         add("logits", o.vocab, o.q, 1, true);
     if (projection) {
-        auto *pos = ggml_new_tensor_1d(s.resident, GGML_TYPE_I32, o.q);
-        ggml_set_name(pos, "positions");
-        ggml_set_input(pos);
-        p->tensors["positions"] = pos;
-        p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(pos));
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            const std::string full = layer_name("positions", layer);
+            auto *pos = ggml_new_tensor_1d(s.resident, GGML_TYPE_I32, o.q);
+            ggml_set_name(pos, full.c_str());
+            ggml_set_input(pos);
+            stack["positions"].push_back(pos);
+            p->tensors["positions"] = pos;
+            p->input_bytes = add_bytes(p->input_bytes, ggml_nbytes(pos));
+        }
     }
     if (projection || attention) {
         add("query", o.head_dim, o.q, o.heads, projection);
-        add("new_key", o.head_dim, o.q, o.kv_heads, projection);
+        // A position-major K cache is a row per position, so the appended key is
+        // one row of n_embd_k_gqa -- the shape llama.cpp's cpy_k builds by
+        // merging the head dim into dim 0.
+        if (o.key_cache_layout == "position_major")
+            add("new_key", o.head_dim * o.kv_heads, o.q, 1, projection);
+        else
+            add("new_key", o.head_dim, o.q, o.kv_heads, projection);
         add("new_value", o.head_dim, o.q, o.kv_heads, projection);
         if (o.attention_gate == "sigmoid")
             add("attention_gate", e, o.q, 1, projection);
@@ -984,7 +1089,12 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
         // V is stored transposed as [position, head, kv head]: llama.cpp reads V
         // through this layout so P*V consumes the cache directly, while the plain
         // layout has to materialize a full transpose of the whole cache per step.
-        add("key_cache", o.head_dim, length, o.kv_heads, false, true, kv_cache_type(o));
+        // The declared variant stores K the other way round instead: one row of
+        // n_embd_k_gqa per position, which is what llama.cpp's k cache holds.
+        if (o.key_cache_layout == "position_major")
+            add("key_cache", o.head_dim * o.kv_heads, length, 1, false, true, kv_cache_type(o));
+        else
+            add("key_cache", o.head_dim, length, o.kv_heads, false, true, kv_cache_type(o));
         add("value_cache", length, o.head_dim, o.kv_heads, false, true, kv_cache_type(o));
         // The scatter offsets are constants of the block, but they have to live
         // in the resident buffer, not in the graph: the graph allocator frees a
@@ -992,11 +1102,19 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
         // once is overwritten by the next sample's intermediates (observed as
         // index garbage on the third compute). They are not ports, so they stay
         // out of the port accounting; the resident buffer size below includes them.
-        key_offsets = ggml_new_tensor_1d(s.resident, GGML_TYPE_I64, o.q);
-        ggml_set_name(key_offsets, "key_offsets");
-        value_offsets = ggml_new_tensor_1d(
-            s.resident, GGML_TYPE_I64, static_cast<int64_t>(o.q) * o.head_dim * o.kv_heads);
-        ggml_set_name(value_offsets, "value_offsets");
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            const std::string kn = layer_name("key_offsets", layer),
+                              vn = layer_name("value_offsets", layer);
+            auto *ko = ggml_new_tensor_1d(s.resident, GGML_TYPE_I64, o.q);
+            ggml_set_name(ko, kn.c_str());
+            auto *vo = ggml_new_tensor_1d(
+                s.resident, GGML_TYPE_I64, static_cast<int64_t>(o.q) * o.head_dim * o.kv_heads);
+            ggml_set_name(vo, vn.c_str());
+            stack["key_offsets"].push_back(ko);
+            stack["value_offsets"].push_back(vo);
+        }
+        key_offsets = stack["key_offsets"].back();
+        value_offsets = stack["value_offsets"].back();
     }
     if (attention || ffn)
         add("attention_hidden", o.hidden, o.q, 1, attention);
@@ -1004,47 +1122,68 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     // consumes, so it is a materialized output exactly like the FFN's.
     if (ffn || embedding)
         add("hidden_output", o.hidden, o.q, 1, true);
+    // A stack multiplies every resident byte by its height.  Refuse a height the
+    // machine cannot hold rather than letting the allocator die mid-run, where
+    // the record would be a crash instead of a number.
+    if (layers > 1) {
+        size_t per_layer = 0;
+        for (const auto &role : roles_for(o, stage))
+            per_layer = add_bytes(per_layer, d.weights.at(role).packed.size());
+        if (per_layer > (size_t{8} << 30) / static_cast<size_t>(layers))
+            throw std::runtime_error("--repeat-layers " + std::to_string(layers) + " would hold " +
+                                     std::to_string(per_layer) + " bytes of weights per layer");
+    }
     for (const auto &role : roles_for(o, stage)) {
         const auto &w = d.weights.at(role);
-        auto *t = w.experts > 1
-                      ? ggml_new_tensor_3d(s.resident, w.type, w.cols, w.rows, w.experts)
-                      : ggml_new_tensor_2d(s.resident, w.type, w.cols, w.rows);
-        ggml_set_name(t, role.c_str());
-        ggml_set_input(t);
-        p->weights[role] = t;
-        p->weight_bytes = add_bytes(p->weight_bytes, ggml_nbytes(t));
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            const std::string full = layer_name(role, layer);
+            auto *t = w.experts > 1
+                          ? ggml_new_tensor_3d(s.resident, w.type, w.cols, w.rows, w.experts)
+                          : ggml_new_tensor_2d(s.resident, w.type, w.cols, w.rows);
+            ggml_set_name(t, full.c_str());
+            ggml_set_input(t);
+            p->weight_stack[role].push_back(t);
+            p->weights[role] = t;
+            p->weight_bytes = add_bytes(p->weight_bytes, ggml_nbytes(t));
+        }
     }
     s.buffer = ggml_backend_alloc_ctx_tensors(s.resident, s.backend);
     if (!s.buffer)
         throw std::runtime_error("resident allocation failed");
-    for (const auto &w : p->weights)
-        ggml_backend_tensor_set(w.second, d.weights.at(w.first).packed.data(), 0,
-                                ggml_nbytes(w.second));
+    for (const auto &role : p->weight_stack)
+        for (auto *t : role.second)
+            ggml_backend_tensor_set(t, d.weights.at(role.first).packed.data(), 0,
+                                    ggml_nbytes(t));
     auto put = [&](const std::string &name, const std::vector<float> &f) {
-        if (p->tensors.count(name)) {
-            auto *t = p->tensors.at(name);
-            if (f.size() != static_cast<size_t>(ggml_nelements(t)))
-                throw std::runtime_error("unprepared stage input: " + name);
-            if (t->type == GGML_TYPE_F32)
-                ggml_backend_tensor_set(t, f.data(), 0, ggml_nbytes(t));
-            else if (t->type == GGML_TYPE_F16) {
-                std::vector<ggml_fp16_t> half(f.size());
-                ggml_fp32_to_fp16_row(f.data(), half.data(),
-                                      static_cast<int64_t>(f.size()));
-                ggml_backend_tensor_set(t, half.data(), 0, ggml_nbytes(t));
-            } else
-                throw std::runtime_error("unsupported stage input dtype: " + name);
+        if (stack.count(name)) {
+            // Every layer of the stack reads the same input.
+            for (auto *t : stack.at(name)) {
+                if (f.size() != static_cast<size_t>(ggml_nelements(t)))
+                    throw std::runtime_error("unprepared stage input: " + name);
+                if (t->type == GGML_TYPE_F32)
+                    ggml_backend_tensor_set(t, f.data(), 0, ggml_nbytes(t));
+                else if (t->type == GGML_TYPE_F16) {
+                    std::vector<ggml_fp16_t> half(f.size());
+                    ggml_fp32_to_fp16_row(f.data(), half.data(),
+                                          static_cast<int64_t>(f.size()));
+                    ggml_backend_tensor_set(t, half.data(), 0, ggml_nbytes(t));
+                } else
+                    throw std::runtime_error("unsupported stage input dtype: " + name);
+            }
         }
     };
     put("hidden_input", d.x);
-    put("key_cache", d.kcache);
+    // The reference keeps both caches in the logical order, so the declared
+    // layout is applied here rather than at every reader.
+    put("key_cache", in_key_layout(o, d.kcache, length));
     put("value_cache", d.vcache);
     if (embedding)
-        ggml_backend_tensor_set(p->tensors.at("token_ids"), d.ids.data(), 0,
-                                static_cast<size_t>(o.q) * sizeof(int32_t));
+        for (auto *t : stack.at("token_ids"))
+            ggml_backend_tensor_set(t, d.ids.data(), 0,
+                                    static_cast<size_t>(o.q) * sizeof(int32_t));
     if (!projection && attention) {
         put("query", d.query);
-        put("new_key", d.key);
+        put("new_key", in_key_layout(o, d.key, o.q));
         put("new_value", d.value);
         if (o.attention_gate == "sigmoid")
             put("attention_gate", d.agate);
@@ -1052,145 +1191,176 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     if (!attention && ffn)
         put("attention_hidden", d.attn_hidden);
     if (projection)
-        ggml_backend_tensor_set(p->tensors.at("positions"), d.positions.data(), 0,
-                                static_cast<size_t>(o.q) * sizeof(int32_t));
-    p->graph = ggml_new_graph_custom(s.ctx, 512, false);
+        for (auto *t : stack.at("positions"))
+            ggml_backend_tensor_set(t, d.positions.data(), 0,
+                                    static_cast<size_t>(o.q) * sizeof(int32_t));
+    p->graph = ggml_new_graph_custom(s.ctx, 512 * layers, false);
     auto *ctx = s.ctx;
-    auto materialize = [&](const std::string &name, ggml_tensor *v) {
-        auto *out = ggml_cpy(ctx, v, p->tensors.at(name));
+    auto weight_at = [&](const std::string &role, int64_t layer) {
+        return p->weight_stack.at(role).at(layer);
+    };
+    auto materialize = [&](int64_t layer, const std::string &name, ggml_tensor *v) {
+        auto *out = ggml_cpy(ctx, v, at(name, layer));
         ggml_set_output(out);
         ggml_build_forward_expand(p->graph, out);
         return out;
     };
-    auto norm = [&](ggml_tensor *v, const std::string &role) {
-        return ggml_mul(ctx, ggml_rms_norm(ctx, v, o.norm_eps), p->weights.at(role));
+    auto norm = [&](int64_t layer, ggml_tensor *v, const std::string &role) {
+        return ggml_mul(ctx, ggml_rms_norm(ctx, v, o.norm_eps), weight_at(role, layer));
     };
-    if (embedding) {
-        materialize("hidden_output", ggml_get_rows(ctx, p->weights.at("token_embd"),
-                                                   p->tensors.at("token_ids")));
-    } else if (head) {
-        // Final RMSNorm and the LM head are the last two operations of a token
-        // step; together with the embedding they are what a decoder-block-only
-        // prediction leaves out.
-        auto *n = norm(p->tensors.at("hidden_input"), "final_norm");
-        materialize("logits", ggml_mul_mat(ctx, p->weights.at("lm_head"), n));
-    }
-    ggml_tensor *query = nullptr, *key = nullptr, *value = nullptr, *agate = nullptr,
-                *hidden = nullptr;
-    if (projection) {
-        auto *n = norm(p->tensors.at("hidden_input"), "input_norm");
-        auto qkv = [&](const std::string &role, int64_t heads, bool rotary) {
-            auto *projected = ggml_mul_mat(ctx, p->weights.at(role), n);
-            // llama.cpp adds the stored bias to the projection, then applies
-            // QK norm and RoPE; the order is part of the declared graph.
-            if (o.attention_bias)
-                projected = ggml_add(ctx, projected, p->weights.at(role + "_bias"));
-            // OLMoE normalizes the flat projection output (one gain per hidden
-            // unit) before the head split; the per-head variant normalizes
-            // after it.  The order relative to RoPE is the declared graph.
-            if (rotary && o.qk_norm == "rms_hidden")
-                projected = norm(projected, role == "q" ? "q_norm" : "k_norm");
-            auto *v = ggml_reshape_3d(ctx, projected, o.head_dim, heads, o.q);
-            if (rotary) {
-                if (o.qk_norm == "rms")
-                    v = norm(v, role == "q" ? "q_norm" : "k_norm");
-                v = ggml_rope_ext(ctx, v, p->tensors.at("positions"), nullptr,
-                                  static_cast<int>(o.rope_dims), GGML_ROPE_TYPE_NORMAL, 0,
-                                  o.rope_base, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    // Every layer of the stack reads the same block input; each holds its own
+    // weights, cache and materialized ports.  At a height of one this loop is
+    // the historical graph, node for node.
+    for (int64_t layer = 0; layer < layers; ++layer) {
+        if (embedding) {
+            materialize(layer, "hidden_output",
+                        ggml_get_rows(ctx, weight_at("token_embd", layer),
+                                      at("token_ids", layer)));
+        } else if (head) {
+            // Final RMSNorm and the LM head are the last two operations of a token
+            // step; together with the embedding they are what a decoder-block-only
+            // prediction leaves out.
+            auto *n = norm(layer, at("hidden_input", layer), "final_norm");
+            materialize(layer, "logits", ggml_mul_mat(ctx, weight_at("lm_head", layer), n));
+        }
+        ggml_tensor *query = nullptr, *key = nullptr, *value = nullptr, *agate = nullptr,
+                    *hidden = nullptr;
+        if (projection) {
+            auto *n = norm(layer, at("hidden_input", layer), "input_norm");
+            auto qkv = [&](const std::string &role, int64_t heads, bool rotary) {
+                auto *projected = ggml_mul_mat(ctx, weight_at(role, layer), n);
+                // llama.cpp adds the stored bias to the projection, then applies
+                // QK norm and RoPE; the order is part of the declared graph.
+                if (o.attention_bias)
+                    projected = ggml_add(ctx, projected, weight_at(role + "_bias", layer));
+                // OLMoE normalizes the flat projection output (one gain per hidden
+                // unit) before the head split; the per-head variant normalizes
+                // after it.  The order relative to RoPE is the declared graph.
+                if (rotary && o.qk_norm == "rms_hidden")
+                    projected = norm(layer, projected, role == "q" ? "q_norm" : "k_norm");
+                auto *v = ggml_reshape_3d(ctx, projected, o.head_dim, heads, o.q);
+                if (rotary) {
+                    if (o.qk_norm == "rms")
+                        v = norm(layer, v, role == "q" ? "q_norm" : "k_norm");
+                    v = ggml_rope_ext(ctx, v, at("positions", layer), nullptr,
+                                      static_cast<int>(o.rope_dims), GGML_ROPE_TYPE_NORMAL, 0,
+                                      o.rope_base, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+                }
+                return ggml_cont(ctx, ggml_permute(ctx, v, 0, 2, 1, 3));
+            };
+            query = materialize(layer, "query", qkv("q", o.heads, true));
+            key = materialize(layer, "new_key", qkv("k", o.kv_heads, true));
+            value = materialize(layer, "new_value", qkv("v", o.kv_heads, false));
+            if (o.attention_gate == "sigmoid")
+                agate = materialize(layer, "attention_gate",
+                                    ggml_mul_mat(ctx, weight_at("gate_proj", layer), n));
+            if (layers == 1)
+                p->node_ranges["projection"] = {0, ggml_graph_n_nodes(p->graph)};
+        } else if (attention) {
+            query = at("query", layer);
+            key = at("new_key", layer);
+            value = at("new_value", layer);
+            if (o.attention_gate == "sigmoid")
+                agate = at("attention_gate", layer);
+        }
+        if (attention) {
+            auto *kc = at("key_cache", layer), *vc = at("value_cache", layer);
+            // SET_ROWS is the only scatter that writes a cache of any element type
+            // *and* returns the complete cache, so readers depend on the write even
+            // in the joint graph. SET-inplace accepts an f32 destination only.
+            // K: one row per (kv head, new position); the head plane is dim 2.
+            auto *kr = ggml_set_rows(ctx, kc, key, at("key_offsets", layer));
+            // K, the way llama.cpp reads it: the scatter result is one row of
+            // n_embd_k_gqa per position, so the attention read is the view
+            // llama-kv-cache.cpp:get_k builds -- position stride is a whole
+            // row, head stride is one head row.  mul_mat still broadcasts the
+            // kv heads over the query heads.
+            if (o.key_cache_layout == "position_major")
+                kr = ggml_view_3d(ctx, kr, o.head_dim, length, o.kv_heads, kr->nb[1],
+                                  kr->nb[0] * o.head_dim, 0);
+            // V: the transposed cache interleaves heads along the slowest axis, so
+            // the append is one element per (head, position, channel) triple.
+            auto *vflat = ggml_reshape_2d(ctx, vc, 1, static_cast<int64_t>(ggml_nelements(vc)));
+            auto *newflat = ggml_reshape_2d(ctx, value, 1,
+                                            static_cast<int64_t>(ggml_nelements(value)));
+            auto *vr = ggml_reshape_3d(
+                ctx, ggml_set_rows(ctx, vflat, newflat, at("value_offsets", layer)), length,
+                o.head_dim, o.kv_heads);
+            auto *scores = ggml_mul_mat(ctx, kr, query);
+            scores = ggml_scale(ctx, scores, 1.0f / std::sqrt(static_cast<float>(o.head_dim)));
+            scores = ggml_diag_mask_inf(ctx, scores, static_cast<int>(o.history));
+            auto *probs = ggml_soft_max(ctx, scores);
+            auto *attended = ggml_mul_mat(ctx, vr, probs);
+            auto *merged = ggml_reshape_2d(
+                ctx, ggml_cont(ctx, ggml_permute(ctx, attended, 0, 2, 1, 3)), e, o.q);
+            if (agate)
+                merged = ggml_mul(ctx, merged, ggml_sigmoid(ctx, agate));
+            hidden = materialize(
+                layer, "attention_hidden",
+                ggml_add(ctx, ggml_mul_mat(ctx, weight_at("output", layer), merged),
+                         at("hidden_input", layer)));
+            if (layers == 1)
+                p->node_ranges["attention"] = {
+                    projection ? p->node_ranges.at("projection").second : 0,
+                    ggml_graph_n_nodes(p->graph)};
+        } else if (ffn)
+            hidden = at("attention_hidden", layer);
+        if (ffn && o.experts == 0) {
+            auto *n = norm(layer, hidden, "post_attention_norm");
+            auto *g = ggml_mul_mat(ctx, weight_at("gate", layer), n);
+            auto *u = ggml_mul_mat(ctx, weight_at("up", layer), n);
+            auto *active = ggml_swiglu_split(ctx, g, u);
+            materialize(layer, "hidden_output",
+                        ggml_add(ctx, ggml_mul_mat(ctx, weight_at("down", layer), active), hidden));
+            if (layers == 1)
+                p->node_ranges["dense_ffn"] = {
+                    attention ? p->node_ranges.at("attention").second : 0,
+                    ggml_graph_n_nodes(p->graph)};
+        } else if (ffn) {
+            // The sparse block in the sequence llama.cpp builds it: router scores,
+            // top-k, three indirect matrix products, the weighted reduction over the
+            // selected experts, then the shared expert (if the checkpoint has one)
+            // and the residual.
+            auto *n = norm(layer, hidden, "post_attention_norm");
+            auto *logits = ggml_mul_mat(ctx, weight_at("router", layer), n); // [experts, tokens]
+            auto *probs = ggml_soft_max(ctx, logits);                        // over all experts
+            auto *selected = ggml_argsort_top_k(ctx, probs, static_cast<int>(o.top_k));
+            auto *weights = ggml_get_rows(
+                ctx, ggml_reshape_3d(ctx, probs, 1, o.experts, o.q), selected); // [1, k, tokens]
+            if (o.normalize_topk) {
+                // Renormalizing the selected weights is what the declared variant
+                // does; the clamp is llama.cpp's own guard against a zero sum.
+                auto *w2 = ggml_reshape_2d(ctx, weights, o.top_k, o.q);
+                auto *sum = ggml_clamp(ctx, ggml_sum_rows(ctx, w2), 6.103515625e-5f, INFINITY);
+                weights = ggml_reshape_3d(ctx, ggml_div(ctx, w2, sum), 1, o.top_k, o.q);
             }
-            return ggml_cont(ctx, ggml_permute(ctx, v, 0, 2, 1, 3));
-        };
-        query = materialize("query", qkv("q", o.heads, true));
-        key = materialize("new_key", qkv("k", o.kv_heads, true));
-        value = materialize("new_value", qkv("v", o.kv_heads, false));
-        if (o.attention_gate == "sigmoid")
-            agate = materialize("attention_gate", ggml_mul_mat(ctx, p->weights.at("gate_proj"), n));
-        p->node_ranges["projection"] = {0, ggml_graph_n_nodes(p->graph)};
-    } else if (attention) {
-        query = p->tensors.at("query");
-        key = p->tensors.at("new_key");
-        value = p->tensors.at("new_value");
-        if (o.attention_gate == "sigmoid")
-            agate = p->tensors.at("attention_gate");
-    }
-    if (attention) {
-        auto *kc = p->tensors.at("key_cache"), *vc = p->tensors.at("value_cache");
-        // SET_ROWS is the only scatter that writes a cache of any element type
-        // *and* returns the complete cache, so readers depend on the write even
-        // in the joint graph. SET-inplace accepts an f32 destination only.
-        // K: one row per (kv head, new position); the head plane is dim 2.
-        auto *kr = ggml_set_rows(ctx, kc, key, key_offsets);
-        // V: the transposed cache interleaves heads along the slowest axis, so
-        // the append is one element per (head, position, channel) triple.
-        auto *vflat = ggml_reshape_2d(ctx, vc, 1, static_cast<int64_t>(ggml_nelements(vc)));
-        auto *newflat = ggml_reshape_2d(ctx, value, 1,
-                                        static_cast<int64_t>(ggml_nelements(value)));
-        auto *vr = ggml_reshape_3d(ctx, ggml_set_rows(ctx, vflat, newflat, value_offsets),
-                                   length, o.head_dim, o.kv_heads);
-        auto *scores = ggml_mul_mat(ctx, kr, query);
-        scores = ggml_scale(ctx, scores, 1.0f / std::sqrt(static_cast<float>(o.head_dim)));
-        scores = ggml_diag_mask_inf(ctx, scores, static_cast<int>(o.history));
-        auto *probs = ggml_soft_max(ctx, scores);
-        auto *attended = ggml_mul_mat(ctx, vr, probs);
-        auto *merged =
-            ggml_reshape_2d(ctx, ggml_cont(ctx, ggml_permute(ctx, attended, 0, 2, 1, 3)), e, o.q);
-        if (agate)
-            merged = ggml_mul(ctx, merged, ggml_sigmoid(ctx, agate));
-        hidden = materialize("attention_hidden",
-                             ggml_add(ctx, ggml_mul_mat(ctx, p->weights.at("output"), merged),
-                                      p->tensors.at("hidden_input")));
-        p->node_ranges["attention"] = {projection ? p->node_ranges.at("projection").second : 0,
-                                       ggml_graph_n_nodes(p->graph)};
-    } else if (ffn)
-        hidden = p->tensors.at("attention_hidden");
-    if (ffn && o.experts == 0) {
-        auto *n = norm(hidden, "post_attention_norm");
-        auto *g = ggml_mul_mat(ctx, p->weights.at("gate"), n);
-        auto *u = ggml_mul_mat(ctx, p->weights.at("up"), n);
-        auto *active = ggml_swiglu_split(ctx, g, u);
-        materialize("hidden_output",
-                    ggml_add(ctx, ggml_mul_mat(ctx, p->weights.at("down"), active), hidden));
-        p->node_ranges["dense_ffn"] = {attention ? p->node_ranges.at("attention").second : 0,
-                                       ggml_graph_n_nodes(p->graph)};
-    } else if (ffn) {
-        // The sparse block in the sequence llama.cpp builds it: router scores,
-        // top-k, three indirect matrix products, the weighted reduction over the
-        // selected experts, then the shared expert (if the checkpoint has one)
-        // and the residual.
-        auto *n = norm(hidden, "post_attention_norm");
-        auto *logits = ggml_mul_mat(ctx, p->weights.at("router"), n); // [experts, tokens]
-        auto *probs = ggml_soft_max(ctx, logits);                     // over all experts
-        auto *selected = ggml_argsort_top_k(ctx, probs, static_cast<int>(o.top_k));
-        auto *weights = ggml_get_rows(
-            ctx, ggml_reshape_3d(ctx, probs, 1, o.experts, o.q), selected); // [1, k, tokens]
-        if (o.normalize_topk) {
-            // Renormalizing the selected weights is what the declared variant
-            // does; the clamp is llama.cpp's own guard against a zero sum.
-            auto *w2 = ggml_reshape_2d(ctx, weights, o.top_k, o.q);
-            auto *sum = ggml_clamp(ctx, ggml_sum_rows(ctx, w2), 6.103515625e-5f, INFINITY);
-            weights = ggml_reshape_3d(ctx, ggml_div(ctx, w2, sum), 1, o.top_k, o.q);
+            auto *cur = ggml_reshape_3d(ctx, n, o.hidden, 1, o.q);
+            auto *up = ggml_mul_mat_id(ctx, weight_at("up_exps", layer), cur, selected);
+            auto *gate = ggml_mul_mat_id(ctx, weight_at("gate_exps", layer), cur, selected);
+            auto *active = ggml_swiglu_split(ctx, gate, up);
+            auto *experts = ggml_mul_mat_id(ctx, weight_at("down_exps", layer), active, selected);
+            experts = ggml_mul(ctx, experts, weights); // [hidden, k, tokens]
+            auto *moe = ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2], 0);
+            for (int64_t i = 1; i < o.top_k; ++i)
+                moe = ggml_add(ctx, moe,
+                               ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2],
+                                            i * experts->nb[1]));
+            if (o.shared_intermediate > 0) {
+                auto *sg =
+                    ggml_sigmoid(ctx, ggml_mul_mat(ctx, weight_at("gate_inp_shexp", layer), n));
+                auto *shared =
+                    ggml_swiglu_split(ctx, ggml_mul_mat(ctx, weight_at("gate_shexp", layer), n),
+                                      ggml_mul_mat(ctx, weight_at("up_shexp", layer), n));
+                shared =
+                    ggml_mul(ctx, ggml_mul_mat(ctx, weight_at("down_shexp", layer), shared), sg);
+                moe = ggml_add(ctx, moe, shared);
+            }
+            materialize(layer, "hidden_output", ggml_add(ctx, moe, hidden));
+            if (layers == 1)
+                p->node_ranges["moe_ffn"] = {
+                    attention ? p->node_ranges.at("attention").second : 0,
+                    ggml_graph_n_nodes(p->graph)};
         }
-        auto *cur = ggml_reshape_3d(ctx, n, o.hidden, 1, o.q);
-        auto *up = ggml_mul_mat_id(ctx, p->weights.at("up_exps"), cur, selected);
-        auto *gate = ggml_mul_mat_id(ctx, p->weights.at("gate_exps"), cur, selected);
-        auto *active = ggml_swiglu_split(ctx, gate, up);
-        auto *experts = ggml_mul_mat_id(ctx, p->weights.at("down_exps"), active, selected);
-        experts = ggml_mul(ctx, experts, weights); // [hidden, k, tokens]
-        auto *moe = ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2], 0);
-        for (int64_t i = 1; i < o.top_k; ++i)
-            moe = ggml_add(ctx, moe,
-                           ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2],
-                                        i * experts->nb[1]));
-        if (o.shared_intermediate > 0) {
-            auto *sg = ggml_sigmoid(ctx, ggml_mul_mat(ctx, p->weights.at("gate_inp_shexp"), n));
-            auto *shared = ggml_swiglu_split(ctx, ggml_mul_mat(ctx, p->weights.at("gate_shexp"), n),
-                                             ggml_mul_mat(ctx, p->weights.at("up_shexp"), n));
-            shared = ggml_mul(ctx, ggml_mul_mat(ctx, p->weights.at("down_shexp"), shared), sg);
-            moe = ggml_add(ctx, moe, shared);
-        }
-        materialize("hidden_output", ggml_add(ctx, moe, hidden));
-        p->node_ranges["moe_ffn"] = {attention ? p->node_ranges.at("attention").second : 0,
-                                     ggml_graph_n_nodes(p->graph)};
     }
     for (int i = 0; i < ggml_graph_n_nodes(p->graph); ++i)
         if (!ggml_backend_supports_op(s.backend, ggml_graph_node(p->graph, i)))
@@ -1214,10 +1384,13 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
                     vo[src] = static_cast<int64_t>(o.history + t) +
                               length * (j + o.head_dim * h);
                 }
-        ggml_backend_tensor_set(key_offsets, ko.data(), 0,
-                                static_cast<size_t>(o.q) * sizeof(int64_t));
-        ggml_backend_tensor_set(value_offsets, vo.data(), 0,
-                                vo.size() * sizeof(int64_t));
+        for (int64_t layer = 0; layer < layers; ++layer) {
+            auto *ko_t = stack.at("key_offsets").at(static_cast<size_t>(layer));
+            auto *vo_t = stack.at("value_offsets").at(static_cast<size_t>(layer));
+            ggml_backend_tensor_set(ko_t, ko.data(), 0,
+                                    static_cast<size_t>(o.q) * sizeof(int64_t));
+            ggml_backend_tensor_set(vo_t, vo.data(), 0, vo.size() * sizeof(int64_t));
+        }
         {   // the scatter is only correct if the offsets really reached the buffer
             std::vector<int64_t> back(vo.size());
             ggml_backend_tensor_get(value_offsets, back.data(), 0,
@@ -1227,6 +1400,16 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
                                     static_cast<size_t>(o.q) * sizeof(int64_t));
             if (back != vo || backk != ko || !key_offsets->buffer || !value_offsets->buffer)
                 throw std::runtime_error("scatter offsets did not reach the buffer");
+            // Every layer scatters with its own copy; one that did not receive
+            // the offsets would write the cache at position zero instead.
+            for (int64_t layer = 1; layer < layers; ++layer) {
+                auto *vo_t = stack.at("value_offsets").at(static_cast<size_t>(layer));
+                std::vector<int64_t> again(vo.size());
+                ggml_backend_tensor_get(vo_t, again.data(), 0, vo.size() * sizeof(int64_t));
+                if (again != vo)
+                    throw std::runtime_error("scatter offsets did not reach layer " +
+                                             std::to_string(layer));
+            }
         }
     }
     p->internal_bytes = ggml_gallocr_get_buffer_size(s.allocator, 0);
@@ -1333,12 +1516,12 @@ static std::vector<float> attention_reference(const Options &o, const Data &d,
                                               const std::vector<float> &gate) {
     const auto len = o.history + o.q, e = o.head_dim * o.heads;
     // k and v are the host copies of the two caches in their physical layouts:
-    // K as [head, position, kv head], V transposed as [position, head, kv head].
-    auto k = d.kcache, v = d.vcache;
+    // K as declared by --key-cache-layout, V transposed as [position, head, kv].
+    auto k = in_key_layout(o, d.kcache, len), v = d.vcache;
     for (int64_t h = 0; h < o.kv_heads; ++h)
         for (int64_t t = 0; t < o.q; ++t)
             for (int64_t j = 0; j < o.head_dim; ++j) {
-                const size_t dst = static_cast<size_t>(j + o.head_dim * (o.history + t + len * h)),
+                const size_t dst = key_index(o, j, o.history + t, h, len),
                              vdst = static_cast<size_t>(o.history + t) +
                                     static_cast<size_t>(len) *
                                         static_cast<size_t>(j + o.head_dim * h),
@@ -1357,7 +1540,7 @@ static std::vector<float> attention_reference(const Options &o, const Data &d,
                 for (int64_t j = 0; j < o.head_dim; ++j)
                     score += static_cast<double>(
                                  query[static_cast<size_t>(j + o.head_dim * (t + o.q * h))]) *
-                             k[static_cast<size_t>(j + o.head_dim * (s + len * kh))];
+                             k[key_index(o, j, s, kh, len)];
                 scores[static_cast<size_t>(s)] = score / std::sqrt(static_cast<double>(o.head_dim));
                 largest = std::max(largest, scores[static_cast<size_t>(s)]);
             }
@@ -1856,17 +2039,19 @@ static PathSnapshot path_snapshot(const Options &o, const Data &d, Stage &stage)
     for (int64_t h = 0; h < o.kv_heads; ++h)
         for (int64_t t = 0; t < length; ++t)
             for (int64_t j = 0; j < o.head_dim; ++j) {
-                const size_t dst = static_cast<size_t>(j + o.head_dim * (t + length * h)),
+                // `key` comes back from the tensor, so it is in the declared
+                // layout; the reference buffer is in the logical order.
+                const size_t dst = key_index(o, j, t, h, length),
+                             logical = static_cast<size_t>(j + o.head_dim * (t + length * h)),
                              vdst = static_cast<size_t>(t) +
                                     static_cast<size_t>(length) *
                                         static_cast<size_t>(j + o.head_dim * h);
                 if (t < o.history)
                     result.history_unchanged = result.history_unchanged &&
-                                               key[dst] == d.kcache[dst] &&
+                                               key[dst] == d.kcache[logical] &&
                                                value[vdst] == d.vcache[vdst];
                 else {
-                    const size_t src =
-                        static_cast<size_t>(j + o.head_dim * (t - o.history + o.q * h));
+                    const size_t src = key_index(o, j, t - o.history, h, o.q);
                     result.append_exact =
                         result.append_exact && key[dst] == stored(o, new_key[src]) &&
                         value[vdst] == stored(o, new_value[src]);
@@ -2077,11 +2262,18 @@ static int run(const Options &o) {
     const bool decoder_stage = stage_kind == "projection" || stage_kind == "attention" ||
                                stage_kind == "dense_ffn" || stage_kind == "moe_ffn";
     if (decoder_stage) {
-        auto prep = build_stage(o, d, "block");
+        // The preparation that seeds a stage record is a plain block, and the
+        // declared K-cache layout belongs to the stage being measured: the
+        // preparation keeps the historical one so `d` stays in logical order.
+        Options prep_options = o;
+        prep_options.key_cache_layout = "head_major";
+        auto prep = build_stage(prep_options, d, "block");
         compute(prep->s, prep->graph);
         capture(*prep, d);
     }
-    auto stage = build_stage(o, d, stage_kind);
+    // The measured stage carries the declared stack height; the upstream
+    // preparation that seeds a stage-level record stays a single block.
+    auto stage = build_stage(o, d, stage_kind, o.repeat_layers);
     auto &s = stage->s;
     std::vector<int64_t> wall;
     std::vector<int64_t> cycles;
@@ -2211,20 +2403,30 @@ static int run(const Options &o) {
         const auto &kn = stage_kind == "block" ? outputs.at("new_key") : d.key;
         const auto &vn = stage_kind == "block" ? outputs.at("new_value") : d.value;
         const int64_t len = o.history + o.q;
+        // The graph's own new_key output is in the declared layout; the input
+        // copy (stage attention) is in the logical order, so it is converted.
+        std::vector<float> kn_layout;
+        const std::vector<float> *kn_physical = &kn;
+        if (stage_kind != "block") {
+            kn_layout = in_key_layout(o, kn, o.q);
+            kn_physical = &kn_layout;
+        }
         for (int64_t h = 0; h < o.kv_heads; ++h)
             for (int64_t t = 0; t < len; ++t)
                 for (int64_t j = 0; j < o.head_dim; ++j) {
-                    const size_t dst = static_cast<size_t>(j + o.head_dim * (t + len * h)),
+                    const size_t dst = key_index(o, j, t, h, len),
+                                 logical = static_cast<size_t>(j + o.head_dim * (t + len * h)),
                                  vdst = static_cast<size_t>(t) +
                                         static_cast<size_t>(len) *
                                             static_cast<size_t>(j + o.head_dim * h);
                     if (t < o.history)
-                        history_unchanged = history_unchanged && actualk[dst] == d.kcache[dst] &&
+                        history_unchanged = history_unchanged &&
+                                            actualk[dst] == d.kcache[logical] &&
                                             actualv[vdst] == d.vcache[vdst];
                     else {
-                        const size_t src =
-                            static_cast<size_t>(j + o.head_dim * (t - o.history + o.q * h));
-                        append_exact = append_exact && actualk[dst] == stored(o, kn[src]) &&
+                        const size_t src = key_index(o, j, t - o.history, h, o.q);
+                        append_exact = append_exact &&
+                                       actualk[dst] == stored(o, (*kn_physical)[src]) &&
                                        actualv[vdst] == stored(o, vn[src]);
                     }
                 }
@@ -2280,6 +2482,16 @@ static int run(const Options &o) {
               << (decoder_stage ? 1 : 0) << ",\"samples\":" << o.samples
               << ",\"seed\":" << o.seed
               << ",\"evict_bytes\":" << o.evict_bytes
+              // Additive, and only when a stack was declared: a height of one
+              // is the single-layer record every earlier campaign holds.
+              << (o.repeat_layers > 1
+                      ? ",\"repeat_layers\":" + std::to_string(o.repeat_layers)
+                      : std::string())
+              // Additive, and only when the non-default layout was declared: a
+              // default-layout record stays byte-identical to what it always was.
+              << (o.key_cache_layout == "position_major"
+                      ? ",\"key_cache_layout\":\"position_major\""
+                      : std::string())
               << ",\"residency_regime\":\""
               << (o.evict_bytes > 0 ? "streamed_cold_cache_before_each_sample"
                                     : "resident_warm_cache_shared_across_samples")
@@ -2294,6 +2506,7 @@ static int run(const Options &o) {
                  "\"implementation_variant\":\""
               << (o.experts > 0 ? "ggml_cpu_moe_materialized_" : "ggml_cpu_dense_materialized_")
               << o.stage << (paired ? "_" + o.compute_mode : "")
+              << (o.key_cache_layout == "position_major" ? "_kcache_position_major" : "")
               << (o.experts > 0 ? "_v1" : kv_cache_type(o) == GGML_TYPE_F16 ? "_v2" : "_v1")
               << "\",\"timing\":\""
               << (paired ? "steady_clock_paired_same_resident_graph_partitions_including_sync"

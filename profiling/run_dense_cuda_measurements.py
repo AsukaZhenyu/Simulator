@@ -6,6 +6,7 @@ M2 cost tables. The shared lock serializes all profiling hardware execution.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import csv
 from datetime import datetime, timezone
 import json
@@ -28,6 +29,39 @@ from profile_contract import summarize_samples, validate_measurement
 from run_measurements import dump, environment, sha256
 
 ROOT = Path(__file__).resolve().parent
+
+
+def _pin_affinity(pid: int, mask: int) -> str:
+    """Bind a child we just created to `mask`.  Returns a receipt string for the manifest.
+
+    Without this the probe is scheduled wherever Windows likes, and on this machine that
+    is the difference between one number and three: the same command, same clocks, same
+    power draws 300--350 us when pinned to `cpu_mask 2,4` and 920 / 1050 / 336 / 1051 us
+    when left free (3.13x).  The IR executor is always launched with the case's own
+    `cpu_mask`, so an unpinned probe measures a process the executor never runs.
+
+    Affinity is set immediately after creation.  CUDA init, graph construction and the
+    warmup all happen after this call, so the timed region is never in the free state;
+    the receipt records the mask, not a claim about residency.
+    """
+    if os.name != "nt":
+        return "unsupported-platform"
+    kernel = ctypes.windll.kernel32
+    handle = kernel.OpenProcess(0x0200 | 0x0400, False, pid)   # SET_QUOTA | QUERY_INFORMATION
+    if not handle:
+        return "open-failed"
+    try:
+        return "applied" if kernel.SetProcessAffinityMask(handle, ctypes.c_size_t(mask)) else "set-failed"
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _mask_of(text: str) -> int:
+    """`"2,4"` -> 0b10100.  The same spelling the case headers use."""
+    ids = [int(part) for part in text.split(",")]
+    if not ids or any(cpu < 0 or cpu >= 64 for cpu in ids):
+        raise ValueError("cpu mask must be a comma-separated list of logical CPU ids in 0..63")
+    return sum(1 << cpu for cpu in ids)
 
 
 def _same(actual, expected, label):
@@ -114,7 +148,8 @@ def validate_device_execution(case: dict, native: dict) -> None:
 def native_command(case: dict, binary_dir: Path, args: argparse.Namespace) -> list[str]:
     suffix = ".exe" if os.name == "nt" else ""
     return [str(binary_dir / ("ggml-dense-layer-cuda-probe" + suffix)),
-            *native_arguments(case, args.warmup, args.samples, args.seed)]
+            *native_arguments(case, args.warmup, args.samples, args.seed),
+            "--repetitions", str(args.inner_repetitions)]
 
 
 def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) -> None:
@@ -137,7 +172,11 @@ def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) 
         "upstream_setup_compute_repetitions": 0 if case["kind"] == "block" else 1,
         "input_lineage": "same_seed_complete_upstream_preparation_outside_timing",
         "position_dtype": "i32",
-        "warmup": args.warmup, "samples": args.samples, "seed": args.seed}
+        "warmup": args.warmup, "samples": args.samples, "seed": args.seed,
+        # Callers that measure memory rather than time pass no repetition knob: their
+        # native run takes the probe's default, which is one. Declaring that as the
+        # expectation still binds -- a native run that repeated would say so and fail.
+        "timed_repetitions": getattr(args, "inner_repetitions", 1)}
     for key, value in expected.items():
         actual = validate_config(native.get(key)) if key == "config" else native.get(key)
         _same(actual, value, f"native {key}")
@@ -268,13 +307,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--timeout-s", type=float, default=180)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--cpu-mask", default=None,
+                        help="pin every child probe to this CPU set (`2,4`), the same spelling "
+                             "the case headers use.  Omitted means the OS decides, which on "
+                             "this machine is a 3.1x band -- see _pin_affinity")
     parser.add_argument("--backend-revision", help="Declared source revision; actual executable/library hashes recorded separately")
+    parser.add_argument("--inner-repetitions", type=int, default=1,
+                        help="graph executions timed as one sample.  One execution per sample "
+                             "at these shapes measures the host dispatch, not the work: the "
+                             "same case reads cv 0.099 at 1 and 0.009 at 128.  The price "
+                             "stays per execution -- `wall_ns` is the loop time divided by "
+                             "this count, and `raw/*.json` keeps the loop time verbatim")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
     args = parser.parse_args(argv)
-    if args.cuda_device < 0 or args.warmup < 0 or not 3 <= args.samples <= 10000 or not 0 <= args.seed <= 0xFFFFFFFF or not math.isfinite(args.timeout_s) or args.timeout_s <= 0:
-        parser.error("invalid CUDA device, warmup, samples, seed or timeout")
+    if args.cuda_device < 0 or args.warmup < 0 or not 3 <= args.samples <= 10000 or not 0 <= args.seed <= 0xFFFFFFFF or not math.isfinite(args.timeout_s) or args.timeout_s <= 0 or not 1 <= args.inner_repetitions <= 10000:
+        parser.error("invalid CUDA device, warmup, samples, seed, inner repetitions or timeout")
     suite = json.loads(args.suite.read_text(encoding="utf-8"))
+    if args.cpu_mask:
+        mask = _mask_of(args.cpu_mask)
+    else:
+        mask = None
     plan = build_plan(suite, args.cuda_device, args.cuda_graphs)
     random.Random(args.seed).shuffle(plan)
     binary_dir = args.native_bin.resolve()
@@ -318,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
             "created_at_utc": datetime.now(timezone.utc).isoformat(), "profile_id": output.name,
             "environment": environment(), "suite": suite, "suite_sha256": sha256(args.suite),
             "case_order": [case["id"] for case in plan],
-            "protocol": {"backend": f"CUDA{args.cuda_device}", "batch": 1,
+            "protocol": {"cpu_mask": args.cpu_mask, "backend": f"CUDA{args.cuda_device}", "batch": 1,
                 "cuda_device": args.cuda_device, "cuda_graphs": args.cuda_graphs,
                 "warmup": args.warmup, "samples": args.samples, "seed": args.seed,
                 "sequential_execution": True, "graphs_per_sample": 1,
@@ -345,13 +398,35 @@ def main(argv: list[str] | None = None) -> int:
             row = {"case_id": case["id"], "case": case,
                 "signature": measurement_signature(case, binary_hash), "raw_output": raw_name}
             try:
-                result = subprocess.run(command, capture_output=True, text=True, errors="replace", env=child_env, timeout=args.timeout_s)
+                if args.cpu_mask:
+                    child = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, text=True,
+                                             errors="replace", env=child_env)
+                    raw["affinity_receipt"] = _pin_affinity(child.pid, mask)
+                    try:
+                        stdout, stderr = child.communicate(timeout=args.timeout_s)
+                        result = subprocess.CompletedProcess(
+                            command, child.returncode, stdout, stderr)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        raise
+                else:
+                    result = subprocess.run(command, capture_output=True, text=True, errors="replace", env=child_env, timeout=args.timeout_s)
                 raw.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
                 if result.returncode != 0:
                     raise RuntimeError(f"Dense decoder probe exited {result.returncode}: {result.stderr[-1000:]}")
                 native = json.loads(result.stdout)
                 validate_native_binding(case, native, args)
                 native["expected_samples"] = args.samples
+                native["timed_repetitions"] = args.inner_repetitions
+                if args.inner_repetitions > 1:
+                    # The price is per execution; the timed region is R executions.  The loop
+                    # times survive verbatim in raw/*.json (this record's `stdout`), so the
+                    # division is auditable rather than lossy.
+                    native["loop_ns"] = list(native["wall_ns"])
+                    native["wall_ns_normalization"] = "loop_ns / timed_repetitions"
+                    native["wall_ns"] = [value / args.inner_repetitions
+                                         for value in native["wall_ns"]]
                 native = validate_measurement(native)
                 row.update(status="measured", native=native, summary=summarize_samples(native["wall_ns"]))
                 row["quality_flags"] = ["high_observed_variability_cv_gt_0.1"] if row["summary"]["cv"] > 0.1 else []

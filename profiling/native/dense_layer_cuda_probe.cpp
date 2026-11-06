@@ -40,7 +40,8 @@ struct Options {
     int64_t hidden = 0, intermediate = 0, heads = 0, kv_heads = 0, head_dim = 0, q = 0,
             history = -1, rope_dims = 0;
     float rope_base = 0, norm_eps = 0;
-    int cuda_device = -1, warmup = -1, samples = 0;
+    int cuda_device = -1, warmup = -1, samples = 0, repetitions = 1, sensor_q = 0;
+    int first_runs = 0, fresh_graphs = 0;
     uint32_t seed = 0;
 };
 static int64_t integer(const std::string &text) {
@@ -107,7 +108,9 @@ static Options parse(int argc, char **argv) {
             if (t < 0 || t > std::numeric_limits<uint32_t>::max())
                 throw std::runtime_error("seed out of range");
             o.seed = static_cast<uint32_t>(t);
-        } else if (key == "--cuda-device" || key == "--warmup" || key == "--samples") {
+        } else if (key == "--cuda-device" || key == "--warmup" || key == "--samples" ||
+                   key == "--repetitions" || key == "--sensor-q" || key == "--first-runs" ||
+                   key == "--fresh-graphs") {
             const auto t = integer(v);
             if (t < 0 || t > std::numeric_limits<int>::max())
                 throw std::runtime_error("option out of range: " + key);
@@ -117,6 +120,14 @@ static Options parse(int argc, char **argv) {
                 o.warmup = static_cast<int>(t);
             if (key == "--samples")
                 o.samples = static_cast<int>(t);
+            if (key == "--repetitions")
+                o.repetitions = static_cast<int>(t);
+            if (key == "--sensor-q")
+                o.sensor_q = static_cast<int>(t);
+            if (key == "--first-runs")
+                o.first_runs = static_cast<int>(t);
+            if (key == "--fresh-graphs")
+                o.fresh_graphs = static_cast<int>(t);
         } else
             throw std::runtime_error("unknown option: " + key);
     }
@@ -144,6 +155,10 @@ static Options parse(int argc, char **argv) {
                                  "explicit base and epsilon");
     if (o.warmup < 0 || o.samples < 3 || o.samples > 10000 || !seen.count("--seed"))
         throw std::runtime_error("requires explicit warmup/samples/seed, samples in 3..10000");
+    if (o.repetitions < 1 || o.repetitions > 10000)
+        throw std::runtime_error("repetitions must be in 1..10000");
+    if (o.first_runs < 0 || o.first_runs > 1000 || o.fresh_graphs < 0 || o.fresh_graphs > 64)
+        throw std::runtime_error("first-runs must be in 0..1000, fresh-graphs in 0..64");
     const std::set<std::string> types = {"f32", "f16", "q4_k", "q6_k"};
     for (const auto &role : {"q", "k", "v", "output", "gate", "up", "down"})
         if (!o.dtypes.count(role) || !types.count(o.dtypes.at(role)))
@@ -259,6 +274,19 @@ static void compute(Session &s, ggml_cgraph *graph) {
     if (status != GGML_STATUS_SUCCESS)
         throw std::runtime_error("CUDA graph compute failed: " + std::to_string(status));
     ggml_backend_synchronize(s.backend); // wall timing includes completed CUDA work
+}
+
+// Back-to-back launches followed by one synchronize.  A single graph compute at the small
+// shapes costs less than the host-side dispatch, so timing one launch per sample measures
+// the dispatch, not the work.  Repeating inside the timed region amortises it; dividing the
+// loop time by R is the per-execution cost the price is meant to express.
+static void compute_batch(Session &s, ggml_cgraph *graph, int repetitions) {
+    for (int i = 0; i < repetitions; ++i) {
+        const ggml_status status = ggml_backend_graph_compute_async(s.backend, graph);
+        if (status != GGML_STATUS_SUCCESS)
+            throw std::runtime_error("CUDA graph compute failed: " + std::to_string(status));
+    }
+    ggml_backend_synchronize(s.backend);
 }
 
 static double dot(const std::vector<float> &row, const float *x) {
@@ -963,7 +991,24 @@ static int run(const Options &o) {
     DENSE_CUDA_MEMORY_CHECKPOINT("after_stage_allocation");
     auto &s = stage->s;
     std::vector<int64_t> wall;
-    compute(s, stage->graph); // primes CUDA backend private reusable resources
+    const auto time_once = [](Session &ss, ggml_cgraph *g) {
+        const auto begin = std::chrono::steady_clock::now();
+        compute(ss, g);
+        const auto end = std::chrono::steady_clock::now();
+        const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+        if (ns <= 0)
+            throw std::runtime_error("nonpositive CUDA sample");
+        return ns;
+    };
+    // The first execution of this graph, timed rather than thrown away.  Everything the backend
+    // does once per graph -- module loading, kernel selection, scratch growth -- lands here, and
+    // nothing below can see it, because every sample re-runs this same, already primed graph.
+    // The IR executor never gets that discount: it builds a graph per node and runs it once
+    // (`ir_runner.cpp:1232`), so this is the price it actually pays.
+    const auto priming_ns = time_once(s, stage->graph);
+    std::vector<int64_t> first_run;
+    for (int i = 0; i < o.first_runs; ++i)
+        first_run.push_back(time_once(s, stage->graph));
     DENSE_CUDA_MEMORY_CHECKPOINT("after_setup");
     if (stage_kind == "block")
         capture(*stage, d);
@@ -972,7 +1017,7 @@ static int run(const Options &o) {
     DENSE_CUDA_MEMORY_CHECKPOINT("after_warmup");
     for (int i = 0; i < o.samples; ++i) {
         const auto begin = std::chrono::steady_clock::now();
-        compute(s, stage->graph);
+        compute_batch(s, stage->graph, o.repetitions);
         const auto end = std::chrono::steady_clock::now();
         const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
         if (ns <= 0)
@@ -980,6 +1025,49 @@ static int run(const Options &o) {
         wall.push_back(ns);
     }
     DENSE_CUDA_MEMORY_CHECKPOINT("after_samples");
+    // In-process sensor: a fixed workload timed in the same process, so that a per-process
+    // device-state band can be divided out instead of being mistaken for a shape effect.
+    std::vector<int64_t> sensor_wall;
+    if (o.sensor_q > 0) {
+        Options so = o;
+        so.stage = "projection";
+        so.q = o.sensor_q;
+        so.history = 0;
+        const auto saved_x = d.x;
+        const auto saved_positions = d.positions;
+        d.x.assign(static_cast<size_t>(product({o.hidden, so.q})), 0.5f);
+        d.positions.assign(static_cast<size_t>(so.q), 0);
+        auto sensor = build_stage(so, d, "projection");
+        compute(sensor->s, sensor->graph);
+        for (int i = 0; i < 10; ++i)
+            compute(sensor->s, sensor->graph);
+        for (int i = 0; i < 10; ++i) {
+            const auto begin = std::chrono::steady_clock::now();
+            compute_batch(sensor->s, sensor->graph, o.repetitions);
+            const auto end = std::chrono::steady_clock::now();
+            const auto ns =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+            if (ns <= 0)
+                throw std::runtime_error("nonpositive sensor sample");
+            sensor_wall.push_back(ns);
+        }
+        d.x = saved_x;
+        d.positions = saved_positions;
+    }
+    DENSE_CUDA_MEMORY_CHECKPOINT("after_sensor");
+    // A graph the backend has never seen, with its weight uploads flushed before the clock
+    // starts.  This is one step further than `priming_ns`: the process is warm (modules loaded,
+    // handles created) but this graph is not, which is exactly the executor's standing state on
+    // node k > 1 of a plan.  The second execution of the same fresh graph is recorded as well,
+    // so a per-graph setup cost separates from a per-buffer one.
+    std::vector<int64_t> fresh_first, fresh_second;
+    for (int i = 0; i < o.fresh_graphs; ++i) {
+        auto fresh = build_stage(o, d, stage_kind);
+        ggml_backend_synchronize(fresh->s.backend);
+        fresh_first.push_back(time_once(fresh->s, fresh->graph));
+        fresh_second.push_back(time_once(fresh->s, fresh->graph));
+    }
+    DENSE_CUDA_MEMORY_CHECKPOINT("after_fresh_graphs");
     std::map<std::string, std::vector<float>> outputs;
     for (const auto &p : stage->ports) {
         outputs[p.first] = read_tensor(p.second);
@@ -1084,6 +1172,7 @@ static int run(const Options &o) {
               << ",\"setup_compute_repetitions\":1,"
                  "\"upstream_setup_compute_repetitions\":"
               << (stage_kind == "block" ? 0 : 1) << ",\"samples\":" << o.samples
+              << ",\"timed_repetitions\":" << o.repetitions
               << ",\"seed\":" << o.seed
               << ",\"input_generator\":\"mt19937_uniform24_scaled_weights_gamma_near_one_v1\","
                  "\"input_lineage\":\"same_seed_complete_upstream_preparation_outside_timing\","
@@ -1238,6 +1327,28 @@ static int run(const Options &o) {
     std::cout << "}";
     std::cout << ",\"wall_ns\":";
     emit_ns(wall);
+    // The same graph, executed once per number above.  `steady_per_execution_ns` is what the 4c
+    // protocol calls the price; `priming_ns` is execution 1 of that graph and `first_run_ns`
+    // executions 2..N+1, all before the warm-up.  `fresh_graph_*` are graphs built after the
+    // samples, each run once (then twice) with its uploads already flushed.
+    std::vector<int64_t> sorted_wall = wall;
+    std::nth_element(sorted_wall.begin(), sorted_wall.begin() + sorted_wall.size() / 2,
+                     sorted_wall.end());
+    const int64_t steady_median = sorted_wall[sorted_wall.size() / 2];
+    std::cout << ",\"priming_ns\":" << priming_ns << ",\"steady_median_ns\":" << steady_median
+              << ",\"steady_per_execution_ns\":"
+              << std::setprecision(17)
+              << (static_cast<double>(steady_median) / static_cast<double>(o.repetitions))
+              << ",\"first_runs\":" << o.first_runs << ",\"first_run_ns\":";
+    emit_ns(first_run);
+    std::cout << ",\"fresh_graphs\":" << o.fresh_graphs << ",\"fresh_graph_first_run_ns\":";
+    emit_ns(fresh_first);
+    std::cout << ",\"fresh_graph_second_run_ns\":";
+    emit_ns(fresh_second);
+    if (o.sensor_q > 0) {
+        std::cout << ",\"sensor_q\":" << o.sensor_q << ",\"sensor_wall_ns\":";
+        emit_ns(sensor_wall);
+    }
     std::cout << "}\n";
     if (!passed) {
         std::cerr << "CUDA dense layer numerical or KV validation failed\n";

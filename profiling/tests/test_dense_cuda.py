@@ -47,6 +47,7 @@ def cuda_native(selected, **changes):
     result.update(schema="ggml_dense_layer_cuda_probe/1", contract=contract.CONTRACT,
         backend="CUDA0", cuda_device=0, cuda_graphs="disabled",
         cuda_graphs_requested="disabled", cuda_graphs_applied="disabled", cuda_graph_disable_environment="1",
+        timed_repetitions=1,
         matmul_precision="ggml_cuda_backend_default",
         implementation_variant=contract.VARIANTS[selected["kind"]],
         timing="steady_clock_cuda_graph_compute_including_sync", workspace_bytes=None,
@@ -94,7 +95,11 @@ def cuda_native(selected, **changes):
 
 
 def protocol_args():
-    return SimpleNamespace(warmup=2, samples=3, seed=17, cuda_device=0, cuda_graphs="disabled")
+    # Mirrors every field `validate_native_binding`/`native_command` read out of the real
+    # argument namespace; `inner_repetitions` and `cpu_mask` join the protocol whenever
+    # the runner gains a knob the native probe has to echo back.
+    return SimpleNamespace(warmup=2, samples=3, seed=17, cuda_device=0, cuda_graphs="disabled",
+                           inner_repetitions=1, cpu_mask=None)
 
 
 class CudaNativeProtocolTests(unittest.TestCase):
