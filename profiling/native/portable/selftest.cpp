@@ -229,6 +229,15 @@ void check_modules() {
     check(mapped.size() > suffix.size()
               && mapped.compare(mapped.size() - suffix.size(), suffix.size(), suffix) == 0,
           "the map names the path a library was loaded from", mapped);
+    // A library built with a SONAME is mapped under the versioned name while the
+    // probe asks for the Windows one; the two are the same module. A suffix that
+    // is not a version belongs to a different file and must not match.
+    check(portable_same_library("libggml-base.so.0", "libggml-base.so"),
+          "a versioned name is the module the unversioned name asks for");
+    check(!portable_same_library("libggml-base.so.bak", "libggml-base.so"),
+          "a suffix that is not a version is a different file");
+    check(!portable_same_library("libggml-base.so.11", "libggml-base.so.1"),
+          "a longer version is not a prefix match");
     check(portable_mapped_path("libno-such-module-here.so").empty(),
           "a library that is not mapped has no path in the map");
 #endif

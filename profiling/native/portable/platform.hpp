@@ -460,13 +460,27 @@ inline std::string portable_library_name(const char *name) {
 // unless the library carries a DT_SONAME. Reading the map is how the same
 // question is answered without asking the loader to guess.
 #if defined(__linux__)
+// A library whose SONAME carries a major version is mapped as
+// `libggml-base.so.0` while the probe asks for the Windows name and gets
+// `libggml-base.so`: one module, two spellings, and NOLOAD by the unversioned
+// name finds nothing. A name that merely starts the same way (`.so.1` beside
+// `.so.0`) is a *different* module, so the match is the version suffix alone.
+inline bool portable_same_library(const std::string &mapped, const std::string &library) {
+    if (mapped == library) return true;
+    if (mapped.size() <= library.size() + 1) return false;
+    if (mapped.compare(0, library.size(), library) != 0) return false;
+    if (mapped[library.size()] != '.') return false;
+    return mapped.find_first_not_of("0123456789.", library.size() + 1) == std::string::npos;
+}
+
 inline std::string portable_mapped_path(const std::string &library) {
     FILE *maps = std::fopen("/proc/self/maps", "r");
     if (maps == nullptr) return std::string();
     std::string found;
+    bool ambiguous = false;
     char line[4096];
-    while (found.empty() && std::fgets(line, sizeof(line), maps) != nullptr) {
-        // "7f..-7f.. r-xp 00000000 fd:01 12345 /path/to/libggml-cpu.so"
+    while (!ambiguous && std::fgets(line, sizeof(line), maps) != nullptr) {
+        // "7f..-7f.. r-xp 00000000 fd:01 12345 /path/to/libggml-cpu.so.0"
         const char *path = std::strchr(line, '/');
         if (path == nullptr) continue;
         std::string mapped(path);
@@ -478,7 +492,13 @@ inline std::string portable_mapped_path(const std::string &library) {
             mapped.resize(mapped.size() - deleted.size());
         const std::size_t slash = mapped.find_last_of('/');
         const std::string base = slash == std::string::npos ? mapped : mapped.substr(slash + 1);
-        if (base == library) found = mapped;
+        if (!portable_same_library(base, library)) continue;
+        // Two different paths carrying the same name is a question this cannot
+        // answer; picking one would bind the tap to a copy that may not be the
+        // one computing, which is the failure mode this whole query exists to
+        // avoid. Nothing is returned and the caller reports the miss.
+        if (found.empty()) found = mapped;
+        else if (found != mapped) { found.clear(); ambiguous = true; }
     }
     std::fclose(maps);
     return found;
