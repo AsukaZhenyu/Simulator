@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from profiling import host
 from profiling.real_moe_validation.runtime_window_io import available, child_environment, file_sha, receipt, PLACEMENT_LABELS, LABELS
@@ -62,6 +63,18 @@ class RuntimeWindowIOTest(unittest.TestCase):
         search = environment[host.shared_library_variable()].split(os.pathsep)
         self.assertEqual(search[0], '/private/runtime')
         self.assertEqual(environment['PATH'].split(os.pathsep)[0], '/private/runtime')
+
+    def test_the_collectors_own_environment_names_that_variable_too(self):
+        # The check above cannot see the defect on Windows, where both variables
+        # are PATH. The collector that runs the published model jobs builds its
+        # environment through `run.child_environment`, and that one is asked
+        # here under a loader that has a variable of its own.
+        from profiling.real_moe_validation.run import child_environment as collector_environment
+        with mock.patch.object(host, 'shared_library_variable', return_value='LD_LIBRARY_PATH'):
+            environment = collector_environment(('/private/runtime',),
+                                                dict(cuda_graph_policy='runtime_default_enabled',
+                                                     tf32_override='0'))
+        self.assertEqual(environment['LD_LIBRARY_PATH'].split(os.pathsep)[0], '/private/runtime')
 
     def test_available_memory_is_asked_of_the_host(self):
         self.assertGreater(available(), 0)

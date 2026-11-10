@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from profiling import host
 from profiling.dac_validation import e2a
 from profiling.state_calibration import run as common_run
 
@@ -82,7 +83,14 @@ def request(manifest, *, mode, placement, requests, threads=16, warmup_replays=1
 def child_environment(runtime_dirs,req):
     require(req['cuda_graph_policy']=='runtime_default_enabled' and req['tf32_override']=='0','unknown explicit native flags')
     env=dict(os.environ)
-    env['PATH']=os.pathsep.join([*map(str,runtime_dirs),env.get('PATH','')])
+    directories=os.pathsep.join([*map(str,runtime_dirs),env.get('PATH','')])
+    # The runtime directories go first on whichever variable this host's loader
+    # reads. `PATH` alone starts a Linux child into a loader error naming a
+    # library that is already in the list -- the same defect
+    # `state_calibration.run.child_environment` names on its own line.
+    env['PATH']=directories
+    search=host.shared_library_variable()
+    if search!='PATH':env[search]=directories
     env.pop('GGML_CUDA_DISABLE_GRAPHS',None)
     env['NVIDIA_TF32_OVERRIDE']='0'
     return env

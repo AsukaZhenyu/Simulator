@@ -423,9 +423,9 @@ def retire_authorization(campaign: Campaign, cohort: Path, role: str) -> None:
 
 def column_model(campaign: Campaign, args) -> Path:
     model, build = Path(args.model), Path(args.runtime_build)
-    cuda_bin, _ = cuda_dirs(args)
+    runtime = probe_toolkit_dirs(args)
     preflight(campaign, "model", 6.0,
-              [model, build / "BUILD_COMPLETE.json", cuda_bin], backend="cuda")
+              [model, build / "BUILD_COMPLETE.json", *runtime], backend="cuda")
     out = fresh_cohort(campaign.root / "model" / "formal", campaign)
     python = require_python(campaign, VENV_PYTHON)
     tests = fresh_file(campaign.root / "model" / "software-tests.json", campaign)
@@ -436,11 +436,16 @@ def column_model(campaign: Campaign, args) -> Path:
                      args.heldout_index))
     campaign.step("model:software tests", [python, "-m", "profiling.real_moe_validation.record_tests",
                                           "--out", tests])
-    campaign.step("model:prepare", [python, "-m", "profiling.real_moe_validation.prepare_portable",
-                                    "--out", out, "--build", build, "--model", model,
-                                    "--runtime-dir", cuda_bin,
-                                    "--heldout-index", args.heldout_index,
-                                    "--labels", ",".join(MODEL_LABELS)])
+    step = [python, "-m", "profiling.real_moe_validation.prepare_portable",
+            "--out", out, "--build", build, "--model", model,
+            "--heldout-index", args.heldout_index,
+            "--labels", ",".join(MODEL_LABELS)]
+    # The manifest's runtime list is what every collected process reads, so the
+    # toolkit's libraries belong in it beside its binaries: a layout that keeps
+    # them apart otherwise starts each probe into a loader error.
+    for directory in runtime:
+        step += ["--runtime-dir", directory]
+    campaign.step("model:prepare", step)
     campaign.step("model:freeze", [python, "-m", "profiling.real_moe_validation.runtime_window_campaign",
                                    "freeze", "--out", out, "--tests", tests])
     campaign.step("model:authorize calibration", [python, "-m", "profiling.real_moe_validation.authorize",
@@ -560,10 +565,9 @@ def runtime_dirs(column: str, args) -> tuple[Path, ...]:
 
 def requirements(column: str, args) -> tuple[float, list[Path]]:
     """Free memory and the artifacts a column needs, without touching hardware."""
-    cuda_bin, _ = cuda_dirs(args)
     toolkit = probe_toolkit_dirs(args)
     if column == "model":
-        return 6.0, [Path(args.model), Path(args.runtime_build) / "BUILD_COMPLETE.json", cuda_bin]
+        return 6.0, [Path(args.model), Path(args.runtime_build) / "BUILD_COMPLETE.json", *toolkit]
     if column == "dense":
         return 2.0, [Path(args.depth_binary), *toolkit]
     return 2.0, [Path(args.e2a_binary), e2a_runtime(args), *toolkit]
