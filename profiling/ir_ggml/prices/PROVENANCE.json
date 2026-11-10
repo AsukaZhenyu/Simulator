@@ -11,7 +11,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-moe-v1/granite-3.0-3b-a800m-pinned-export"
+   "origin": "profiling/results/20261104-multimodel-moe-v1/granite-3.0-3b-a800m-pinned-export",
+   "extension": {
+    "path": "granite-3.0-3b-a800m/gpu_costs.json",
+    "sha256": "d3fcad54cf41c1e53ee70ceb6d24eec98443372aa064dbfe01c23058434a1e15",
+    "bytes": 27556,
+    "entries": 9,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_moe_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.08384308257012267,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   },
   "olmoe-1b-7b": {
    "path": "olmoe-1b-7b/costs.json",
@@ -22,7 +38,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-moe-olmo/olmoe-1b-7b-pinned-r2-export"
+   "origin": "profiling/results/20261104-multimodel-moe-olmo/olmoe-1b-7b-pinned-r2-export",
+   "extension": {
+    "path": "olmoe-1b-7b/gpu_costs.json",
+    "sha256": "0c7237a7a0cccd9c4b17d75b6497ba3f1c7b97c78bbaec7723a22ca7b8f21c34",
+    "bytes": 34406,
+    "entries": 11,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_moe_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.0937386417754063,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   },
   "qwen1.5-moe-a2.7b": {
    "path": "qwen1.5-moe-a2.7b/costs.json",
@@ -33,7 +65,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-moe-v1/qwen1.5-moe-a2.7b-pinned-export"
+   "origin": "profiling/results/20261104-multimodel-moe-v1/qwen1.5-moe-a2.7b-pinned-export",
+   "extension": {
+    "path": "qwen1.5-moe-a2.7b/gpu_costs.json",
+    "sha256": "719b09d15aaf8b999e826f9197d0980027e22c37995b8fb4b89a4889841a3911",
+    "bytes": 37458,
+    "entries": 11,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_moe_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.09635568564543273,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   },
   "qwen3-0.6b": {
    "path": "qwen3-0.6b/costs.json",
@@ -44,7 +92,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-0.6b-pinned-export"
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-0.6b-pinned-export",
+   "extension": {
+    "path": "qwen3-0.6b/gpu_costs.json",
+    "sha256": "c5d95643b839d77b2afadcf1643ebbccfab14302812ba18d3aa2296db45e37dc",
+    "bytes": 22508,
+    "entries": 8,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_dense_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.09437331835566101,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   },
   "qwen3-1.7b": {
    "path": "qwen3-1.7b/costs.json",
@@ -55,7 +119,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-1.7b-pinned-export"
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-1.7b-pinned-export",
+   "extension": {
+    "path": "qwen3-1.7b/gpu_costs.json",
+    "sha256": "31d91e727b00c5acdd176dea055e13a08f7a168112e7bd656c0f60da394a0238",
+    "bytes": 33472,
+    "entries": 12,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_dense_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.09619785192608588,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   },
   "qwen3-4b": {
    "path": "qwen3-4b/costs.json",
@@ -66,7 +146,23 @@
    "devices": [
     "cpu"
    ],
-   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-4b-pinned-export"
+   "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-4b-pinned-export",
+   "extension": {
+    "path": "qwen3-4b/gpu_costs.json",
+    "sha256": "5521e105cf17f80e431142aec994dffc8e40ebc6f2b2157f00eb7557fb60e362",
+    "bytes": 33316,
+    "entries": 12,
+    "devices": [
+     "gpu"
+    ],
+    "contracts": [
+     "ggml_cuda_dense_decoder_block_v1"
+    ],
+    "cv_gate": 0.1,
+    "max_cv": 0.09765393196032557,
+    "origin": "profiling/results/20261109-gpu-prices-six-warmup1000",
+    "note": "measured by its own campaign; absent cells are refused by the cv gate"
+   }
   }
  }
 }

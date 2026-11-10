@@ -54,7 +54,12 @@ class PhysicalStageSourceTests(unittest.TestCase):
         self.assertLess(source.index('checked(cuptiActivityRegisterTimestampCallback(timestamp)'),
                         source.index('checked(cuptiActivityEnable(kind)'))
         self.assertIn('(value / hz) * 1000000000ULL + (value % hz) * 1000000000ULL / hz',source)
-        self.assertIn('"clock_origin","absolute_qpc_zero"',source)
+        # The header is shared with the dense column, so the clock it names comes
+        # from the portable macros; on Windows those are the published strings.
+        self.assertIn('{"clock_id",PORTABLE_PHYSICAL_CLOCK_ID},{"clock_origin",CLOCK_ORIGIN}',source)
+        platform=(HERE.parent/'portable/platform.hpp').read_text(encoding="utf-8")
+        self.assertIn('#define PORTABLE_PHYSICAL_CLOCK_ID "windows_qpc_floor_ns"',platform)
+        self.assertIn('#define CLOCK_ORIGIN "absolute_qpc_zero"',platform)
 
     def test_kernel_memcpy_runtime_and_external_records_are_retained(self):
         source=(HERE / "cupti_capture.hpp").read_text(encoding="utf-8")

@@ -82,6 +82,20 @@ class InstantiateTests(unittest.TestCase):
         # The toy substrate's 36 ns arrival is replaced by the model's own geometry.
         self.assertNotEqual(header["tokens"], "0")
 
+    def test_a_moe_policy_for_a_model_with_a_shared_expert_declares_it(self):
+        # The frozen `moe_ffn` price covers the shared expert, so the executor has to be
+        # told the model has one; a model without one must not grow the line.
+        out = self.build(["moe-compute-000-demand"], model="qwen1.5-moe-a2.7b")
+        header = {}
+        for line in (out / "moe-compute-000-demand.txt").read_text(encoding="utf-8").splitlines():
+            key, _, value = line.partition(" ")
+            header[key] = value
+        self.assertEqual(header["shared"], "5632")
+        self.assertEqual(header["dtype_down_shexp"], "q6_k")
+        other = self.build(["moe-compute-000-demand"], model="granite-3.0-3b-a800m")
+        lines = (other / "moe-compute-000-demand.txt").read_text(encoding="utf-8").splitlines()
+        self.assertFalse([line for line in lines if line.startswith("shared ")])
+
     def test_the_manifest_names_every_case_it_wrote(self):
         out = self.build(["dense-compute-000-spare", "attention-compute-000-demand"])
         manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))

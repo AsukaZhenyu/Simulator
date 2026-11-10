@@ -19,6 +19,14 @@ FROZEN_NATIVE = ROOT / "build/real-moe-validation-20261027/tap-runtime-v4b/sourc
 class GPUConsumerTapSourceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Both inputs are materialised outside the checkout: the pinned llama.cpp
+        # tree and the frozen tap source, which is a build product archived under
+        # paper-write/simulator-archive/build/. Skip rather than error when a
+        # fresh clone cannot supply them; the transform itself is untested then,
+        # not wrong.
+        for path in (CUDA_SOURCE, FROZEN_NATIVE):
+            if not path.is_file():
+                raise unittest.SkipTest("%s is not in the checkout" % path)
         cls.original_cuda = CUDA_SOURCE.read_text(encoding="utf-8")
         cls.original_native = FROZEN_NATIVE.read_text(encoding="utf-8")
         cls.cuda = tap_v5.patched_cuda(cls.original_cuda)

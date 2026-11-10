@@ -1,0 +1,71 @@
+case offload-d4-g3-last-spare
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1 
+node 3 router cpu 2 
+node 4 expert cpu 2,3 
+node 5 combine cpu 4,2,3 
+node 6 copy pcie 5 bytes=393216,dir=cpu>gpu,tensor=g:request0-prefill-layer0:op:layer0:request0:combine
+node 7 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 8 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer1:W_input_norm
+node 9 copy pcie - bytes=1327104,dir=cpu>gpu,tensor=w:layer1:W_q
+node 10 copy pcie - bytes=442368,dir=cpu>gpu,tensor=w:layer1:W_k
+node 11 copy pcie - bytes=645120,dir=cpu>gpu,tensor=w:layer1:W_v
+node 12 proj gpu 6,7,8,9,10,11 
+node 13 attn gpu 12 
+node 14 copy pcie - bytes=245760,dir=cpu>gpu,tensor=w:layer1:W_router
+node 15 router gpu 13,14 
+node 16 copy pcie - bytes=61194240,dir=cpu>gpu,tensor=w:layer1:E0
+node 17 expert gpu 13,15,16 
+node 18 combine gpu 17,13,15 
+node 19 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 20 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer2:W_input_norm
+node 21 copy pcie - bytes=1327104,dir=cpu>gpu,tensor=w:layer2:W_q
+node 22 copy pcie - bytes=442368,dir=cpu>gpu,tensor=w:layer2:W_k
+node 23 copy pcie - bytes=645120,dir=cpu>gpu,tensor=w:layer2:W_v
+node 24 proj gpu 18,19,20,21,22,23 
+node 25 attn gpu 24 
+node 26 copy pcie - bytes=245760,dir=cpu>gpu,tensor=w:layer2:W_router
+node 27 router gpu 25,26 
+node 28 copy pcie - bytes=61194240,dir=cpu>gpu,tensor=w:layer2:E0
+node 29 expert gpu 25,27,28 
+node 30 combine gpu 29,25,27 
+node 31 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 32 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer3:W_input_norm
+node 33 copy pcie - bytes=1327104,dir=cpu>gpu,tensor=w:layer3:W_q
+node 34 copy pcie - bytes=442368,dir=cpu>gpu,tensor=w:layer3:W_k
+node 35 copy pcie - bytes=645120,dir=cpu>gpu,tensor=w:layer3:W_v
+node 36 proj gpu 30,31,32,33,34,35 
+node 37 attn gpu 36 
+node 38 copy pcie - bytes=245760,dir=cpu>gpu,tensor=w:layer3:W_router
+node 39 router gpu 37,38 
+node 40 copy pcie - bytes=61194240,dir=cpu>gpu,tensor=w:layer3:E0
+node 41 expert gpu 37,39,40 
+node 42 combine gpu 41,37,39 
+node 43 copy pcie 42 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer3:op:layer3:request0:combine

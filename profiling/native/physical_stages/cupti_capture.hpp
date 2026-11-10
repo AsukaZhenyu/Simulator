@@ -2,7 +2,7 @@
 #pragma once
 #include <cupti.h>
 #include <cuda_runtime_api.h>
-#include <windows.h>
+#include "../portable/platform.hpp"
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -212,7 +212,15 @@ public:
             rows.push_back(std::move(row));
         }
         return json{{"schema","physical-stage-cupti-1"},{"cupti_version",version_},
-            {"clock_id","windows_qpc_floor_ns"},{"clock_origin","absolute_qpc_zero"},
+            // The clock this capture stamps against is the one `platform.hpp`
+            // supplies, so the name comes from there rather than from a literal:
+            // on Windows the macros resolve to `windows_qpc_floor_ns` and
+            // `absolute_qpc_zero` (the published receipts are unchanged byte for
+            // byte), and on Linux the same capture stamps against
+            // CLOCK_MONOTONIC and says so. This header is shared -- the dense
+            // column compiles it too -- so a literal here would have the dense
+            // receipt claim a Windows clock on a Linux host.
+            {"clock_id",PORTABLE_PHYSICAL_CLOCK_ID},{"clock_origin",CLOCK_ORIGIN},
             {"qpc_frequency_hz",frequency_},{"capture_begin_ns",begin_ns_},{"capture_end_ns",end_ns_},
             {"timestamp_callback_registered_before_activity_enable",true},
             {"external_correlation_kind",static_cast<uint32_t>(CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0)},

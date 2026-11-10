@@ -53,6 +53,7 @@ hardware queue; a computable parameter does not imply a qualified parameter.
 | selected-row MoE 的独立数值参考 | [MOE_ROWS_VERIFICATION.md](MOE_ROWS_VERIFICATION.md) |
 | 路由导入、独立搬运、allocator/重载实验 | `moe_routes.py`、`moe_transfer.py`、`reconfiguration/run.py`；分别查看 `--help` |
 | **IR 策略编译成 ggml 图并真实计时**（800 条 E/S 策略、冻结价表对照、A1/A2） | [ir_ggml](ir_ggml/README.md) |
+| **论文 Table II 的逐设备准确度**（Dense 执行器逐动作、真实 MoE 全请求；一台设备一次） | [../docs/DEVICE_ACCURACY.md](../docs/DEVICE_ACCURACY.md) |
 
 这些工具对应不同执行边界，不能互换价格。数据接入规则见 [M2 物理合同](../modeling/llm_infer_model/m2/PHYSICAL_CONTRACT.md)与[执行校准合同](EXECUTION_CALIBRATION_CONTRACT.md)。
 

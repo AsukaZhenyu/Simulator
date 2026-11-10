@@ -1,0 +1,44 @@
+case pd-transfer_constrained-018-demand
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+decode_history 128
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1,0 
+node 3 moe_ffn gpu 12,11,9,8,10 
+node 4 arrival cpu 13,2 
+node 5 proj cpu 4 t=1,h=128
+node 6 attn cpu 5,2,4 t=1,h=128
+node 7 moe_ffn gpu 14,11,9,8,10 t=1,h=128
+node 8 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer0:W_post_attention_norm
+node 9 copy pcie - bytes=17694720,dir=cpu>gpu,tensor=w:layer0:W_gate
+node 10 copy pcie - bytes=17694720,dir=cpu>gpu,tensor=w:layer0:W_up
+node 11 copy pcie - bytes=25804800,dir=cpu>gpu,tensor=w:layer0:W_down
+node 12 copy pcie 2 bytes=393216,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:attn
+node 13 copy pcie 2,3 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer0:t:layer0:request0:ffn
+node 14 copy pcie 6 bytes=6144,dir=cpu>gpu,tensor=g:request0-decode0-layer0:t:layer0:request0:attn,t=1,h=128
+node 15 copy pcie 7 bytes=6144,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:ffn,t=1,h=128

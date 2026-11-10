@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 
 from . import e2a
+from profiling import host
 
 
 def main():
@@ -19,8 +20,28 @@ def main():
     parser.add_argument("--runtime-dir",type=Path,action="append",required=True)
     args=parser.parse_args()
     binary=args.binary.resolve();runtime_dirs=[str(p.resolve()) for p in args.runtime_dir]
-    e2a.require(binary.is_file() and (binary.parent/"build-manifest.json").is_file(),"explicit source-bound native build required")
-    for directory in runtime_dirs:e2a.require(Path(directory).is_dir(),"explicit runtime directory missing")
+    # Every refusal names the path it is about: on a rented machine the paths
+    # are typed, and "explicit runtime directory missing" alone does not say
+    # which of several `--runtime-dir` values was the misspelling.
+    e2a.require(binary.is_file(),"explicit binary is not a file: "+str(binary))
+    e2a.require((binary.parent/"build-manifest.json").is_file(),
+        "explicit source-bound native build required: no build-manifest.json beside "+str(binary))
+    for directory in runtime_dirs:
+        e2a.require(Path(directory).is_dir(),"explicit runtime directory missing: "+directory)
+    # Same refusal as the depth column's adapter: a runtime list that holds no
+    # library of this platform prepares a cohort whose every process exits before
+    # it measures anything. The glob is the host's own, so a Linux host checks
+    # for `lib*.so` and never passes because a `.dll` list happened to be right
+    # on the machine the table came from.
+    libraries=[path for directory in runtime_dirs
+               for path in Path(directory).glob(host.shared_library_pattern())]
+    e2a.require(libraries,"the runtime directories hold no "+host.shared_library_pattern()
+        +" files; the probe would not load")
+    # Holding *a* library is not holding the three the probe loads by name. A
+    # strict-F32 build that stopped part way has `libggml-base.so` and nothing
+    # else, which passes the check above; the process then exits on an unresolved
+    # symbol, one phase into a cohort that can no longer be reused.
+    e2a.require_components(runtime_dirs)
     descriptor=dict(binary=str(binary),runtime_dirs=runtime_dirs)
     original_read=e2a.read;legacy_descriptor=(e2a.ROOT/"profiling/steady_costs/results/steady-v1-f32/manifest.json").resolve()
     def explicit_descriptor_read(path):

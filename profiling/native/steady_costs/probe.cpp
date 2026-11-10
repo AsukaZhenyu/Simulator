@@ -1,4 +1,8 @@
 // Batched steady-state prices: no CPU cycle counters and no residual inference.
+// The Win32 names this file uses (affinity, `_putenv_s`, `GetCurrentThreadId`)
+// are supplied on a POSIX host by ../portable/platform.hpp; on Windows it is the
+// real <windows.h>.
+#include "../portable/platform.hpp"
 #include "state_response_generated.inc"
 #include "components.hpp"
 
@@ -14,6 +18,13 @@ struct Request {
         mode=str(source,"mode");instrumentation=str(source,"instrumentation");poll=str(source,"poll");
         require(mode=="full"||mode=="full-stamped"||mode=="action"||mode=="all-actions"||mode=="async-graph"||mode=="sync-idle","unknown steady mode");
         require(instrumentation=="bare"||instrumentation=="events","unknown steady instrumentation");
+#if defined(PROBE_BACKEND_METAL)
+        // A CUDA event measures "on the device, between two stream positions".
+        // A unified machine has one timeline, and the portable `bare`
+        // instrumentation is the honest instrument there; `events` is refused
+        // rather than timed by something else under the same name.
+        require(instrumentation!="events","this build is Metal; event instrumentation is CUDA's. Use bare");
+#endif
         require(poll=="0","steady CPU pool must use explicit poll=0");
         const auto w=state_response::integer(source.at("warmup"),"warmup");require(w<=10000,"warmup exceeds envelope");warmup=static_cast<int>(w);
         trials=static_cast<int>(positive(source.at("trials"),"trials",10000));
@@ -30,6 +41,13 @@ class OwnThreadAffinity {
     DWORD_PTR previous_=0;bool closed_=false;GROUP_AFFINITY before_{},after_{};json receipt_;
 public:
     explicit OwnThreadAffinity(DWORD_PTR requested) {
+        // A pinned main thread is the protocol, not a nicety: every price in the
+        // response table is a price of one core. macOS has no enforced thread
+        // affinity (THREAD_AFFINITY_POLICY is a hint), so it refuses here with
+        // the reason rather than measuring an unpinned thread and labelling the
+        // receipt as pinned.
+        require(PORTABLE_AFFINITY!=0,"this platform exposes no enforced thread affinity; "
+            "the measurement protocol pins the main thread and cannot be honoured here");
         require(GetThreadGroupAffinity(GetCurrentThread(),&before_)!=0,"cannot observe own initial thread group affinity");
         DWORD_PTR process_mask=0,system_mask=0;require(GetProcessAffinityMask(GetCurrentProcess(),&process_mask,&system_mask)!=0,"cannot observe own process affinity");
         require((requested&process_mask)==requested,"requested main thread mask is outside current process affinity");
@@ -185,7 +203,15 @@ static json run_component(Component &component,const Request &request) {
 
 static json self_test() {
     const auto value=mix32(123,0,0);require(value==mix32(123,0,0)&&value!=mix32(123,1,0),"mix32 deterministic/index contract failed");
+    // A digest is only comparable across hosts if it is the same digest on every
+    // host, so these are NIST's vectors and not this implementation's output.
+    // The 56-byte message is the one that matters: its 0x80 and length do not
+    // fit in the final block, so it exercises the two-block padding path.
     const std::string text="abc";require(sha256_bytes(text.data(),text.size())=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad","SHA256 known vector failed");
+    require(sha256_bytes(nullptr,0)=="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","SHA256 empty-message vector failed");
+    const std::string two_block="abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    require(two_block.size()==56,"padding-boundary vector length changed");
+    require(sha256_bytes(two_block.data(),two_block.size())=="248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1","SHA256 two-block vector failed");
     Request request(json{{"schema","steady-cost-request-1"},{"mode","action"},{"target_action_index",nullptr},
         {"warmup",0},{"warmup_min_ms",0},{"trials",1},{"repeats",1},{"poll","0"},{"instrumentation","bare"},{"main_thread_mask",4}});
     auto zero_json=request.source;zero_json["target_action_index"]=0;Request zero(zero_json);require(zero.target==0,"action zero parser failed");
@@ -209,7 +235,7 @@ int main(int argc,char **argv){try{
     } else {Executor executor(std::move(program));result=steady::run_full(executor,request);}
     result.update(json{{"schema","steady-cost-native-1"},{"request",request_json},{"process_id",single_layer::pid()},
         {"main_thread_affinity",affinity.finish()},
-        {"main_thread_id",GetCurrentThreadId()},{"clock",json{{"clock_id","windows_qpc"},{"frequency_hz",single_layer::frequency()}}},
+        {"main_thread_id",GetCurrentThreadId()},{"clock",json{{"clock_id",PORTABLE_CLOCK_ID},{"frequency_hz",single_layer::frequency()}}},
         {"collected_cpu_cycles",false},{"per_action_CPU_counter_queries",false},{"performance_parameters_fitted",false},
         {"CPU_GPU_times_additive",false},{"stream_elapsed_is_kernel_active_time",false},
         {"stream_elapsed_scope","actual pinned GGML CUDA backend stream event envelope; includes possible host submission gaps and stream delays"},

@@ -13,6 +13,7 @@ from profiling.steady_costs.contracts import (
 )
 from profiling.steady_costs.campaign import fraction,make_request,mean,pack,read,receipt,stats,utc,verify_native,write_new
 from profiling.steady_costs.calibration import action_key,errors,evaluate,freeze,restore_table
+from profiling import host
 from llm_infer_model.performance.steady_action_costs import SteadyActionCost,SteadyActionKey,SteadyActionTable,compile_steady_actions
 
 
@@ -109,7 +110,7 @@ class ContractsTests(unittest.TestCase):
     def test_native_protocol_rejects_counter_affinity_and_timer_changes(self):
         p=program();q=make_request('action',component=True);oracle=component_reference(p)
         native=dict(schema='steady-cost-native-1',program_sha256=p['program_sha256'],program_spec=p,request=q,process_id=1,
-            clock=dict(clock_id='windows_qpc',frequency_hz=1_000_000_000),
+            clock=dict(clock_id=host.measurement_clock_id(),frequency_hz=1_000_000_000),
             collected_cpu_cycles=False,per_action_CPU_counter_queries=False,
             observed_runtime_flags=dict(GGML_CUDA_DISABLE_GRAPHS='1',NVIDIA_TF32_OVERRIDE='0',matmul_precision='GGML_PREC_F32'),
             main_thread_affinity=dict(schema='steady-owned-main-thread-affinity-1',requested_mask=4,observed_mask=4,final_mask=4,

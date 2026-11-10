@@ -253,6 +253,10 @@ GOAL_LOCATIONS_M1 = (LOC_DRAM, LOC_VRAM, LOC_SSD)
 DEVICE_CPU = "cpu"
 DEVICE_GPU = "gpu"
 _DEVICES = frozenset({DEVICE_CPU, DEVICE_GPU})
+
+#: How the accelerator's memory relates to the host's. ``shared`` is Apple
+#: Silicon, DGX Spark's Grace-Blackwell pairing, and any other unified box.
+_MEMORY_MODES = ("separate", "shared")
 # Which storage domain a device reads its operands from and writes its result
 # to. This is the whole of the "CPU computes in DRAM, GPU computes in VRAM"
 # rule (M1_DESIGN.md §5).
@@ -1884,6 +1888,24 @@ def _scenario_from(
     )
 
 
+def _parse_memory_mode(raw: Any, label: str) -> str:
+    """``separate`` or ``shared``, and nothing else.
+
+    The two words are the difference between "a copy to the accelerator moves
+    bytes over a link" and "it moves nothing": on a shared pool the search drops
+    COPY from the action space and only SHARE can make a tensor visible in the
+    other domain. A typo used to pass a plain string check and then mean
+    `separate`, so a UMA machine ran the whole campaign as a discrete one and
+    nothing reported it. M2 has checked this value for a while
+    (``m2/spec.py``); this is the same verdict, in the place that owns 0.2.
+    """
+    value = _require_str(raw, f"{label}.memory_mode")
+    if value not in _MEMORY_MODES:
+        raise InvalidInput(
+            f"{label}.memory_mode is {value!r}; the modes are {list(_MEMORY_MODES)}")
+    return value
+
+
 def _parse_architecture(raw: Any, where: str, version: str) -> Architecture:
     if version == SCHEMA_VERSION_M1:
         return _parse_architecture_m1(raw, where)
@@ -1978,7 +2000,7 @@ def _parse_architecture_m1(raw: Any, where: str) -> Architecture:
     )
     label = f"{where}.architecture"
     return Architecture(
-        memory_mode=_require_str(block.get("memory_mode", "separate"), f"{label}.memory_mode"),
+        memory_mode=_parse_memory_mode(block.get("memory_mode", "separate"), label),
         shared_capacity_bytes=(None if block.get("shared_capacity_bytes") is None else _require_int(
             block["shared_capacity_bytes"], f"{label}.shared_capacity_bytes", minimum=1)),
         shared_runtime_reserved_bytes=_require_int(

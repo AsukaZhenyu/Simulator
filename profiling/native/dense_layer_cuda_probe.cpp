@@ -36,12 +36,46 @@ static void dense_cuda_memory_checkpoint(const char *label);
 #endif
 struct Options {
     std::string stage, attention_gate, qk_norm, rope_mode, cuda_graphs;
+    // The cache element type, not a weight dtype.  Defaults to f32 so the strict-F32
+    // contract this probe was written for is unchanged when the flag is absent; the
+    // pricing contract the CPU table declares is f16 (`dense_contract.KV_DTYPE`), and a
+    // GPU price that has to sit beside a CPU one must store the cache the same way.
+    std::string kv_dtype = "f32";
     std::map<std::string, std::string> dtypes;
     int64_t hidden = 0, intermediate = 0, heads = 0, kv_heads = 0, head_dim = 0, q = 0,
             history = -1, rope_dims = 0;
     float rope_base = 0, norm_eps = 0;
     int cuda_device = -1, warmup = -1, samples = 0, repetitions = 1, sensor_q = 0;
     int first_runs = 0, fresh_graphs = 0;
+    // DIAGNOSTIC (2026-11-09): per-node cost by prefix truncation.  The graph's node list is
+    // already a linear order, so running the first k nodes and differencing successive k gives
+    // node k's own launch + execution without a profiler.  The device level moves inside one
+    // process -- the same graph reads 294 us and 766 us minutes apart -- so each prefix sample
+    // is paired with a full-graph execution taken at the same instant and only the ratio is
+    // kept.  0 disables the sweep, which is what the published prices were taken with;
+    // `node_profile_samples` is the number of (prefix, reference) pairs per prefix.
+    int node_profile = 0, node_profile_samples = 31;
+    // The sparse feed-forward.  With experts == 0 the feed-forward is the dense gate/up/down
+    // block and nothing changes; with experts > 0 it is the routed expert block of
+    // `moe_ffn`, whose weights are [cols, rows, experts] planes.
+    int64_t experts = 0, top_k = 0, shared_intermediate = 0;
+    bool normalize_topk = false;
+    // How many expert planes are resident in the priced graph.  A block that streams the
+    // experts it routes to holds `k` of them (one token uses exactly `k`); a block that keeps
+    // the whole stack holds `E`.  The router chain is unchanged either way -- logits, softmax
+    // and top-k are still over all `E` experts -- so only the planes the products address
+    // change.  0 means `E`, which is the published geometry.
+    int64_t stack = 0;
+    // DIAGNOSTIC (2026-11-09): the block's cost depends on *which* experts the tokens land
+    // on, and by default that is whatever the synthetic router logits happen to select --
+    // an undeclared variable that differs from model to model.  With `--route 1` the three
+    // indirect products are given uniformly scattered ids instead, so the routing is
+    // declared and the same across models and across the executor.  Absent, the price is
+    // the one already published, bit for bit.
+    bool route = false;
+    // A model may add a bias to its query/key/value projections (Qwen1.5-MoE does).  The
+    // bias is part of the declared work, so a price taken without it is a different graph.
+    bool attention_bias = false;
     uint32_t seed = 0;
 };
 static int64_t integer(const std::string &text) {
@@ -62,10 +96,15 @@ static Options parse(int argc, char **argv) {
     Options o;
     std::set<std::string> seen;
     const std::map<std::string, std::string> dtype_keys = {
-        {"--q-dtype", "q"},      {"--k-dtype", "k"},
-        {"--v-dtype", "v"},      {"--gate-proj-dtype", "gate_proj"},
-        {"--o-dtype", "output"}, {"--ffn-gate-dtype", "gate"},
-        {"--up-dtype", "up"},    {"--down-dtype", "down"}};
+        {"--q-dtype", "q"},              {"--k-dtype", "k"},
+        {"--v-dtype", "v"},              {"--gate-proj-dtype", "gate_proj"},
+        {"--o-dtype", "output"},         {"--ffn-gate-dtype", "gate"},
+        {"--up-dtype", "up"},            {"--down-dtype", "down"},
+        {"--gate-exps-dtype", "gate_exps"}, {"--up-exps-dtype", "up_exps"},
+        {"--down-exps-dtype", "down_exps"}, {"--shexp-gate-dtype", "gate_shexp"},
+        {"--shexp-up-dtype", "up_shexp"},   {"--shexp-down-dtype", "down_shexp"},
+        {"--q-bias-dtype", "q_bias"},       {"--k-bias-dtype", "k_bias"},
+        {"--v-bias-dtype", "v_bias"}};
     for (int i = 1; i < argc; i += 2) {
         const std::string key = argv[i];
         if (i + 1 == argc || !seen.insert(key).second)
@@ -77,8 +116,12 @@ static Options parse(int argc, char **argv) {
             o.stage = v;
         else if (key == "--cuda-graphs")
             o.cuda_graphs = v;
+        else if (key == "--kv-dtype")
+            o.kv_dtype = v;
         else if (key == "--attention-gate")
             o.attention_gate = v;
+        else if (key == "--attention-bias")
+            o.attention_bias = integer(v) != 0;
         else if (key == "--qk-norm")
             o.qk_norm = v;
         else if (key == "--rope-mode")
@@ -87,6 +130,18 @@ static Options parse(int argc, char **argv) {
             o.hidden = integer(v);
         else if (key == "--intermediate")
             o.intermediate = integer(v);
+        else if (key == "--experts")
+            o.experts = integer(v);
+        else if (key == "--top-k")
+            o.top_k = integer(v);
+        else if (key == "--shared-intermediate")
+            o.shared_intermediate = integer(v);
+        else if (key == "--normalize-topk")
+            o.normalize_topk = integer(v) != 0;
+        else if (key == "--route")
+            o.route = integer(v) != 0;
+        else if (key == "--stack")
+            o.stack = integer(v);
         else if (key == "--heads")
             o.heads = integer(v);
         else if (key == "--kv-heads")
@@ -110,7 +165,8 @@ static Options parse(int argc, char **argv) {
             o.seed = static_cast<uint32_t>(t);
         } else if (key == "--cuda-device" || key == "--warmup" || key == "--samples" ||
                    key == "--repetitions" || key == "--sensor-q" || key == "--first-runs" ||
-                   key == "--fresh-graphs") {
+                   key == "--fresh-graphs" || key == "--node-profile" ||
+                   key == "--node-profile-samples") {
             const auto t = integer(v);
             if (t < 0 || t > std::numeric_limits<int>::max())
                 throw std::runtime_error("option out of range: " + key);
@@ -128,17 +184,42 @@ static Options parse(int argc, char **argv) {
                 o.first_runs = static_cast<int>(t);
             if (key == "--fresh-graphs")
                 o.fresh_graphs = static_cast<int>(t);
+            if (key == "--node-profile")
+                o.node_profile = static_cast<int>(t);
+            if (key == "--node-profile-samples")
+                o.node_profile_samples = static_cast<int>(t);
         } else
             throw std::runtime_error("unknown option: " + key);
     }
-    const std::set<std::string> stages = {"projection", "attention", "dense_ffn", "block"};
+    const std::set<std::string> stages = {"projection", "attention", "dense_ffn", "moe_ffn",
+                                          "block"};
     if (!stages.count(o.stage))
         throw std::runtime_error("unsupported stage");
+    // The sparse feed-forward is its own stage: it replaces the dense one, so measuring it
+    // inside `block` would declare a graph with both.  A block-level sparse measurement is
+    // not implemented, and saying so is better than returning a dense number under its name.
+    // Declaring the router and expert geometry is harmless on the stages that never read
+    // those weights: a sparse model's projection and attention are the same graph either
+    // way, and refusing them would leave those cells unpriceable for no reason.
+    if (o.stage == "moe_ffn" && o.experts <= 0)
+        throw std::runtime_error("moe_ffn requires experts > 0");
+    if (o.stage == "dense_ffn" && o.experts > 0)
+        throw std::runtime_error("a dense feed-forward cannot also declare routed experts");
+    if (o.experts > 0 &&
+        (o.top_k <= 0 || o.top_k > o.experts || o.shared_intermediate < 0))
+        throw std::runtime_error("experts require top_k in 1..experts and "
+                                 "shared_intermediate >= 0");
+    if (o.stack < 0 || (o.stack > 0 && (o.stack < o.top_k || o.stack > o.experts)))
+        throw std::runtime_error("--stack must be 0 (all experts) or in top_k..experts");
+    if (o.experts > 0 && o.stack == 0)
+        o.stack = o.experts;
     if (!seen.count("--cuda-device") || o.cuda_device < 0 || o.cuda_device >= GGML_CUDA_MAX_DEVICES)
         throw std::runtime_error("requires explicit --cuda-device in CUDA device range");
     if (!seen.count("--cuda-graphs") || o.cuda_graphs != "disabled")
         throw std::runtime_error(
             "this variant requires explicit --cuda-graphs disabled; no fallback");
+    if (o.kv_dtype != "f32" && o.kv_dtype != "f16")
+        throw std::runtime_error("--kv-dtype must be f32 or f16 (cache element type, not weights)");
     if (o.hidden <= 0 || o.intermediate <= 0 || o.heads <= 0 || o.kv_heads <= 0 ||
         o.head_dim <= 0 || o.heads % o.kv_heads || o.q <= 0 || o.history < 0)
         throw std::runtime_error("invalid block geometry");
@@ -147,8 +228,9 @@ static Options parse(int argc, char **argv) {
         throw std::runtime_error("sequence indexing overflow");
     if (o.attention_gate != "none" && o.attention_gate != "sigmoid")
         throw std::runtime_error("attention_gate must be none or sigmoid");
-    if (o.qk_norm != "none" && o.qk_norm != "rms")
-        throw std::runtime_error("qk_norm must be none or rms");
+    if (o.qk_norm != "none" && o.qk_norm != "rms" && o.qk_norm != "rms_hidden")
+        throw std::runtime_error("qk_norm must be none, rms, or rms_hidden (one gain per hidden "
+                                 "unit, applied before the head reshape)");
     if (o.rope_mode != "normal" || o.rope_dims <= 0 || o.rope_dims % 2 ||
         o.rope_dims > o.head_dim || o.rope_base <= 1 || o.norm_eps <= 0)
         throw std::runtime_error("requires normal RoPE, positive even dimensions <= head_dim, "
@@ -159,10 +241,39 @@ static Options parse(int argc, char **argv) {
         throw std::runtime_error("repetitions must be in 1..10000");
     if (o.first_runs < 0 || o.first_runs > 1000 || o.fresh_graphs < 0 || o.fresh_graphs > 64)
         throw std::runtime_error("first-runs must be in 0..1000, fresh-graphs in 0..64");
-    const std::set<std::string> types = {"f32", "f16", "q4_k", "q6_k"};
-    for (const auto &role : {"q", "k", "v", "output", "gate", "up", "down"})
+    const std::set<std::string> types = {"f32", "f16", "q4_k", "q6_k", "q8_0"};
+    // Only the roles the selected stage reads are required.  A model whose feed-forward is
+    // sparse has no dense gate/up/down weights at all, and its projection and attention are
+    // still measurable; demanding the full block would refuse them for lacking a stage they
+    // do not run.  Everything the caller declares is emitted, because the receipt has to
+    // describe the same config the case declared.
+    std::map<std::string, std::set<std::string>> stage_roles = {
+        {"projection", {"q", "k", "v"}},
+        {"attention", {"output"}},
+        {"dense_ffn", {"gate", "up", "down"}},
+        {"moe_ffn", {"gate_exps", "up_exps", "down_exps"}},
+        {"block", {"q", "k", "v", "output", "gate", "up", "down"}}};
+    // A sparse model's block ends in the routed experts, not in a dense feed-forward, so it
+    // requires those roles instead.
+    if (o.experts > 0)
+        stage_roles["block"] = {"q", "k", "v", "output", "gate_exps", "up_exps", "down_exps"};
+    if (o.shared_intermediate > 0)
+        for (const auto &role : {"gate_shexp", "up_shexp", "down_shexp"}) {
+            stage_roles.at("moe_ffn").insert(role);
+            stage_roles.at("block").insert(role);
+        }
+    for (const auto &role : stage_roles.at(o.stage))
         if (!o.dtypes.count(role) || !types.count(o.dtypes.at(role)))
             throw std::runtime_error(std::string("missing/unsupported matrix dtype: ") + role);
+    // The router and the shared-expert gate are F32 parameters of the sparse block, like the
+    // norms: the caller declares the expert geometry, never the router's type.  They are
+    // recorded for every stage of such a case, because the receipt's config is the block's
+    // config and the block is sparse whichever stage was timed.
+    const bool sparse = o.experts > 0;
+    if (sparse)
+        o.dtypes["router"] = "f32";
+    if (sparse && o.shared_intermediate > 0)
+        o.dtypes["gate_inp_shexp"] = "f32";
     if (o.attention_gate == "sigmoid") {
         if (!o.dtypes.count("gate_proj") || !types.count(o.dtypes.at("gate_proj")))
             throw std::runtime_error("sigmoid gate requires gate projection dtype");
@@ -173,10 +284,21 @@ static Options parse(int argc, char **argv) {
     }
     o.dtypes["input_norm"] = "f32";
     o.dtypes["post_attention_norm"] = "f32";
-    if (o.qk_norm == "rms") {
+    if (o.qk_norm == "rms" || o.qk_norm == "rms_hidden") {
         o.dtypes["q_norm"] = "f32";
         o.dtypes["k_norm"] = "f32";
     }
+    // A stored bias belongs to the projection graph, so a biased case declares the three
+    // rows per output channel for every stage it measures: the preparation that seeds an
+    // attention stage runs that same projection.  The type is F32, like the norms.
+    if (o.attention_bias)
+        for (const auto &role : {"q_bias", "k_bias", "v_bias"}) {
+            if (!o.dtypes.count(role))
+                throw std::runtime_error(std::string("a biased projection requires a declared "
+                                                     "bias weight: ") + role);
+            if (o.dtypes.at(role) != "f32")
+                throw std::runtime_error(std::string("bias weights are f32 parameters: ") + role);
+        }
     return o;
 }
 static size_t product(std::initializer_list<int64_t> dims) {
@@ -225,25 +347,12 @@ struct Session {
 struct Weight {
     ggml_tensor *tensor = nullptr;
     int64_t cols = 0, rows = 0;
+    // One plane per expert.  A routed projection is the same matrix repeated `experts`
+    // times along the third axis, and `ggml_mul_mat_id` addresses the plane; `row()` takes
+    // a global row index, so plane e row r is `e * rows + r`.
+    int64_t experts = 1;
     ggml_type type = GGML_TYPE_F32;
     std::vector<uint8_t> packed;
-
-    void initialize(std::mt19937 &rng) {
-        std::vector<float> values(product({cols, rows}));
-        fill(values, rng);
-        for (float &value : values)
-            value /= std::sqrt(static_cast<float>(cols));
-        packed.resize(ggml_nbytes(tensor));
-        if (type == GGML_TYPE_F32)
-            std::memcpy(packed.data(), values.data(), packed.size());
-        else if (type == GGML_TYPE_F16)
-            ggml_fp32_to_fp16_row(values.data(), reinterpret_cast<ggml_fp16_t *>(packed.data()),
-                                  static_cast<int64_t>(values.size()));
-        else if (ggml_quantize_chunk(type, values.data(), packed.data(), 0, rows, cols, nullptr) !=
-                 packed.size())
-            throw std::runtime_error("weight quantization size mismatch");
-        ggml_backend_tensor_set(tensor, packed.data(), 0, packed.size());
-    }
 
     void row(int64_t index, std::vector<float> &values) const {
         values.resize(static_cast<size_t>(cols));
@@ -260,15 +369,24 @@ struct Weight {
     }
 };
 
-static ggml_tensor *input(ggml_context *ctx, const char *name, int64_t a, int64_t b,
-                          int64_t c = 1) {
+// The cache element type.  One helper, so the tensor allocation, the host copy and the
+// receipt cannot disagree about what the cache stores.
+static ggml_type kv_cache_type(const Options &o) {
+    return o.kv_dtype == "f16" ? GGML_TYPE_F16 : GGML_TYPE_F32;
+}
+// The value a half cache actually stores for an f32 input.
+static float half_round(float value) {
+    const ggml_fp16_t half = ggml_fp32_to_fp16(value);
+    return ggml_fp16_to_fp32(half);
+}
+static ggml_tensor *input_typed(ggml_context *ctx, const char *name, ggml_type type,
+                                int64_t a, int64_t b, int64_t c = 1) {
     product({a, b, c});
-    auto *t = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, a, b, c);
+    auto *t = ggml_new_tensor_3d(ctx, type, a, b, c);
     ggml_set_name(t, name);
     ggml_set_input(t);
     return t;
 }
-
 static void compute(Session &s, ggml_cgraph *graph) {
     const ggml_status status = ggml_backend_graph_compute_async(s.backend, graph);
     if (status != GGML_STATUS_SUCCESS)
@@ -305,6 +423,8 @@ static ggml_type type_of(const std::string &t) {
         return GGML_TYPE_Q4_K;
     if (t == "q6_k")
         return GGML_TYPE_Q6_K;
+    if (t == "q8_0")
+        return GGML_TYPE_Q8_0;
     throw std::runtime_error("unknown dtype");
 }
 struct Data {
@@ -340,20 +460,87 @@ static Data make_data(const Options &o) {
             throw std::runtime_error("quantization size mismatch");
         d.weights.emplace(role, std::move(w));
     };
-    add("q", o.hidden, e);
-    add("k", o.hidden, kv);
-    add("v", o.hidden, kv);
-    if (o.attention_gate == "sigmoid")
-        add("gate_proj", o.hidden, e);
-    add("output", e, o.hidden);
-    add("gate", o.hidden, o.intermediate);
-    add("up", o.hidden, o.intermediate);
-    add("down", o.intermediate, o.hidden);
+    // A stage builds and allocates only its own roles, so a weight the stage does not read
+    // is absent from `dtypes` and must not be created here either.
+    auto add_if = [&](const std::string &role, int64_t cols, int64_t rows, bool gamma = false) {
+        if (o.dtypes.count(role))
+            add(role, cols, rows, gamma);
+    };
+    add_if("q", o.hidden, e);
+    add_if("k", o.hidden, kv);
+    add_if("v", o.hidden, kv);
+    if (o.attention_bias) {
+        add_if("q_bias", e, 1);
+        add_if("k_bias", kv, 1);
+        add_if("v_bias", kv, 1);
+    }
+    add_if("gate_proj", o.hidden, e);
+    add_if("output", e, o.hidden);
+    add_if("gate", o.hidden, o.intermediate);
+    add_if("up", o.hidden, o.intermediate);
+    add_if("down", o.intermediate, o.hidden);
+    if (o.experts > 0) {
+        // One expert plane is one dense matrix, so the planes are generated and quantized in
+        // blocks: the float staging copy stays small beside the packed bytes it is only an
+        // intermediate for, and an eight-gigabyte device is not asked to hold both.
+        auto add_exps = [&](const std::string &role, int64_t cols, int64_t rows) {
+            if (!o.dtypes.count(role))
+                return;
+            Weight w;
+            w.cols = cols;
+            w.rows = rows;
+            w.experts = o.stack;   // resident planes, not the model's expert count
+            w.type = type_of(o.dtypes.at(role));
+            if ((w.type == GGML_TYPE_Q4_K || w.type == GGML_TYPE_Q6_K) && cols % 256)
+                throw std::runtime_error(
+                    "quantized reduction dimension must be divisible by 256: " + role);
+            const size_t row_bytes = ggml_row_size(w.type, cols);
+            w.packed.resize(row_bytes * static_cast<size_t>(rows) *
+                            static_cast<size_t>(o.stack));
+            const int64_t plane = product({cols, rows});
+            const int64_t block = std::max<int64_t>(1, (int64_t{8} << 20) / plane);
+            std::vector<float> f(static_cast<size_t>(plane) * static_cast<size_t>(block));
+            for (int64_t start = 0; start < o.stack; start += block) {
+                const int64_t n = std::min(block, o.stack - start);
+                f.resize(static_cast<size_t>(plane) * static_cast<size_t>(n));
+                fill(f, rng);
+                for (float &v : f)
+                    v /= std::sqrt(static_cast<float>(cols));
+                uint8_t *dst = w.packed.data() + static_cast<size_t>(start) * row_bytes *
+                                                     static_cast<size_t>(rows);
+                if (w.type == GGML_TYPE_F32)
+                    std::memcpy(dst, f.data(), f.size() * sizeof(float));
+                else if (w.type == GGML_TYPE_F16)
+                    ggml_fp32_to_fp16_row(f.data(), reinterpret_cast<ggml_fp16_t *>(dst),
+                                          static_cast<int64_t>(f.size()));
+                else if (ggml_quantize_chunk(w.type, f.data(), dst, 0, rows * n, cols,
+                                             nullptr) !=
+                         row_bytes * static_cast<size_t>(rows) * static_cast<size_t>(n))
+                    throw std::runtime_error("expert tensor quantization size mismatch: " + role);
+            }
+            d.weights.emplace(role, std::move(w));
+        };
+        add_exps("gate_exps", o.hidden, o.intermediate);
+        add_exps("up_exps", o.hidden, o.intermediate);
+        // The down projection reduces over the expert width, so its rows are the hidden
+        // dimension -- the stored layout, not a transposed copy.
+        add_exps("down_exps", o.intermediate, o.hidden);
+        add_if("router", o.hidden, o.experts);
+        if (o.shared_intermediate > 0) {
+            add_if("gate_shexp", o.hidden, o.shared_intermediate);
+            add_if("up_shexp", o.hidden, o.shared_intermediate);
+            add_if("down_shexp", o.shared_intermediate, o.hidden);
+            add_if("gate_inp_shexp", o.hidden, 1);
+        }
+    }
     add("input_norm", o.hidden, 1, true);
     add("post_attention_norm", o.hidden, 1, true);
-    if (o.qk_norm == "rms") {
-        add("q_norm", o.head_dim, 1, true);
-        add("k_norm", o.head_dim, 1, true);
+    if (o.qk_norm == "rms" || o.qk_norm == "rms_hidden") {
+        // One gain per head, or one per hidden unit when the normalization runs over the
+        // head-concatenated projection (OLMoE).
+        const int64_t width = o.qk_norm == "rms_hidden" ? o.hidden : o.head_dim;
+        add("q_norm", width, 1, true);
+        add("k_norm", width, 1, true);
     }
     d.x.resize(product({o.hidden, o.q}));
     fill(d.x, rng);
@@ -361,6 +548,19 @@ static Data make_data(const Options &o) {
     fill(d.kcache, rng);
     d.vcache.resize(d.kcache.size());
     fill(d.vcache, rng);
+    if (kv_cache_type(o) == GGML_TYPE_F16) {
+        // The host vectors are what the independent reference and the exact KV append check
+        // compare against.  When the cache tensor stores halves, the host copies are rounded
+        // the same way first: then the reference reads the history the graph actually sees,
+        // the append can still be compared exactly, and nothing is compared across dtypes.
+        for (auto *cache : {&d.kcache, &d.vcache}) {
+            std::vector<ggml_fp16_t> halves(cache->size());
+            ggml_fp32_to_fp16_row(cache->data(), halves.data(),
+                                  static_cast<int64_t>(cache->size()));
+            ggml_fp16_to_fp32_row(halves.data(), cache->data(),
+                                  static_cast<int64_t>(cache->size()));
+        }
+    }
     for (int64_t i = 0; i < o.q; ++i)
         d.positions.push_back(static_cast<int32_t>(o.history + i));
     return d;
@@ -369,6 +569,14 @@ struct Stage {
     Session s;
     ggml_cgraph *graph = nullptr;
     std::map<std::string, ggml_tensor *> tensors, weights, ports;
+    // Scatter offsets for an f16 cache.  They are constants of the block, but they live in
+    // the resident buffer rather than in the graph: the graph allocator frees a leaf's slot
+    // once its last reader has run, so a constant written into the graph is overwritten by
+    // the next sample's intermediates.  They are not ports, so they stay out of the port
+    // accounting; the resident byte total below includes them.
+    ggml_tensor *key_offsets = nullptr, *value_offsets = nullptr;
+    // DIAGNOSTIC (2026-11-09): explicit routing for the sparse block.  See `Options::route`.
+    ggml_tensor *route_ids = nullptr;
     std::map<std::string, std::pair<int, int>> node_ranges;
     size_t input_bytes = 0, output_bytes = 0, weight_bytes = 0, kv_bytes = 0, internal_bytes = 0,
            logical_internal = 0;
@@ -377,18 +585,28 @@ static std::vector<std::string> roles_for(const Options &o, const std::string &s
     std::vector<std::string> roles;
     if (stage == "projection" || stage == "block") {
         roles = {"input_norm", "q", "k", "v"};
+        if (o.attention_bias)
+            for (const auto &r : {"q_bias", "k_bias", "v_bias"})
+                roles.push_back(r);
         if (o.attention_gate == "sigmoid")
             roles.push_back("gate_proj");
-        if (o.qk_norm == "rms") {
+        if (o.qk_norm == "rms" || o.qk_norm == "rms_hidden") {
             roles.push_back("q_norm");
             roles.push_back("k_norm");
         }
     }
     if (stage == "attention" || stage == "block")
         roles.push_back("output");
-    if (stage == "dense_ffn" || stage == "block")
+    if (stage == "dense_ffn" || (stage == "block" && o.experts == 0))
         for (const auto &r : {"post_attention_norm", "gate", "up", "down"})
             roles.push_back(r);
+    if (stage == "moe_ffn" || (stage == "block" && o.experts > 0)) {
+        for (const auto &r : {"post_attention_norm", "router", "gate_exps", "up_exps", "down_exps"})
+            roles.push_back(r);
+        if (o.shared_intermediate > 0)
+            for (const auto &r : {"gate_shexp", "up_shexp", "down_shexp", "gate_inp_shexp"})
+                roles.push_back(r);
+    }
     return roles;
 }
 static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
@@ -406,8 +624,8 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     if (!s.resident || !s.ctx)
         throw std::runtime_error("tensor metadata allocation failed");
     auto add = [&](const std::string &name, int64_t a, int64_t b, int64_t c, bool output,
-                   bool cache = false) {
-        auto *t = input(s.resident, name.c_str(), a, b, c);
+                   bool cache = false, ggml_type type = GGML_TYPE_F32) {
+        auto *t = input_typed(s.resident, name.c_str(), type, a, b, c);
         p->tensors[name] = t;
         if (cache)
             p->kv_bytes = add_bytes(p->kv_bytes, ggml_nbytes(t));
@@ -421,7 +639,7 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     };
     const bool projection = stage == "projection" || stage == "block",
                attention = stage == "attention" || stage == "block",
-               ffn = stage == "dense_ffn" || stage == "block";
+               ffn = stage == "dense_ffn" || stage == "moe_ffn" || stage == "block";
     if (projection || attention)
         add("hidden_input", o.hidden, o.q, 1, false);
     if (projection) {
@@ -439,8 +657,22 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
             add("attention_gate", e, o.q, 1, projection);
     }
     if (attention) {
-        add("key_cache", o.head_dim, length, o.kv_heads, false, true);
-        add("value_cache", o.head_dim, length, o.kv_heads, false, true);
+        add("key_cache", o.head_dim, length, o.kv_heads, false, true, kv_cache_type(o));
+        add("value_cache", o.head_dim, length, o.kv_heads, false, true, kv_cache_type(o));
+        if (kv_cache_type(o) == GGML_TYPE_F16) {
+            // SET-inplace accepts an f32 destination only, so a half cache cannot be
+            // appended that way.  SET_ROWS writes a destination of any element type, takes
+            // f32 values (the rule the CUDA backend's set_rows path requires anyway) and
+            // returns the complete cache, so readers still depend on the write.
+            p->key_offsets = ggml_new_tensor_2d(s.resident, GGML_TYPE_I64, o.q, o.kv_heads);
+            ggml_set_name(p->key_offsets, "key_offsets");
+            ggml_set_input(p->key_offsets);
+            p->value_offsets = ggml_new_tensor_2d(s.resident, GGML_TYPE_I64, o.q, o.kv_heads);
+            ggml_set_name(p->value_offsets, "value_offsets");
+            ggml_set_input(p->value_offsets);
+            // Deliberately not counted as an input port: the contract's input accounting
+            // names the tensors the mathematics consumes, and the offsets are addressing.
+        }
     }
     if (attention || ffn)
         add("attention_hidden", o.hidden, o.q, 1, attention);
@@ -448,11 +680,25 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
         add("hidden_output", o.hidden, o.q, 1, true);
     for (const auto &role : roles_for(o, stage)) {
         const auto &w = d.weights.at(role);
-        auto *t = ggml_new_tensor_2d(s.resident, w.type, w.cols, w.rows);
+        // An expert plane is the third axis of the stored matrix, which is where
+        // `ggml_mul_mat_id` reads it from.
+        auto *t = w.experts > 1
+                      ? ggml_new_tensor_3d(s.resident, w.type, w.cols, w.rows, w.experts)
+                      : ggml_new_tensor_2d(s.resident, w.type, w.cols, w.rows);
         ggml_set_name(t, role.c_str());
         ggml_set_input(t);
         p->weights[role] = t;
         p->weight_bytes = add_bytes(p->weight_bytes, ggml_nbytes(t));
+    }
+    // An explicit routing arm needs an ids tensor the graph cannot overwrite, so it lives
+    // in the resident buffer beside the weights (the same reason as the cache offsets).
+    // A stack smaller than the model's expert count needs explicit ids too: the router's
+    // own top-k addresses planes 0..E-1, and a graph that holds only `k` planes has to
+    // name which of them it holds.
+    const bool explicit_ids = o.route || (o.experts > 0 && o.stack < o.experts);
+    if (ffn && o.experts > 0 && explicit_ids) {
+        p->route_ids = ggml_new_tensor_2d(s.resident, GGML_TYPE_I32, o.top_k, o.q);
+        ggml_set_name(p->route_ids, "route_ids");
     }
     s.buffer = ggml_backend_alloc_ctx_tensors(s.resident, s.backend);
     if (!s.buffer)
@@ -460,17 +706,51 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     for (const auto &w : p->weights)
         ggml_backend_tensor_set(w.second, d.weights.at(w.first).packed.data(), 0,
                                 ggml_nbytes(w.second));
+    if (p->route_ids) {
+        // The same formula `ir_runner.cpp` gives its executor, so the two graphs see one
+        // routing: every expert receives the same number of tokens, which is what routing
+        // over a real corpus averages to and what a batched kernel has to pay for.
+        const int64_t stride = std::max<int64_t>(1, o.stack / std::max<int64_t>(1, o.top_k));
+        std::vector<int32_t> ids(static_cast<size_t>(o.top_k) * static_cast<size_t>(o.q));
+        for (int64_t t = 0; t < o.q; ++t)
+            for (int64_t k = 0; k < o.top_k; ++k)
+                ids[static_cast<size_t>(k + o.top_k * t)] =
+                    static_cast<int32_t>((t + k * stride) % o.stack);
+        ggml_backend_tensor_set(p->route_ids, ids.data(), 0, ids.size() * sizeof(int32_t));
+    }
     auto put = [&](const std::string &name, const std::vector<float> &f) {
         if (p->tensors.count(name)) {
             auto *t = p->tensors.at(name);
             if (f.size() != static_cast<size_t>(ggml_nelements(t)))
                 throw std::runtime_error("unprepared stage input: " + name);
-            ggml_backend_tensor_set(t, f.data(), 0, ggml_nbytes(t));
+            // The host vector is always f32; a cache tensor stores its own element type.
+            // Converting is the difference between storing half the values and storing
+            // four-byte floats reinterpreted as two-byte halves.
+            if (t->type == GGML_TYPE_F32) {
+                ggml_backend_tensor_set(t, f.data(), 0, ggml_nbytes(t));
+            } else if (t->type == GGML_TYPE_F16) {
+                std::vector<ggml_fp16_t> halves(f.size());
+                ggml_fp32_to_fp16_row(f.data(), halves.data(), static_cast<int64_t>(f.size()));
+                ggml_backend_tensor_set(t, halves.data(), 0, ggml_nbytes(t));
+            } else {
+                throw std::runtime_error("unsupported input element type for " + name);
+            }
         }
     };
     put("hidden_input", d.x);
     put("key_cache", d.kcache);
     put("value_cache", d.vcache);
+    if (p->key_offsets) {
+        // Row r of the cache is the position r's head slice, and the scatter addresses the
+        // row and the head plane separately (set-rows.cu: dst_row*s1 + i02*s2), so one
+        // offset per (new position, kv head) is the whole specification.
+        std::vector<int64_t> ko(static_cast<size_t>(o.q) * static_cast<size_t>(o.kv_heads));
+        for (int64_t h = 0; h < o.kv_heads; ++h)
+            for (int64_t t = 0; t < o.q; ++t)
+                ko[static_cast<size_t>(t + o.q * h)] = o.history + t;
+        for (auto *t : {p->key_offsets, p->value_offsets})
+            ggml_backend_tensor_set(t, ko.data(), 0, ko.size() * sizeof(int64_t));
+    }
     if (!projection && attention) {
         put("query", d.query);
         put("new_key", d.key);
@@ -499,8 +779,15 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     if (projection) {
         auto *n = norm(p->tensors.at("hidden_input"), "input_norm");
         auto qkv = [&](const std::string &role, int64_t heads, bool rotary) {
-            auto *v = ggml_reshape_3d(ctx, ggml_mul_mat(ctx, p->weights.at(role), n), o.head_dim,
-                                      heads, o.q);
+            auto *flat = ggml_mul_mat(ctx, p->weights.at(role), n);
+            // llama.cpp adds the stored bias to the projection, then applies QK norm and
+            // RoPE; the order is part of the declared graph.
+            if (o.attention_bias)
+                flat = ggml_add(ctx, flat, p->weights.at(role + "_bias"));
+            // The per-hidden variant normalizes the flat projection before the head split.
+            if (rotary && o.qk_norm == "rms_hidden")
+                flat = norm(flat, role == "q" ? "q_norm" : "k_norm");
+            auto *v = ggml_reshape_3d(ctx, flat, o.head_dim, heads, o.q);
             if (rotary) {
                 if (o.qk_norm == "rms")
                     v = norm(v, role == "q" ? "q_norm" : "k_norm");
@@ -527,10 +814,18 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
         auto *kc = p->tensors.at("key_cache"), *vc = p->tensors.at("value_cache");
         const size_t offset =
             static_cast<size_t>(o.history) * static_cast<size_t>(o.head_dim) * sizeof(float);
-        // SET-inplace returns the complete cache with an explicit dependency on
+        // Both appends return the complete cache with an explicit dependency on
         // new K/V. Readers therefore depend on the writes, including in block.
-        auto *kr = ggml_set_inplace(ctx, kc, key, kc->nb[1], kc->nb[2], kc->nb[3], offset);
-        auto *vr = ggml_set_inplace(ctx, vc, value, vc->nb[1], vc->nb[2], vc->nb[3], offset);
+        // SET-inplace can only target an f32 cache; a half cache is appended with SET_ROWS,
+        // which is the scatter the CPU contract uses for any element type.
+        ggml_tensor *kr = nullptr, *vr = nullptr;
+        if (kc->type == GGML_TYPE_F32) {
+            kr = ggml_set_inplace(ctx, kc, key, kc->nb[1], kc->nb[2], kc->nb[3], offset);
+            vr = ggml_set_inplace(ctx, vc, value, vc->nb[1], vc->nb[2], vc->nb[3], offset);
+        } else {
+            kr = ggml_set_rows(ctx, kc, key, p->key_offsets);
+            vr = ggml_set_rows(ctx, vc, value, p->value_offsets);
+        }
         auto *scores = ggml_mul_mat(ctx, kr, query);
         scores = ggml_scale(ctx, scores, 1.0f / std::sqrt(static_cast<float>(o.head_dim)));
         scores = ggml_diag_mask_inf(ctx, scores, static_cast<int>(o.history));
@@ -548,7 +843,7 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
                                        ggml_graph_n_nodes(p->graph)};
     } else if (ffn)
         hidden = p->tensors.at("attention_hidden");
-    if (ffn) {
+    if (ffn && o.experts == 0) {
         auto *n = norm(hidden, "post_attention_norm");
         auto *g = ggml_mul_mat(ctx, p->weights.at("gate"), n);
         auto *u = ggml_mul_mat(ctx, p->weights.at("up"), n);
@@ -557,6 +852,53 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
                     ggml_add(ctx, ggml_mul_mat(ctx, p->weights.at("down"), active), hidden));
         p->node_ranges["dense_ffn"] = {attention ? p->node_ranges.at("attention").second : 0,
                                        ggml_graph_n_nodes(p->graph)};
+    } else if (ffn) {
+        // The sparse block as llama.cpp builds it: router scores, a softmax over all
+        // experts, top-k selection, three indirect products, the weighted reduction over
+        // the selected experts, then the shared expert (if the checkpoint has one) and the
+        // residual.
+        auto *n = norm(hidden, "post_attention_norm");
+        auto *logits = ggml_mul_mat(ctx, p->weights.at("router"), n);  // [experts, tokens]
+        auto *probs = ggml_soft_max(ctx, logits);
+        auto *selected = ggml_argsort_top_k(ctx, probs, static_cast<int>(o.top_k));
+        // The ids the three indirect products use.  Absent an explicit routing arm this is
+        // the router's own top-k, so the published graph is unchanged; with one, the id is
+        // both the plane that is read and the probability it is weighted by, which is the
+        // only reading an explicit-ids graph has.
+        auto *routed = p->route_ids ? p->route_ids : selected;
+        auto *weights = ggml_get_rows(
+            ctx, ggml_reshape_3d(ctx, probs, 1, o.experts, o.q), routed);  // [1, k, tokens]
+        if (o.normalize_topk) {
+            // Renormalizing the selected weights is what the declared variant does; the
+            // clamp is llama.cpp's own guard against a zero sum.
+            auto *w2 = ggml_reshape_2d(ctx, weights, o.top_k, o.q);
+            auto *sum = ggml_clamp(ctx, ggml_sum_rows(ctx, w2), 6.103515625e-5f, INFINITY);
+            weights = ggml_reshape_3d(ctx, ggml_div(ctx, w2, sum), 1, o.top_k, o.q);
+        }
+        auto *cur = ggml_reshape_3d(ctx, n, o.hidden, 1, o.q);
+        // The router's own chain stays in the graph either way, so the priced op set does
+        // not change; only the ids the three indirect products are given do.
+        auto *up = ggml_mul_mat_id(ctx, p->weights.at("up_exps"), cur, routed);
+        auto *gate = ggml_mul_mat_id(ctx, p->weights.at("gate_exps"), cur, routed);
+        auto *active = ggml_swiglu_split(ctx, gate, up);
+        auto *experts = ggml_mul_mat_id(ctx, p->weights.at("down_exps"), active, routed);
+        experts = ggml_mul(ctx, experts, weights);  // [hidden, k, tokens]
+        auto *moe = ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2], 0);
+        for (int64_t i = 1; i < o.top_k; ++i)
+            moe = ggml_add(ctx, moe,
+                           ggml_view_2d(ctx, experts, o.hidden, o.q, experts->nb[2],
+                                        i * experts->nb[1]));
+        if (o.shared_intermediate > 0) {
+            auto *sg = ggml_sigmoid(ctx, ggml_mul_mat(ctx, p->weights.at("gate_inp_shexp"), n));
+            auto *shared =
+                ggml_swiglu_split(ctx, ggml_mul_mat(ctx, p->weights.at("gate_shexp"), n),
+                                  ggml_mul_mat(ctx, p->weights.at("up_shexp"), n));
+            shared = ggml_mul(ctx, ggml_mul_mat(ctx, p->weights.at("down_shexp"), shared), sg);
+            moe = ggml_add(ctx, moe, shared);
+        }
+        materialize("hidden_output", ggml_add(ctx, moe, hidden));
+        p->node_ranges["moe_ffn"] = {attention ? p->node_ranges.at("attention").second : 0,
+                                     ggml_graph_n_nodes(p->graph)};
     }
     for (int i = 0; i < ggml_graph_n_nodes(p->graph); ++i)
         if (!ggml_backend_supports_op(s.backend, ggml_graph_node(p->graph, i)))
@@ -598,18 +940,32 @@ static std::unique_ptr<Stage> build_stage(const Options &o, const Data &d,
     return p;
 }
 static std::vector<float> read_tensor(ggml_tensor *t) {
-    std::vector<float> f(static_cast<size_t>(ggml_nelements(t)));
+    const auto elements = static_cast<size_t>(ggml_nelements(t));
+    std::vector<float> f(elements);
+    if (t->type == GGML_TYPE_F16) {
+        // Read the stored halves, then widen: `ggml_nbytes` is two bytes per element
+        // here, so a direct copy into a float buffer would fill only half of it.
+        std::vector<ggml_fp16_t> halves(elements);
+        ggml_backend_tensor_get(t, halves.data(), 0, ggml_nbytes(t));
+        ggml_fp16_to_fp32_row(halves.data(), f.data(), static_cast<int64_t>(elements));
+        return f;
+    }
     ggml_backend_tensor_get(t, f.data(), 0, ggml_nbytes(t));
     return f;
 }
 static void capture(Stage &s, Data &d) {
-    d.query = read_tensor(s.ports.at("query"));
-    d.key = read_tensor(s.ports.at("new_key"));
-    d.value = read_tensor(s.ports.at("new_value"));
-    if (s.ports.count("attention_gate"))
-        d.agate = read_tensor(s.ports.at("attention_gate"));
-    d.attn_hidden = read_tensor(s.ports.at("attention_hidden"));
-    d.final_hidden = read_tensor(s.ports.at("hidden_output"));
+    // A preparation strip produces only the ports of the stages it contains, so a port that
+    // is absent is simply not part of what the strip computes.
+    auto take = [&](const std::string &name, std::vector<float> &into) {
+        if (s.ports.count(name))
+            into = read_tensor(s.ports.at(name));
+    };
+    take("query", d.query);
+    take("new_key", d.key);
+    take("new_value", d.value);
+    take("attention_gate", d.agate);
+    take("attention_hidden", d.attn_hidden);
+    take("hidden_output", d.final_hidden);
 }
 static std::vector<float> normalized(const std::vector<float> &x, int64_t width,
                                      const Weight &gamma, float eps) {
@@ -642,8 +998,16 @@ static std::vector<float> matmul(const Weight &w, const std::vector<float> &x, i
 static std::vector<float> projected(const Options &o, const Data &d, const std::vector<float> &norm,
                                     const std::string &role, int64_t heads, bool rotary) {
     auto f = matmul(d.weights.at(role), norm, o.q);
-    if (rotary && o.qk_norm == "rms")
-        f = normalized(f, o.head_dim, d.weights.at(role == "q" ? "q_norm" : "k_norm"), o.norm_eps);
+    if (o.attention_bias) {
+        std::vector<float> bias;
+        d.weights.at(role + "_bias").row(0, bias);
+        const size_t width = bias.size();
+        for (size_t i = 0; i < f.size(); ++i)
+            f[i] += bias[i % width];
+    }
+    if (rotary && o.qk_norm != "none")
+        f = normalized(f, o.qk_norm == "rms_hidden" ? o.hidden : o.head_dim,
+                       d.weights.at(role == "q" ? "q_norm" : "k_norm"), o.norm_eps);
     if (rotary) {
         for (int64_t t = 0; t < o.q; ++t)
             for (int64_t h = 0; h < heads; ++h) {
@@ -761,6 +1125,115 @@ static std::map<size_t, double> ffn_reference(const Options &o, const Data &d,
     }
     return result;
 }
+static std::map<size_t, double> moe_reference(const Options &o, const Data &d,
+                                              const std::vector<float> &h,
+                                              const std::vector<size_t> &indices) {
+    // The independent double-precision path through the same declared sparse block: router
+    // scores, softmax over all experts, the declared top-k rule, the three expert products,
+    // the weighted reduction, the shared expert and the residual.  It reads the stored
+    // (possibly quantized) weights, so a disagreement is a graph disagreement, not a
+    // storage one.
+    auto n = normalized(h, o.hidden, d.weights.at("post_attention_norm"), o.norm_eps);
+    std::map<size_t, double> result;
+    std::vector<float> row;
+    std::set<size_t> tokens;
+    for (const size_t ix : indices)
+        tokens.insert(ix / static_cast<size_t>(o.hidden));
+    for (const size_t t : tokens) {
+        const float *x = n.data() + t * static_cast<size_t>(o.hidden);
+        std::vector<double> logits(static_cast<size_t>(o.experts)), probs(logits.size());
+        for (int64_t expert = 0; expert < o.experts; ++expert) {
+            d.weights.at("router").row(expert, row);
+            logits[static_cast<size_t>(expert)] = dot(row, x);
+        }
+        const double largest = *std::max_element(logits.begin(), logits.end());
+        double total = 0;
+        for (size_t i = 0; i < logits.size(); ++i) {
+            probs[i] = std::exp(logits[i] - largest);
+            total += probs[i];
+        }
+        for (double &p : probs)
+            p /= total;
+        std::vector<size_t> order(probs.size());
+        for (size_t i = 0; i < order.size(); ++i)
+            order[i] = i;
+        std::partial_sort(order.begin(), order.begin() + o.top_k, order.end(),
+                          [&](size_t a, size_t b) { return probs[a] > probs[b]; });
+        if (o.route || o.stack < o.experts) {
+            // The same declared routing the graph is given, so the check stays a check of
+            // the graph and not of a routing the graph did not run.  With a `k`-plane
+            // stack the id is both the probability it weights by and the plane it reads,
+            // which is what an explicit-ids graph does.
+            const int64_t stride =
+                std::max<int64_t>(1, o.stack / std::max<int64_t>(1, o.top_k));
+            for (int64_t i = 0; i < o.top_k; ++i)
+                order[static_cast<size_t>(i)] = static_cast<size_t>(
+                    (static_cast<int64_t>(t) + i * stride) % o.stack);
+        }
+        double selected_sum = 0;
+        for (int64_t i = 0; i < o.top_k; ++i)
+            selected_sum += probs[order[static_cast<size_t>(i)]];
+        std::vector<double> out(static_cast<size_t>(o.hidden), 0.0);
+        std::vector<double> gate(static_cast<size_t>(o.intermediate)),
+            up(static_cast<size_t>(o.intermediate)), active(gate.size());
+        for (int64_t i = 0; i < o.top_k; ++i) {
+            const size_t expert = order[static_cast<size_t>(i)];
+            const double weight =
+                o.normalize_topk ? probs[expert] / std::max(selected_sum, 6.103515625e-5)
+                                 : probs[expert];
+            for (int64_t j = 0; j < o.intermediate; ++j) {
+                d.weights.at("gate_exps").row(static_cast<int64_t>(expert) * o.intermediate + j,
+                                            row);
+                gate[static_cast<size_t>(j)] = dot(row, x);
+                d.weights.at("up_exps").row(static_cast<int64_t>(expert) * o.intermediate + j, row);
+                up[static_cast<size_t>(j)] = dot(row, x);
+                const double g = gate[static_cast<size_t>(j)];
+                active[static_cast<size_t>(j)] =
+                    static_cast<double>(static_cast<float>(g / (1.0 + std::exp(-g)))) *
+                    up[static_cast<size_t>(j)];
+            }
+            for (int64_t k = 0; k < o.hidden; ++k) {
+                d.weights.at("down_exps").row(static_cast<int64_t>(expert) * o.hidden + k, row);
+                double value = 0;
+                for (int64_t j = 0; j < o.intermediate; ++j)
+                    value += static_cast<double>(row[static_cast<size_t>(j)]) *
+                             active[static_cast<size_t>(j)];
+                out[static_cast<size_t>(k)] += weight * value;
+            }
+        }
+        if (o.shared_intermediate > 0) {
+            d.weights.at("gate_inp_shexp").row(0, row);
+            const double g = 1.0 / (1.0 + std::exp(-dot(row, x)));
+            std::vector<double> sh(static_cast<size_t>(o.shared_intermediate)),
+                shup(static_cast<size_t>(o.shared_intermediate));
+            for (int64_t j = 0; j < o.shared_intermediate; ++j) {
+                d.weights.at("gate_shexp").row(j, row);
+                sh[static_cast<size_t>(j)] = dot(row, x);
+                d.weights.at("up_shexp").row(j, row);
+                shup[static_cast<size_t>(j)] = dot(row, x);
+                const double v = sh[static_cast<size_t>(j)];
+                sh[static_cast<size_t>(j)] =
+                    static_cast<double>(static_cast<float>(v / (1.0 + std::exp(-v)))) *
+                    shup[static_cast<size_t>(j)];
+            }
+            for (int64_t k = 0; k < o.hidden; ++k) {
+                d.weights.at("down_shexp").row(k, row);
+                double value = 0;
+                for (int64_t j = 0; j < o.shared_intermediate; ++j)
+                    value += static_cast<double>(row[static_cast<size_t>(j)]) *
+                             sh[static_cast<size_t>(j)];
+                out[static_cast<size_t>(k)] += g * value;
+            }
+        }
+        for (int64_t k = 0; k < o.hidden; ++k)
+            out[static_cast<size_t>(k)] +=
+                h[t * static_cast<size_t>(o.hidden) + static_cast<size_t>(k)];
+        for (const size_t ix : indices)
+            if (ix / static_cast<size_t>(o.hidden) == t)
+                result[ix] = out[ix % static_cast<size_t>(o.hidden)];
+    }
+    return result;
+}
 struct Check {
     size_t samples = 0, elements = 0;
     double squared = 0, ref_squared = 0, max_abs = 0, max_relative = 0;
@@ -808,7 +1281,24 @@ static void emit_config(const Options &o) {
               << ",\"head_dim\":" << o.head_dim << ",\"attention_gate\":\"" << o.attention_gate
               << "\",\"qk_norm\":\"" << o.qk_norm << "\",\"rope_mode\":\"" << o.rope_mode
               << "\",\"rope_dims\":" << o.rope_dims << ",\"rope_base\":" << o.rope_base
-              << ",\"norm_epsilon\":" << o.norm_eps << ",\"weight_dtypes\":";
+              << ",\"norm_epsilon\":" << o.norm_eps;
+    // A property of the model's projections, emitted whenever it was declared so the receipt
+    // and the case describe the same config; the stage-scoped `included` list is what says
+    // whether the timed graph itself contains the bias adds.
+    if (o.experts > 0) {
+        std::cout << ",\"experts\":" << o.experts << ",\"top_k\":" << o.top_k;
+        // How many expert planes the priced graph holds; a plan's resident requirement is
+        // this many `E0`, not one.  Omitted when it is the whole stack, so every published
+        // config (and therefore every published contract hash) stays byte-identical.
+        if (o.stack != o.experts)
+            std::cout << ",\"expert_stack\":" << o.stack;
+        std::cout << ",\"shared_intermediate\":" << o.shared_intermediate
+                  << ",\"normalize_topk\":" << (o.normalize_topk ? "true" : "false")
+                  << ",\"attention_bias\":" << (o.attention_bias ? "true" : "false");
+    }
+    else if (o.attention_bias)
+        std::cout << ",\"attention_bias\":true";
+    std::cout << ",\"weight_dtypes\":";
     emit_dtypes(o);
     std::cout << "}";
 }
@@ -823,11 +1313,17 @@ static std::vector<std::string> operations(const Options &o, const std::string &
     if (kind == "projection") {
         std::vector<std::string> v = {"input_RMSNorm", "input_norm_scale", "Q_projection",
                                       "K_projection", "V_projection"};
+        if (o.attention_bias)
+            for (const auto &s : {"Q_bias_add", "K_bias_add", "V_bias_add"})
+                v.push_back(s);
         if (o.attention_gate == "sigmoid")
             v.push_back("gate_projection");
         if (o.qk_norm == "rms")
             for (const auto &s :
                  {"Q_per_head_RMSNorm", "Q_norm_scale", "K_per_head_RMSNorm", "K_norm_scale"})
+                v.push_back(s);
+        else if (o.qk_norm == "rms_hidden")
+            for (const auto &s : {"Q_RMSNorm", "Q_norm_scale", "K_RMSNorm", "K_norm_scale"})
                 v.push_back(s);
         for (const auto &s :
              {"RoPE_Q", "RoPE_K", "materialize_Q", "materialize_K", "materialize_V"})
@@ -858,8 +1354,32 @@ static std::vector<std::string> operations(const Options &o, const std::string &
                 "down_projection",
                 "ffn_residual_add",
                 "materialize_hidden"};
+    if (kind == "moe_ffn") {
+        std::vector<std::string> v = {"post_attention_RMSNorm",
+                                      "post_attention_norm_scale",
+                                      "router_projection",
+                                      "router_softmax",
+                                      "top_k_selection",
+                                      "top_k_weight_gather"};
+        if (o.normalize_topk)
+            v.push_back("top_k_weight_normalize");
+        for (const auto &s : {"expert_gate_projection", "expert_up_projection", "SiLU_gate",
+                              "gate_times_up", "expert_down_projection", "expert_weighting"})
+            v.push_back(s);
+        for (int64_t i = 1; i < o.top_k; ++i)
+            v.push_back("expert_accumulate");
+        if (o.shared_intermediate > 0)
+            for (const auto &s :
+                 {"shared_expert_gate_inp", "shared_sigmoid", "shared_expert_gate_projection",
+                  "shared_expert_up_projection", "SiLU_gate_shared", "gate_times_up_shared",
+                  "shared_expert_down_projection", "shared_gate_scale"})
+                v.push_back(s);
+        v.push_back("ffn_residual_add");
+        v.push_back("materialize_hidden");
+        return v;
+    }
     std::vector<std::string> v;
-    for (const auto &s : {"projection", "attention", "dense_ffn"}) {
+    for (const auto &s : {"projection", "attention", o.experts == 0 ? "dense_ffn" : "moe_ffn"}) {
         auto part = operations(o, s);
         v.insert(v.end(), part.begin(), part.end());
     }
@@ -981,8 +1501,18 @@ static int run(const Options &o) {
     DENSE_CUDA_MEMORY_CHECKPOINT("after_context_initialization");
     Data d = make_data(o);
     const std::string stage_kind = o.stage;
-    if (stage_kind != "block") {
-        auto prep = build_stage(o, d, "block");
+    // The upstream preparation only has to produce the ports the measured stage reads:
+    // `hidden_input` for a projection, the three projections for an attention, a whole block
+    // for a feed-forward.  Building the strip that is needed instead of always a block keeps
+    // a stage measurable when the rest of the graph has no weights declared -- a sparse
+    // model's projection is still a projection, and its feed-forward is not a dense one.
+    const std::string prep_kind =
+        stage_kind == "attention"      ? "projection"
+        : stage_kind == "dense_ffn" ||
+                stage_kind == "moe_ffn" ? "block"
+                                        : "";
+    if (!prep_kind.empty()) {
+        auto prep = build_stage(o, d, prep_kind);
         compute(prep->s, prep->graph);
         capture(*prep, d);
     }
@@ -1025,6 +1555,80 @@ static int run(const Options &o) {
         wall.push_back(ns);
     }
     DENSE_CUDA_MEMORY_CHECKPOINT("after_samples");
+    // Per-node sweep: run the graph truncated to its first k nodes, for every k.  The median of
+    // the timed batches at k, divided by the timed repetitions, is the cost of that prefix; the
+    // difference between successive prefixes is the marginal cost of node k.  This is the
+    // measurement the primitive key needs: it attributes time to a ggml node -- which carries its
+    // own op name, shape and dtypes -- instead of to a stage, which carries none of them.
+    std::vector<int64_t> prefix_ns;
+    std::vector<double> prefix_ratio, prefix_pair_spread;
+    std::vector<int> prefix_nodes;
+    std::vector<int64_t> reference_ns;
+    int64_t node_profile_reference = 0;
+    if (o.node_profile > 0) {
+        const int total_nodes = ggml_graph_n_nodes(stage->graph);
+        // Prefix graphs are built by expanding nodes 0..k-1 in the stage's own topological
+        // order.  `ggml_build_forward_expand` pulls in a node's parents, and every parent sits
+        // at a lower index, so the result is exactly the prefix.  The node objects are shared
+        // with the stage graph and are already resident, so nothing is reallocated: the bytes
+        // timed here are the bytes the published price was taken on.
+        ggml_context *graph_ctx = ggml_init({16 * 1024 * 1024, nullptr, true});
+        if (!graph_ctx)
+            throw std::runtime_error("could not allocate the node-profile graph context");
+        for (int k = 1; k <= total_nodes; ++k) {
+            ggml_cgraph *prefix = ggml_new_graph_custom(graph_ctx, total_nodes + 1, false);
+            for (int j = 0; j < k; ++j)
+                ggml_build_forward_expand(prefix, ggml_graph_node(stage->graph, j));
+            compute(s, prefix); // first run of this prefix pays its own per-graph setup
+            // Every pair is (prefix, full graph) back to back, so a level change between
+            // pairs cancels in the ratio instead of landing on whichever prefix happened to
+            // be running.  The full graph is the price's own object, not a rebuilt copy.
+            // The order alternates because the first execution after a gap is slower -- with
+            // a fixed order that transient lands on the subject every time and shows up as a
+            // self-ratio above one.  The pair right after priming is dropped for the same
+            // reason.
+            std::vector<double> ratio;
+            std::vector<int64_t> ref;
+            for (int i = 0; i < o.node_profile_samples; ++i) {
+                int64_t subject = 0, reference = 0;
+                if (i % 2 == 0) {
+                    subject = time_once(s, prefix);
+                    reference = time_once(s, stage->graph);
+                } else {
+                    reference = time_once(s, stage->graph);
+                    subject = time_once(s, prefix);
+                }
+                if (i == 0)
+                    continue;
+                ratio.push_back(static_cast<double>(subject) /
+                                static_cast<double>(reference));
+                ref.push_back(reference);
+            }
+            const size_t mid = ratio.size() / 2;
+            std::vector<double> spread = ratio;
+            std::sort(spread.begin(), spread.end());
+            prefix_pair_spread.push_back(
+                spread[spread.size() - 1 - spread.size() / 10] - spread[spread.size() / 10]);
+            std::nth_element(ratio.begin(), ratio.begin() + mid, ratio.end());
+            std::nth_element(ref.begin(), ref.begin() + mid, ref.end());
+            prefix_ratio.push_back(ratio[mid]);
+            reference_ns.push_back(ref[mid]);
+            prefix_nodes.push_back(ggml_graph_n_nodes(prefix));
+        }
+        ggml_free(graph_ctx);
+        // One absolute scale for the whole sweep: the median full-graph execution across every
+        // pair.  `prefix_ns` is therefore the cost of the prefix in the units the published
+        // price is stated in, with the level divided out by the ratio.
+        std::vector<int64_t> scale = reference_ns;
+        std::nth_element(scale.begin(), scale.begin() + scale.size() / 2, scale.end());
+        const double reference = static_cast<double>(scale[scale.size() / 2]);
+        node_profile_reference = scale[scale.size() / 2];
+        prefix_ns.assign(prefix_ratio.size(), 0);
+        for (size_t i = 0; i < prefix_ratio.size(); ++i)
+            prefix_ns[i] = static_cast<int64_t>(std::llround(prefix_ratio[i] * reference));
+        compute(s, stage->graph); // leave the stage full and its outputs valid for the checks
+    }
+    DENSE_CUDA_MEMORY_CHECKPOINT("after_node_profile");
     // In-process sensor: a fixed workload timed in the same process, so that a per-process
     // device-state band can be divided out instead of being mistaken for a shape effect.
     std::vector<int64_t> sensor_wall;
@@ -1077,7 +1681,8 @@ static int run(const Options &o) {
     }
     const bool p = stage_kind == "projection" || stage_kind == "block",
                a = stage_kind == "attention" || stage_kind == "block",
-               f = stage_kind == "dense_ffn" || stage_kind == "block";
+               f = stage_kind == "dense_ffn" || stage_kind == "moe_ffn" ||
+                   stage_kind == "block";
     std::vector<float> rq, rk, rv, rg, rh;
     std::map<std::string, Check> checks;
     auto check = [&](const std::string &name, const std::vector<float> &expected, int64_t width,
@@ -1114,7 +1719,9 @@ static int run(const Options &o) {
         auto &c = checks["hidden_output"];
         c.elements = actual.size();
         const auto ix = checked_indices(actual.size(), o.hidden, o.q);
-        const auto reference = ffn_reference(o, d, stage_kind == "block" ? rh : d.attn_hidden, ix);
+        const auto &hidden_in = stage_kind == "block" ? rh : d.attn_hidden;
+        const auto reference = o.experts == 0 ? ffn_reference(o, d, hidden_in, ix)
+                                              : moe_reference(o, d, hidden_in, ix);
         for (size_t i : ix)
             c.add(actual[i], reference.at(i));
     }
@@ -1135,8 +1742,16 @@ static int run(const Options &o) {
                     else {
                         const size_t src =
                             static_cast<size_t>(j + o.head_dim * (t - o.history + o.q * h));
-                        append_exact =
-                            append_exact && actualk[dst] == kn[src] && actualv[dst] == vn[src];
+                        // A half cache stores the value the graph was given, rounded once.
+                        // The comparison is still exact -- it is against the stored value,
+                        // not against a tolerance.
+                        if (kv_cache_type(o) == GGML_TYPE_F16) {
+                            append_exact = append_exact &&
+                                           actualk[dst] == half_round(kn[src]) &&
+                                           actualv[dst] == half_round(vn[src]);
+                        } else
+                            append_exact =
+                                append_exact && actualk[dst] == kn[src] && actualv[dst] == vn[src];
                     }
                 }
     }
@@ -1160,9 +1775,12 @@ static int run(const Options &o) {
                                       add_bytes(stage->weight_bytes, stage->kv_bytes));
     std::cout << std::setprecision(17)
               << "{\"schema\":\"ggml_dense_layer_cuda_probe/1\","
-                 "\"contract\":\"ggml_cuda_dense_decoder_block_v1\",\"kind\":\"dense_layer\","
-                 "\"stage\":\""
-              << o.stage << "\",\"backend\":\"CUDA" << o.cuda_device
+                 "\"contract\":\""
+              << (o.experts > 0 ? "ggml_cuda_moe_decoder_block_v1"
+                                : "ggml_cuda_dense_decoder_block_v1")
+              << "\",\"kind\":\"dense_layer\","
+                 "\"stage\":"
+              << "\"" << o.stage << "\",\"backend\":\"CUDA" << o.cuda_device
               << "\",\"cuda_device\":" << o.cuda_device
               << ",\"cuda_graphs\":\"disabled\",\"cuda_graphs_requested\":\"disabled\","
                  "\"cuda_graphs_applied\":\"disabled\",\"cuda_graph_disable_environment\":\"1\","
@@ -1177,10 +1795,11 @@ static int run(const Options &o) {
               << ",\"input_generator\":\"mt19937_uniform24_scaled_weights_gamma_near_one_v1\","
                  "\"input_lineage\":\"same_seed_complete_upstream_preparation_outside_timing\","
                  "\"matmul_precision\":\"ggml_cuda_backend_default\",\"activation_dtype\":\"f32\","
-                 "\"kv_dtype\":\"f32\",\"position_dtype\":\"i32\","
-                 "\"implementation_variant\":\"ggml_cuda_dense_materialized_"
-              << o.stage
-              << "_v1\","
+                 "\"kv_dtype\":\""
+              << o.kv_dtype << "\",\"position_dtype\":\"i32\","
+                 "\"implementation_variant\":\"ggml_cuda_"
+              << (o.experts > 0 ? "moe" : "dense") << "_materialized_" << o.stage
+              << (kv_cache_type(o) == GGML_TYPE_F16 ? "_v2" : "_v1") << "\","
                  "\"timing\":\"steady_clock_cuda_graph_compute_including_sync\","
                  "\"scope\":\"resident_repeated_complete_declared_decoder_block\","
                  "\"included\":";
@@ -1199,9 +1818,16 @@ static int run(const Options &o) {
     std::cout << ",\"nodes\":[";
     for (int i = 0; i < ggml_graph_n_nodes(stage->graph); ++i) {
         const auto *n = ggml_graph_node(stage->graph, i);
+        int src_count = 0;
+        for (int j = 0; j < GGML_MAX_SRC; ++j)
+            src_count += n->src[j] ? 1 : 0;
         std::cout << (i ? "," : "") << "{\"op\":\"" << ggml_op_name(n->op)
                   << "\",\"bytes\":" << ggml_nbytes(n)
                   << ",\"view\":" << (n->view_src ? "true" : "false")
+                  << ",\"name\":" << json_quote(n->name)
+                  << ",\"type\":\"" << ggml_type_name(n->type) << "\""
+                  << ",\"ne\":[" << n->ne[0] << "," << n->ne[1] << "," << n->ne[2] << ","
+                  << n->ne[3] << "],\"src_count\":" << src_count
                   << ",\"supported_by_requested_backend\":true,\"buffer_type\":\"CUDA"
                   << o.cuda_device << "\"}";
     }
@@ -1213,7 +1839,10 @@ static int run(const Options &o) {
         const bool cache = t.first == "key_cache" || t.first == "value_cache",
                    out = stage->ports.count(t.first) > 0;
         std::cout << (first ? "" : ",") << "\"" << port_role(t.first) << "\":{\"dtype\":\""
-                  << (v->type == GGML_TYPE_I32 ? "i32" : "f32") << "\",\"shape\":[" << v->ne[0]
+                  << (v->type == GGML_TYPE_I32 ? "i32"
+                      : v->type == GGML_TYPE_F16 ? "f16"
+                                                 : "f32")
+                  << "\",\"shape\":[" << v->ne[0]
                   << "," << v->ne[1] << "," << v->ne[2] << "],\"ne\":[" << v->ne[0] << ","
                   << v->ne[1] << "," << v->ne[2] << "," << v->ne[3]
                   << "],\"bytes\":" << ggml_nbytes(v) << ",\"category\":\""
@@ -1246,7 +1875,8 @@ static int run(const Options &o) {
         first = false;
     }
     std::cout << "}";
-    const size_t kv_per_token = product({o.head_dim, o.kv_heads}) * sizeof(float) * 2,
+    const size_t kv_per_token = product({o.head_dim, o.kv_heads}) *
+                                ggml_type_size(kv_cache_type(o)) * 2,
                  history_bytes = a ? static_cast<size_t>(o.history) * kv_per_token : 0,
                  new_bytes = a ? static_cast<size_t>(o.q) * kv_per_token : 0;
     std::cout << ",\"weight_bytes\":" << stage->weight_bytes
@@ -1349,6 +1979,32 @@ static int run(const Options &o) {
         std::cout << ",\"sensor_q\":" << o.sensor_q << ",\"sensor_wall_ns\":";
         emit_ns(sensor_wall);
     }
+    if (!prefix_ns.empty()) {
+        std::cout << ",\"node_profile\":{\"enabled\":true"
+                  << ",\"samples_per_prefix\":" << o.node_profile_samples
+                  << ",\"method\":\"prefix_truncation_paired_with_full_graph_ratio\","
+                  << "\"reference_ns\":" << node_profile_reference
+                  << ",\"prefix_nodes\":[";
+        for (size_t i = 0; i < prefix_nodes.size(); ++i)
+            std::cout << (i ? "," : "") << prefix_nodes[i];
+        std::cout << "],\"prefix_ratio\":[";
+        for (size_t i = 0; i < prefix_ratio.size(); ++i)
+            std::cout << (i ? "," : "") << std::fixed << std::setprecision(6) << prefix_ratio[i];
+        std::cout << std::defaultfloat << "],\"prefix_ns\":[";
+        for (size_t i = 0; i < prefix_ns.size(); ++i)
+            std::cout << (i ? "," : "") << prefix_ns[i];
+        std::cout << "],\"prefix_pair_spread\":[";
+        for (size_t i = 0; i < prefix_pair_spread.size(); ++i)
+            std::cout << (i ? "," : "") << std::fixed << std::setprecision(6)
+                      << prefix_pair_spread[i];
+        std::cout << std::defaultfloat << "],\"delta_ns\":[";
+        for (size_t i = 0; i < prefix_ns.size(); ++i)
+            std::cout << (i ? "," : "") << (prefix_ns[i] - (i ? prefix_ns[i - 1] : 0));
+        std::cout << "],\"reference_samples_ns\":[";
+        for (size_t i = 0; i < reference_ns.size(); ++i)
+            std::cout << (i ? "," : "") << reference_ns[i];
+        std::cout << "]}";
+    }
     std::cout << "}\n";
     if (!passed) {
         std::cerr << "CUDA dense layer numerical or KV validation failed\n";
@@ -1356,11 +2012,87 @@ static int run(const Options &o) {
     }
     return 0;
 }
+// One case per line, arguments separated by tabs.  Same protocol as the CPU probe: each case
+// is a full parse()+run(), its record goes to its own stream, and it is followed by a
+// "#case <index> <code>" sentinel.  Building the CUDA context once and reusing it across the
+// cases is the point -- a price table that re-pays context creation per case would price the
+// context, not the layer.
+static std::vector<std::string> split_tabs(const std::string &line) {
+    std::vector<std::string> out(1);
+    for (const char c : line) {
+        if (c == '\t')
+            out.emplace_back();
+        else if (c != '\r')
+            out.back().push_back(c);
+    }
+    return out;
+}
+
+static int serve_cases(std::istream &in) {
+    std::string line;
+    std::vector<std::string> owned;
+    std::vector<char *> argv;
+    size_t index = 0, failed = 0;
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '#')
+            continue;
+        owned.clear();
+        argv.clear();
+        owned.emplace_back("ggml-dense-layer-cuda-probe");
+        for (std::string &token : split_tabs(line))
+            if (!token.empty())
+                owned.push_back(std::move(token));
+        for (std::string &arg : owned)
+            argv.push_back(const_cast<char *>(arg.c_str()));
+        argv.push_back(nullptr);
+
+        std::ostringstream record;
+        std::streambuf *saved = std::cout.rdbuf(record.rdbuf());
+        std::string error;
+        int code = 1;
+        try {
+            code = run(parse(static_cast<int>(argv.size()) - 1, argv.data()));
+        } catch (const std::exception &e) {
+            error = e.what();
+        }
+        std::cout.rdbuf(saved);
+        // A case that fails its own numerical/KV check still produced a record (with
+        // "passed":false); keep it next to the failure code.
+        if (!record.str().empty())
+            std::cout << record.str();
+        std::cout << "#case " << index << ' ' << code << '\n';
+        std::cout.flush();
+        if (code != 0) {
+            ++failed;
+            std::cerr << "ggml-dense-layer-cuda-probe case " << index << " failed (" << code << ')';
+            if (!error.empty())
+                std::cerr << ": " << error;
+            std::cerr << '\n';
+        }
+        ++index;
+    }
+    std::cerr << "ggml-dense-layer-cuda-probe: " << index << " case(s), " << failed << " failed\n";
+    return failed == 0 ? 0 : 3;
+}
+
 int main(int argc, char **argv) {
+    if (argc == 2 && std::string(argv[1]) == "--cases-from-stdin") {
+        try {
+            return serve_cases(std::cin);
+        } catch (const std::exception &e) {
+            std::cerr << "ggml-dense-layer-cuda-probe stdin: " << e.what() << '\n';
+            return 1;
+        }
+    }
     try {
         if (argc == 2 && std::string(argv[1]) == "--help") {
             std::cout << "ggml-dense-layer-cuda-probe --stage projection|attention|dense_ffn|block "
-                         "--cuda-device index --cuda-graphs disabled; --list-devices; "
+                         "--cuda-device index --cuda-graphs disabled; optional --kv-dtype f32|f16 "
+                         "(cache element type, default f32); --list-devices; standalone "
+                         "--cases-from-stdin runs one case per input line (tab-separated "
+                         "arguments, '#' starts a comment line) and prints each case's record "
+                         "followed by a '#case <index> <code>' sentinel, continuing after a "
+                         "failing case so a whole price table can be measured in one process; "
                          "explicit CUDA B1 decoder contract; no CPU fallback\n";
             return 0;
         }

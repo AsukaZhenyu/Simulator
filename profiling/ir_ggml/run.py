@@ -387,7 +387,13 @@ def summarise(rows: list[dict]) -> dict:
     reasons: dict[str, int] = {}
     for row in rows:
         for unit, reason in row.get("unpriceable", {}).items():
-            key = f"{unit}: {reason.split(':')[0]}"
+            head, _, rest = reason.partition(":")
+            key = f"{unit}: {head}"
+            # `no_price_at:gpu/decode@1t/64h` is a depth the *accelerator* table lacks, not
+            # a depth the campaign's own window lacks; the reader separates the two axes
+            # and the report counts the device axis as the declared coverage gap.
+            if head == "no_price_at" and "/" in rest.split("@", 1)[0]:
+                key += " on " + rest.split("@", 1)[0].split("/", 1)[0]
             reasons[key] = reasons.get(key, 0) + 1
     out["unpriceable"] = dict(sorted(reasons.items()))
     # gate 3 first: an unstable case is not a reading, so it never enters A1 either.
@@ -477,6 +483,13 @@ def main(argv=None) -> int:
                         help="where instantiate.py wrote this model's cases; defaults to "
                              "cases/<model> (the t=64 tranche) so other shapes can coexist")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--gguf", type=Path, default=None,
+                        help="the model's own gguf file.  The executor then runs layer 0's real "
+                             "weights instead of a deterministic pattern of the same shape and "
+                             "dtype, and aborts if the file and the case disagree.  Every "
+                             "published A1/A2 was measured on the pattern; the flag exists "
+                             "because 'a graph shaped like the model' and 'the model' are "
+                             "different claims, and the second one is checkable")
     parser.add_argument("--ssd-dir", default=None,
                         help="the third tier's file, for cases that declare ssd_bytes; one "
                              "file is reused and resized to each case's own budget")
@@ -531,6 +544,19 @@ def main(argv=None) -> int:
         names = names[: args.limit]
 
     out_path = Path(args.out) if args.out else (RESULTS / f"a1a2-{args.model}-t{args.tokens}.json")
+    # Replica 0 pays the CUDA module load (see `analyse`), so it is a warmup and never a
+    # reading.  A one-replica run of a corpus that reaches the accelerator therefore has
+    # no reading left and measures every non-CPU unit through the load: the control family
+    # of the MoE growth corpus read 2.94 this way with single prefill units 290x their
+    # price, and 1.16 when the same corpus was re-run at `--replicas 4`.  A corpus with no
+    # accelerator node has nothing to warm up, so that case is allowed.
+    if not args.analyse_only and args.replicas < 2 and any(
+            node.get("machine", "cpu") != "cpu"
+            for name in names for node in manifest["cases"][name]["nodes"]):
+        raise SystemExit(
+            f"--replicas {args.replicas}: replica 0 pays the CUDA module load and is the "
+            f"warmup, so a one-replica run of a case with accelerator nodes leaves no "
+            f"reading; pass --replicas 2 at least (the published protocol uses 4)")
     if args.analyse_only:
         document = json.loads(out_path.read_text(encoding="utf-8"))
         rows = document["rows"]
@@ -552,13 +578,17 @@ def main(argv=None) -> int:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(json.dumps(
                 {"model": args.model, "tokens": args.tokens, "replicas": args.replicas,
-                 "runner": str(RUNNER), "rows": rows}, indent=1), encoding="utf-8")
+                 "runner": str(RUNNER), "gguf": str(args.gguf) if args.gguf else None,
+                 "weights": "real" if args.gguf else "pattern",
+                 "rows": rows}, indent=1), encoding="utf-8")
 
         for i, name in enumerate(names):
             path = case_dir / f"{name}.txt"
             try:
                 case = read_case_file(path)
                 command = [str(RUNNER), "--case", str(path), "--replicas", str(args.replicas)]
+                if args.gguf:
+                    command += ["--gguf", str(args.gguf)]
                 if args.ssd_dir:
                     command += ["--ssd-dir", str(args.ssd_dir)]
                 done = subprocess.run(command, capture_output=True, text=True,

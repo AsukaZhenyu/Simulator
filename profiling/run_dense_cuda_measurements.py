@@ -22,7 +22,7 @@ if str(MODELING) not in sys.path:
     sys.path.insert(0, str(MODELING))
 from llm_infer_model.m2.dense_cuda_contract import (
     CONTRACT, build_plan, validate_case, validate_config, signature, native_arguments, resident_accounting,
-    VARIANTS, operations, EXCLUDED, ports
+    variant, operations, EXCLUDED, ports
 )
 from llm_infer_model.tensor.spec import SpecError
 from profile_contract import summarize_samples, validate_measurement
@@ -71,7 +71,8 @@ def _same(actual, expected, label):
 
 def measurement_signature(case: dict, binary_hash: str | None = None) -> dict:
     result = signature(case["config"], case["kind"], case["phase"], case["tokens"],
-                       case["visible_history"], case["cuda_device"], batch=case["batch"], cuda_graphs=case["cuda_graphs"])
+                       case["visible_history"], case["cuda_device"], batch=case["batch"],
+                       cuda_graphs=case["cuda_graphs"], kv_dtype=case["kv_dtype"])
     return {"physical_signature": result, "physical_contract_sha256": sha_signature(result),
             "native_binary_sha256": binary_hash}
 
@@ -147,9 +148,10 @@ def validate_device_execution(case: dict, native: dict) -> None:
 
 def native_command(case: dict, binary_dir: Path, args: argparse.Namespace) -> list[str]:
     suffix = ".exe" if os.name == "nt" else ""
+    extra = [token for value in getattr(args, "probe_arg", []) for token in value.split()]
     return [str(binary_dir / ("ggml-dense-layer-cuda-probe" + suffix)),
             *native_arguments(case, args.warmup, args.samples, args.seed),
-            "--repetitions", str(args.inner_repetitions)]
+            "--repetitions", str(args.inner_repetitions), *extra]
 
 
 def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) -> None:
@@ -163,8 +165,8 @@ def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) 
         "cuda_graph_disable_environment": "1",
         "matmul_precision": "ggml_cuda_backend_default",
         "config": case["config"], "q": case["tokens"], "history": case["visible_history"],
-        "activation_dtype": "f32", "kv_dtype": "f32",
-        "implementation_variant": VARIANTS[case["kind"]],
+        "activation_dtype": "f32", "kv_dtype": case["kv_dtype"],
+        "implementation_variant": variant(case["kind"], case["kv_dtype"]),
         "included": operations(case["config"], case["kind"]), "excluded": list(EXCLUDED),
         "timing": "steady_clock_cuda_graph_compute_including_sync",
         "scope": "resident_repeated_complete_declared_decoder_block",
@@ -190,7 +192,8 @@ def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) 
         if not isinstance(append, dict) or any(append.get(field) is not True for field in ("passed", "append_exact", "history_unchanged")):
             raise ValueError("attention/block requires successful KV append and history-preservation checks")
     validate_reference_ports(case, native)
-    expected_memory = resident_accounting(case["config"], case["kind"], case["tokens"], case["visible_history"])
+    expected_memory = resident_accounting(case["config"], case["kind"], case["tokens"],
+                                          case["visible_history"], case["kv_dtype"])
     for key, value in expected_memory.items():
         _same(native.get(key), value, f"native resident {key}")
     accounting = native.get("memory_accounting")
@@ -209,7 +212,7 @@ def validate_native_binding(case: dict, native: dict, args: argparse.Namespace) 
     if case["kind"] in ("attention", "block"):
         config = case["config"]
         for name in ("key_cache", "value_cache"):
-            expected_port_accounting[name] = {"dtype": "f32", "shape": [config["head_dim"],
+            expected_port_accounting[name] = {"dtype": case["kv_dtype"], "shape": [config["head_dim"],
                 case["visible_history"]+case["tokens"], config["kv_heads"]],
                 "bytes": expected_memory["kv_cache_bytes"]//2, "category": "kv_cache",
                 "ne": [config["head_dim"], case["visible_history"]+case["tokens"], config["kv_heads"], 1]}
@@ -302,6 +305,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, action="append", default=[])
     parser.add_argument("--cuda-device", type=int, required=True)
     parser.add_argument("--cuda-graphs", choices=("disabled",), required=True)
+    parser.add_argument("--kv-dtype", choices=("f32", "f16"), default="f32",
+                        help="cache element type of the measured stage.  f32 reproduces every"
+                             " table measured before the flag existed; f16 is what the CPU"
+                             " tables declare, and a GPU price meant to sit beside them must"
+                             " store the cache the same way")
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--seed", type=int, default=17)
@@ -320,7 +328,30 @@ def main(argv: list[str] | None = None) -> int:
                              "this count, and `raw/*.json` keeps the loop time verbatim")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
+    parser.add_argument("--probe-arg", action="append", default=[], metavar="ARGS",
+                        help="extra arguments forwarded verbatim (whitespace-split) to the "
+                             "probe, for diagnostics outside the price protocol, e.g. "
+                             "`--probe-arg '--node-profile 8'`.  The command is recorded in "
+                             "the receipt, so a diagnostic run is not mistakable for a "
+                             "published price run")
+    parser.add_argument("--contract", choices=("dense", "sparse"), default="dense",
+                        help="which declared CUDA envelope the suite is written in.  `sparse` "
+                             "is `moe_cuda_contract`, whose mathematics is `moe_contract`'s")
     args = parser.parse_args(argv)
+    if args.contract == "sparse":
+        # The two envelopes share every step of this file and differ only in what a case
+        # declares and how its signature is spelled, so the selected module supplies the
+        # names the rest of this module calls.
+        from llm_infer_model.m2 import moe_cuda_contract as selected
+        global CONTRACT, build_plan, validate_case, validate_config, signature
+        global native_arguments, resident_accounting, variant, operations, ports
+        CONTRACT, build_plan, validate_case, validate_config = (
+            selected.CONTRACT, selected.build_plan, selected.validate_case,
+            selected.validate_config)
+        signature, native_arguments, resident_accounting, variant = (
+            selected.signature, selected.native_arguments, selected.resident_accounting,
+            selected.variant)
+        operations, ports = selected.operations, selected.ports
     if args.cuda_device < 0 or args.warmup < 0 or not 3 <= args.samples <= 10000 or not 0 <= args.seed <= 0xFFFFFFFF or not math.isfinite(args.timeout_s) or args.timeout_s <= 0 or not 1 <= args.inner_repetitions <= 10000:
         parser.error("invalid CUDA device, warmup, samples, seed, inner repetitions or timeout")
     suite = json.loads(args.suite.read_text(encoding="utf-8"))
@@ -328,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
         mask = _mask_of(args.cpu_mask)
     else:
         mask = None
-    plan = build_plan(suite, args.cuda_device, args.cuda_graphs)
+    plan = build_plan(suite, args.cuda_device, args.cuda_graphs, kv_dtype=args.kv_dtype)
     random.Random(args.seed).shuffle(plan)
     binary_dir = args.native_bin.resolve()
     commands = [native_command(case, binary_dir, args) for case in plan]
@@ -373,6 +404,7 @@ def main(argv: list[str] | None = None) -> int:
             "case_order": [case["id"] for case in plan],
             "protocol": {"cpu_mask": args.cpu_mask, "backend": f"CUDA{args.cuda_device}", "batch": 1,
                 "cuda_device": args.cuda_device, "cuda_graphs": args.cuda_graphs,
+                "kv_dtype": args.kv_dtype,
                 "warmup": args.warmup, "samples": args.samples, "seed": args.seed,
                 "sequential_execution": True, "graphs_per_sample": 1,
                 "setup_compute_repetitions": 1, "measured_graph_untimed_compute_repetitions": 1 + args.warmup,

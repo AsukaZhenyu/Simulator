@@ -27,8 +27,10 @@ classifiers = [
 gguf = ["gguf>=0.19.0", "numpy>=1.26"]
 # Only the measurement suites under profiling/ need these: numpy for the
 # recorded-series fitting, scipy for the idle fit, jinja2 for chat-template
-# rendering in the MoE validation. The simulator itself has no dependencies.
-profiling = ["numpy>=1.26", "scipy>=1.11", "jinja2>=3.1"]
+# rendering in the MoE validation, psutil for the real-model request window
+# campaign (the end-to-end accuracy row of a device). The simulator itself has
+# no dependencies.
+profiling = ["numpy>=1.26", "scipy>=1.11", "jinja2>=3.1", "psutil>=5.9"]
 
 [project.scripts]
 llm-sim = "llm_simulator.cli:main"

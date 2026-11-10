@@ -20,8 +20,29 @@ from .dataset import read,write
 from .runtime_window_io import (child_environment,file_sha,receipt,sha,require,available,PLACEMENT_LABELS,LABELS,
     LEGACY_LABELS,LABEL_PLACEMENT,LABEL_FOR_PLACEMENT,PROBE_PLACEMENT,PLACEMENT_ENVIRONMENT,GRAPH_POLICIES)
 from profiling.state_calibration import run as common
+from profiling import host
 
 ROOT=Path(__file__).resolve().parents[2]
+# Two inputs of the published cohort are build artifacts of the machine that ran
+# it: the numerical campaign's manifest (model, capacity policy, guards, suite)
+# and the request template derived from that run's tokenizer pass. `prepare_portable`
+# answers exactly these two paths from explicit arguments so a second machine can
+# prepare the same cohort without owning the first machine's build tree.
+LEGACY_DESCRIPTOR=ROOT/'build/real-moe-validation-20261028/mmid-fence-numerical-v2/manifest.json'
+LEGACY_TEMPLATE=ROOT/'build/real-moe-validation-20261027/numerical-diagnostic-v6/requests/normal-SSLS.json'
+# The build tree's own layout is a property of the host: `bin/` holds the probe
+# and its libraries, and the probe's name carries `.exe` only on Windows.
+PROBE_STEM='real-moe-runtime-window-probe'
+TOOLKIT=host.newest_toolkit()
+DEFAULT_CUDA_DIR=str(TOOLKIT/'bin') if TOOLKIT is not None else ''
+
+
+def probe_receipt(binaries):
+    """The probe among a build's binaries, and the libraries it loads beside it."""
+    name=host.executable_name(PROBE_STEM).lower()
+    binary=next(r for r in binaries if Path(r['path']).name.lower()==name)
+    return binary,[r for r in binaries if Path(r['path']).match(host.shared_library_pattern())]
+
 PLACEMENTS=tuple(placement for placement,_ in PLACEMENT_LABELS)
 ADOPTED_JOBS=tuple(label+'-'+kind for label in LABELS for kind in ('calibration-profile','calibration-bare','inventory'))
 
@@ -55,10 +76,10 @@ def request(m,rows,placement,observe,*,warmups=1):
         r['requests'].append(row)
     return r
 
-def prepare(out,build,adopt_from=None,heldout_index=0,adopt_calibration_only=False,resident_peak_limit_bytes=None,resident_peak_reason=None,labels=None,graph_policy='runtime_default_enabled'):
+def prepare(out,build,adopt_from=None,heldout_index=0,adopt_calibration_only=False,resident_peak_limit_bytes=None,resident_peak_reason=None,labels=None,graph_policy='runtime_default_enabled',runtime_dirs=None):
     out,build=Path(out).resolve(),Path(build).resolve();require(not out.exists(),'new real-MoE performance cohort required')
     require(graph_policy in GRAPH_POLICIES,'unknown declared runtime graph policy')
-    old=read(ROOT/'build/real-moe-validation-20261028/mmid-fence-numerical-v2/manifest.json')
+    old=read(LEGACY_DESCRIPTOR)
     # The resident guard exists to stop a process from thrashing the host during
     # measurement. A cohort that needs a larger peak must say so here, in the
     # manifest, instead of editing a frozen number afterwards.
@@ -71,13 +92,14 @@ def prepare(out,build,adopt_from=None,heldout_index=0,adopt_calibration_only=Fal
         amendment=dict(field='resident_peak_limit_bytes',old_value=resident_limit,new_value=resident_peak_limit_bytes,reason=resident_peak_reason,
             measurement_semantics_changed=False,still_below_parent_preflight_bytes=old['parent_preflight_bytes'])
         resident_limit=resident_peak_limit_bytes
-    template=read(ROOT/'build/real-moe-validation-20261027/numerical-diagnostic-v6/requests/normal-SSLS.json')
+    template=read(LEGACY_TEMPLATE)
     suite=read(old['source_suite']['path']);complete=read(build/'BUILD_COMPLETE.json');prepared=read(build/'PREPARED.json')
     require(complete['compiled'] and complete['extra_GPU_syncs']==0 and complete['CPU_barriers_added']==0,'source-bound no-sync build required')
     out.mkdir(parents=True)
+    binary,runtime=probe_receipt(complete['binaries'])
     manifest=dict(schema='real-moe-runtime-window-campaign-1',prepared_at_utc=datetime.now(timezone.utc).isoformat(),build=receipt(build/'BUILD_COMPLETE.json'),
-        binary=next(r for r in complete['binaries'] if Path(r['path']).suffix=='.exe'),runtime=[r for r in complete['binaries'] if Path(r['path']).suffix=='.dll'],
-        runtime_dirs=[str(build/'bin'),'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6/bin'],source_sha256=prepared['native_source_sha256'],
+        binary=binary,runtime=runtime,
+        runtime_dirs=[str(build/'bin'),*(runtime_dirs or (DEFAULT_CUDA_DIR,))],source_sha256=prepared['native_source_sha256'],
         model=old['model'],capacity_policy=old['capacity_policy'],native_guard_bytes=old['native_guard_bytes'],parent_preflight_bytes=old['parent_preflight_bytes'],resident_peak_limit_bytes=resident_limit,resident_peak_amendment=amendment,
         source_suite=old['source_suite'],template=template,calibration=select(suite,'calibration'),heldout=select(suite,'heldout',index=heldout_index),
         heldout_selection=dict(method='lexicographically sorted ID within each fixed domain/length stratum',index=heldout_index,

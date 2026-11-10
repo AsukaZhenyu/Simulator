@@ -15,9 +15,22 @@ python -m profiling.dac_validation.prepare_portable --out build/my-preparation -
 python -m profiling.dac_validation.e2a refine-prethermal --prepared build/my-preparation --out build/my-campaign
 ```
 
-The fixed Windows/QPC/CUDA study still requires the native build documented in
-[`native/steady_costs`](../native/steady_costs/README.md); it does not claim a CPU
-or NPU substitution when CUDA is unavailable.
+The native build is documented in
+[`native/steady_costs`](../native/steady_costs/README.md) and can be driven from
+this package, which is what a fresh host should use:
+
+```bash
+python -m profiling.dac_validation.build_probe \
+    --build-dir build/steady-costs --llama-root PATH/llama.cpp \
+    --ggml-build-dir PATH/llama.cpp/build/ggml --runtime-dir PATH/CUDA/bin \
+    --cuda-root PATH/CUDA
+```
+
+It refuses macOS (no CUDA release, so this column has nothing to measure there),
+records the probe's own `build-manifest.json` and writes a build-driver receipt
+beside it. The study is bound to the device it is measured on -- its clock is
+whatever the host's monotonic counter is, and it does not claim a CPU or NPU
+substitution when CUDA is unavailable.
 
 ```powershell
 python -m profiling.dac_validation.e2a prepare --out build/dac-validation-20261025/e2a-v1

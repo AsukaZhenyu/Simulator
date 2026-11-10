@@ -1,5 +1,5 @@
 // New compact GGML component boundaries. Historical Executor code is untouched.
-#include <bcrypt.h>
+#include "../portable/sha256.hpp"
 #include <iomanip>
 #include <sstream>
 
@@ -12,20 +12,11 @@ static uint32_t mix32(uint32_t seed,uint32_t index,uint32_t ordinal) {
 static double uniform(uint32_t seed,uint32_t index,uint32_t ordinal) {
     return static_cast<double>(mix32(seed,index,ordinal)>>8)/16777216.0;
 }
+// One digest on every host: the same bytes must hash to the same 64 characters
+// whether the component ran under Windows or under Linux, or a receipt could
+// not be compared across the two. See ../portable/sha256.hpp.
 static std::string sha256_bytes(const void *data,size_t size) {
-    require(size<=ULONG_MAX,"SHA256 input outside Windows ULONG envelope");
-    BCRYPT_ALG_HANDLE algorithm=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;
-    require(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)>=0,"BCrypt SHA256 provider unavailable");
-    ULONG length=0,returned=0;std::vector<UCHAR> object,digest(32);
-    try {
-        require(BCryptGetProperty(algorithm,BCRYPT_OBJECT_LENGTH,reinterpret_cast<PUCHAR>(&length),sizeof(length),&returned,0)>=0,
-            "BCrypt object length unavailable");object.resize(length);
-        require(BCryptCreateHash(algorithm,&hash,object.data(),length,nullptr,0,0)>=0,"BCrypt hash create failed");
-        require(BCryptHashData(hash,reinterpret_cast<PUCHAR>(const_cast<void *>(data)),static_cast<ULONG>(size),0)>=0,"BCrypt hash data failed");
-        require(BCryptFinishHash(hash,digest.data(),static_cast<ULONG>(digest.size()),0)>=0,"BCrypt hash finish failed");
-    } catch (...) {if(hash)BCryptDestroyHash(hash);BCryptCloseAlgorithmProvider(algorithm,0);throw;}
-    BCryptDestroyHash(hash);BCryptCloseAlgorithmProvider(algorithm,0);
-    std::ostringstream out;out<<std::hex<<std::setfill('0');for(auto value:digest)out<<std::setw(2)<<static_cast<unsigned>(value);return out.str();
+    return portable_sha256::digest_hex(data,size);
 }
 static int64_t positive(const json &value,const char *name,int64_t maximum=1000000000) {
     const auto parsed=state_response::integer(value,name,1);require(parsed<=maximum,std::string(name)+" exceeds component envelope");return parsed;

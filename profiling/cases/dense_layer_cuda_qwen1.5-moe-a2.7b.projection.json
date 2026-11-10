@@ -1,0 +1,254 @@
+{
+ "gpu_qwen1.5-moe-a2.7b_attention_decode_q1_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_decode_q1_h128": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_decode_q1_h512": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_decode_q1_h1024": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_prefill_q16_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_prefill_q64_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_attention_prefill_q256_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_decode_q1_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_decode_q1_h128": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_decode_q1_h512": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_decode_q1_h1024": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_prefill_q16_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_prefill_q64_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ },
+ "gpu_qwen1.5-moe-a2.7b_projection_prefill_q256_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "down_shexp",
+   "gate_exps",
+   "gate_inp_shexp",
+   "gate_shexp",
+   "router",
+   "up_exps",
+   "up_shexp"
+  ]
+ }
+}

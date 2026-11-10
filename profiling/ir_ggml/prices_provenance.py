@@ -41,19 +41,53 @@ NOTE = (
     "device-to-device ratio against these, never as 1.0."
 )
 
+# The accelerator tables are merged in with `--prices`, never into the frozen export.
+EXTENSION_ORIGIN = {
+    model: "profiling/results/20261109-gpu-prices-six-warmup1000"
+    for model in ("qwen3-0.6b", "qwen3-1.7b", "qwen3-4b", "granite-3.0-3b-a800m",
+                  "olmoe-1b-7b", "qwen1.5-moe-a2.7b")
+}
+
 
 def describe(model: str) -> dict:
     path = PRICES / model / "costs.json"
     blob = json.loads(path.read_text(encoding="utf-8"))
     entries = blob.get("entries", [])
     devices = sorted({entry["device"] for entry in entries if "device" in entry})
-    return {"path": f"{model}/costs.json",
+    record = {"path": f"{model}/costs.json",
+              "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+              "bytes": path.stat().st_size,
+              "export_source": blob.get("source"),
+              "entries": len(entries),
+              "devices": devices,
+              "origin": ORIGIN.get(model)}
+    extension = PRICES / model / "gpu_costs.json"
+    if extension.exists():
+        record["extension"] = describe_extension(extension, model)
+    return record
+
+
+def describe_extension(path: Path, model: str) -> dict:
+    """A separately measured table merged with `--prices`, and the protocol it came from.
+
+    The frozen export is CPU-only, so the accelerator prices are not part of it.  They are
+    measured by their own campaign, whose acceptance rule (a cell is exported only if its
+    coefficient of variation is at or below 0.10) is a property of the number: every entry
+    here carries its own `measurement.cv`, and the cells the rule refused are absent rather
+    than estimated.
+    """
+    blob = json.loads(path.read_text(encoding="utf-8"))
+    prices = blob["prices"]
+    return {"path": f"{model}/gpu_costs.json",
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "bytes": path.stat().st_size,
-            "export_source": blob.get("source"),
-            "entries": len(entries),
-            "devices": devices,
-            "origin": ORIGIN.get(model)}
+            "entries": len(prices),
+            "devices": sorted({entry["device"] for entry in prices}),
+            "contracts": sorted({entry["physical_signature"]["contract"] for entry in prices}),
+            "cv_gate": 0.10,
+            "max_cv": max(entry["measurement"]["cv"] for entry in prices),
+            "origin": EXTENSION_ORIGIN.get(model),
+            "note": "measured by its own campaign; absent cells are refused by the cv gate"}
 
 
 def build() -> dict:
@@ -76,6 +110,12 @@ def main(argv=None) -> int:
         recorded = json.loads(RECORD.read_text(encoding="utf-8"))["tables"]
         drift = [model for model, entry in current["tables"].items()
                  if recorded.get(model, {}).get("sha256") != entry["sha256"]]
+        # An extension is compared too: it is merged with `--prices` and would otherwise
+        # change an A1 run with no record of which table the run read.
+        drift += [f"{model}/gpu_costs.json" for model, entry in current["tables"].items()
+                  if "extension" in entry
+                  and recorded.get(model, {}).get("extension", {}).get("sha256")
+                  != entry["extension"]["sha256"]]
         if drift:
             print(f"price table(s) changed: {drift}", file=sys.stderr)
             return 1

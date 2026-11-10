@@ -1,0 +1,825 @@
+{
+ "schema_version": "dense_layer_measurement_suite_v1",
+ "comment": "GPU price suite for qwen3-1.7b, geometry cloned from its CPU export; cache f16 as the CPU table declares",
+ "cases": [
+  {
+   "id": "gpu_qwen3-1.7b_attention_decode_q1_h0",
+   "kind": "attention",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 214950
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_decode_q1_h128",
+   "kind": "attention",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 128,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 244450
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_decode_q1_h512",
+   "kind": "attention",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 512,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 475800
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_decode_q1_h1024",
+   "kind": "attention",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 1024,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 682950
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_prefill_q16_h0",
+   "kind": "attention",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 16,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 2390150
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_prefill_q64_h0",
+   "kind": "attention",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 64,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 10505250
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_attention_prefill_q256_h0",
+   "kind": "attention",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 256,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 53805900
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_decode_q1_h0",
+   "kind": "dense_ffn",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 1317700
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_decode_q1_h128",
+   "kind": "dense_ffn",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 128,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 1315900
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_decode_q1_h512",
+   "kind": "dense_ffn",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 512,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 1339000
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_decode_q1_h1024",
+   "kind": "dense_ffn",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 1024,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 1338550
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_prefill_q16_h0",
+   "kind": "dense_ffn",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 16,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 19037150
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_prefill_q64_h0",
+   "kind": "dense_ffn",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 64,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 79133900
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_dense_ffn_prefill_q256_h0",
+   "kind": "dense_ffn",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 256,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 312285650
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_decode_q1_h0",
+   "kind": "projection",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 333700
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_decode_q1_h128",
+   "kind": "projection",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 128,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 329500
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_decode_q1_h512",
+   "kind": "projection",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 512,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 316450
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_decode_q1_h1024",
+   "kind": "projection",
+   "phase": "decode",
+   "batch": 1,
+   "tokens": 1,
+   "visible_history": 1024,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 325150
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_prefill_q16_h0",
+   "kind": "projection",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 16,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 4780550
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_prefill_q64_h0",
+   "kind": "projection",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 64,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 18614800
+   }
+  },
+  {
+   "id": "gpu_qwen3-1.7b_projection_prefill_q256_h0",
+   "kind": "projection",
+   "phase": "prefill",
+   "batch": 1,
+   "tokens": 256,
+   "visible_history": 0,
+   "kv_dtype": "f16",
+   "config": {
+    "hidden": 2048,
+    "intermediate": 6144,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "rope_dims": 128,
+    "attention_gate": "none",
+    "qk_norm": "rms",
+    "rope_mode": "normal",
+    "rope_base": 1000000.0,
+    "norm_epsilon": 9.999999974752427e-07,
+    "weight_dtypes": {
+     "input_norm": "f32",
+     "q": "q4_k",
+     "k": "q4_k",
+     "v": "q6_k",
+     "output": "q4_k",
+     "post_attention_norm": "f32",
+     "gate": "q4_k",
+     "up": "q4_k",
+     "down": "q6_k",
+     "q_norm": "f32",
+     "k_norm": "f32"
+    }
+   },
+   "source": {
+    "cpu_price": "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\profiling\\ir_ggml\\prices\\qwen3-1.7b\\costs.json",
+    "cpu_duration_ns": 73569700
+   }
+  }
+ ]
+}

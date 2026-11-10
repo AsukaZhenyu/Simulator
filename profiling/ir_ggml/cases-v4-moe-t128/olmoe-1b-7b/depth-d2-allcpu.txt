@@ -1,0 +1,38 @@
+case depth-d2-allcpu
+model olmoe-1b-7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 64
+top_k 8
+geometry_hidden 2048
+geometry_intermediate 1024
+geometry_heads 16
+geometry_kv_heads 16
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-05
+geometry_qk_norm rms_hidden
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1 
+node 3 router cpu 2 
+node 4 expert cpu 2,3 
+node 5 combine cpu 4,2,3 
+node 6 proj cpu 5,0 
+node 7 attn cpu 6 
+node 8 router cpu 7 
+node 9 expert cpu 7,8 
+node 10 combine cpu 9,7,8 

@@ -1,0 +1,62 @@
+case opsplit-g2-b00011-demand
+model olmoe-1b-7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 64
+top_k 8
+geometry_hidden 2048
+geometry_intermediate 1024
+geometry_heads 16
+geometry_kv_heads 16
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-05
+geometry_qk_norm rms_hidden
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 copy pcie 0 bytes=524288,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 2 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 3 copy pcie 1,2 bytes=8192,dir=cpu>gpu,tensor=w:layer0:W_input_norm
+node 4 copy pcie 1,2 bytes=2359296,dir=cpu>gpu,tensor=w:layer0:W_q
+node 5 copy pcie 1,2 bytes=2359296,dir=cpu>gpu,tensor=w:layer0:W_k
+node 6 copy pcie 1,2 bytes=3440640,dir=cpu>gpu,tensor=w:layer0:W_v
+node 7 proj gpu 1,2,3,4,5,6 
+node 8 attn gpu 7 
+node 9 copy pcie 8 bytes=524288,dir=gpu>cpu,tensor=g:request0-prefill-layer0:op:layer0:request0:attn
+node 10 router cpu 9 
+node 11 expert cpu 9,10 
+node 12 combine cpu 11,9,10 
+node 13 copy pcie 12 bytes=524288,dir=cpu>gpu,tensor=g:request0-prefill-layer0:op:layer0:request0:combine
+node 14 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 15 copy pcie 13,14 bytes=8192,dir=cpu>gpu,tensor=w:layer1:W_input_norm
+node 16 copy pcie 13,14 bytes=2359296,dir=cpu>gpu,tensor=w:layer1:W_q
+node 17 copy pcie 13,14 bytes=2359296,dir=cpu>gpu,tensor=w:layer1:W_k
+node 18 copy pcie 13,14 bytes=3440640,dir=cpu>gpu,tensor=w:layer1:W_v
+node 19 proj gpu 13,14,15,16,17,18 
+node 20 attn gpu 19 
+node 21 copy pcie 20 bytes=524288,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:request0:attn
+node 22 router cpu 21 
+node 23 expert cpu 21,22 
+node 24 combine cpu 23,21,22 
+node 25 proj cpu 24,0 
+node 26 attn cpu 25 
+node 27 router cpu 26 
+node 28 expert cpu 26,27 
+node 29 combine cpu 28,26,27 
+node 30 proj cpu 29,0 
+node 31 attn cpu 30 
+node 32 router cpu 31 
+node 33 expert cpu 31,32 
+node 34 combine cpu 33,31,32 

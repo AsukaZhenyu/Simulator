@@ -2,13 +2,51 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import unittest
+from unittest import mock
 
 
 HERE=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location('steady_generate_test',HERE/'generate_probe.py')
 generator=importlib.util.module_from_spec(spec);spec.loader.exec_module(generator)
+record_spec=importlib.util.spec_from_file_location('steady_record_test',HERE/'record_build.py')
+recorder=importlib.util.module_from_spec(record_spec);record_spec.loader.exec_module(recorder)
+
+
+class BackendClaimTests(unittest.TestCase):
+    """A build receipt may only claim what the binary it describes can do.
+
+    The parent receipt was written for the published Win32 CUDA build. Two of its
+    lines are false of a Metal build -- that event instrumentation exists, and
+    that a CUDA stream schedule was queried -- and a campaign reading them would
+    cite a capability the probe refuses at request construction.
+    """
+
+    def test_a_metal_build_does_not_claim_cuda_events_or_a_stream_schedule(self):
+        fields=recorder.backend_fields('metal','arm64')
+        self.assertEqual(fields['device_memory'],'shared')
+        self.assertEqual(fields['supported_instrumentation'],['bare'])
+        self.assertIn('not applicable',fields['cuda_schedule_observation'])
+        self.assertIsNone(fields['cuda_schedule_override_environment'])
+        self.assertEqual(fields['cuda_schedule_override_values'],[])
+        self.assertIn('steady clock',fields['timing_events_scope'])
+
+    def test_a_cuda_build_overrides_nothing_but_the_memory_mode(self):
+        # A discrete card is decided by the host's shape. An aarch64 CUDA host is not:
+        # a Grace-Blackwell box can carry a card over PCIe, so the receipt says
+        # `unknown` rather than pricing every copy at zero, and the owner's
+        # declaration is the only thing that turns it into `shared`.
+        self.assertEqual(recorder.backend_fields('cuda','x86_64')['device_memory'],
+                         'separate')
+        self.assertEqual(recorder.backend_fields('cuda','aarch64')['device_memory'],
+                         'unknown')
+        with mock.patch.dict(os.environ,{'IR_DEVICE_MEMORY':'shared'}):
+            fields=recorder.backend_fields('cuda','aarch64')
+        self.assertEqual(fields['device_memory'],'shared')
+        self.assertNotIn('supported_instrumentation',fields)
+        self.assertNotIn('cuda_schedule_observation',fields)
 
 
 class SteadyBuildTests(unittest.TestCase):

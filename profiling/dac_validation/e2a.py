@@ -23,6 +23,21 @@ import numpy as np
 
 from llm_infer_model.performance.reusable_action_costs import ReusableResponseTable, coordinate, digest, semantic_action
 from profiling.steady_costs.contracts import component_reference, validate_component
+from profiling import host
+from profiling import runtime_libraries
+
+#: The probe's runtime components live in `profiling.runtime_libraries`, so the
+#: campaign's preflight can ask the same question without importing this module.
+#: A function rather than a tuple: the third library is the accelerator's, and a
+#: CUDA box and a Mac give different answers to "which three".
+RUNTIME_COMPONENTS = runtime_libraries.components
+
+missing_components = runtime_libraries.missing
+
+
+def require_components(directories) -> None:
+    """Refuse a runtime that cannot load the probe, naming the libraries."""
+    runtime_libraries.require(directories)
 
 ROOT = Path(__file__).resolve().parents[2]
 QUALITY = dict(max_process_mean_ape=.10, max_trial_average_p90_ape=.20,
@@ -49,7 +64,7 @@ def number(value):
 def request(mode, *, trials=8, warmup_ms=500, target=None):
     return dict(schema="steady-cost-request-1", mode=mode, target_action_index=target,
         warmup=20, warmup_min_ms=warmup_ms, trials=trials, repeats=8,
-        poll="0", instrumentation="bare", main_thread_mask=4)
+        poll="0", instrumentation="bare", main_thread_mask=host.main_thread_mask())
 def quantile(values, p): return float(np.quantile(values,p,method="higher"))
 
 
@@ -149,8 +164,12 @@ def prepare(out):
             write(pp,p);write(rp,component_reference(p));bindings[key]=dict(program=receipt(pp),reference=receipt(rp),seed=p["seed"])
             for repeat in range(3):jobs.insert(0,dict(id=f"profile-{key}-r{repeat}",split="profile",program_key=key,round=repeat,request=request("action"),role="independent transfer mechanism probe"))
     hardware=hardware_identity()
-    context=dict(binary_sha256=sha(binary),runtime_dlls={str(p):sha(p) for p in Path(old["runtime_dirs"][0]).glob("*.dll")},hardware=hardware,
-        dtype="F32",cuda_graphs="disabled",precision="GGML_PREC_F32",threads=1,poll="0",main_thread_mask=4,
+    context=dict(binary_sha256=sha(binary),runtime_dlls={str(p):sha(p) for p in Path(old["runtime_dirs"][0]).glob(host.shared_library_pattern())},hardware=hardware,
+        dtype="F32",cuda_graphs="disabled",precision="GGML_PREC_F32",threads=1,poll="0",main_thread_mask=host.main_thread_mask(),
+        # The pool topology is an input of every transfer price this column measures. On a
+        # unified pool the `dram->vram` components are one memory's memcpy rather than a link
+        # transfer, and a reader of the receipt has to be able to see that from the receipt.
+        device_memory=host.device_memory(),
         boundary="unchanged synchronous Executor.action; hot prepared inputs; isolated batch-8",allocation_timed=False)
     sources=[receipt(Path(__file__)),receipt(ROOT/"modeling/llm_infer_model/performance/reusable_action_costs.py"),receipt(binary.parent/"build-manifest.json"),receipt(binary)]
     manifest=dict(schema="dac-real-selection-manifest-1",prepared_at_utc=utc(),workloads=workloads,programs=bindings,jobs=jobs,
@@ -279,7 +298,7 @@ def collect(out, split):
                 target_outcome_used_as_model_input=False,barrier=barrier)
             process=None;handles=[]
             try:
-                process,stdout,stderr,affinity=run.launch(command,env,directory/"stdout.txt",directory/"stderr.txt",4);handles=[stdout,stderr]
+                process,stdout,stderr,affinity=run.launch(command,env,directory/"stdout.txt",directory/"stderr.txt",host.main_thread_mask());handles=[stdout,stderr]
                 record.update(process_id=process.pid,affinity=affinity)
                 code=process.wait(timeout=180);record.update(returncode=code,forced_termination=False,process_exited_verified=True)
                 require(code==0,"native process failed")

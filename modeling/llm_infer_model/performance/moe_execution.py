@@ -53,6 +53,19 @@ def _observed(values, name):
         raise InvalidModel("duplicate " + name)
 
 
+NOMINAL_STATE = "nominal"
+# The state is a property of the device, so it can only scale windows that
+# execute on the device. A CPU node, a sampler tail and a host-side window are
+# completed by the host whatever the GPU clocks are doing; only an inclusive
+# runtime bridge carries device work whose cost moves with them.
+STATE_SCOPES = frozenset({"RUNTIME_BRIDGE"})
+
+
+def state_applies(scope):
+    """Whether a declared machine state scales the work of a window scope."""
+    return scope in STATE_SCOPES
+
+
 @dataclass(frozen=True)
 class RuntimeWindowAction:
     id: str
@@ -69,10 +82,12 @@ class RuntimeWindowAction:
     global_operation: bool = False
     payload_bytes: int = 0
     work_spec: WindowWorkSpec | None = None
+    device_state: str = NOMINAL_STATE
 
     def __post_init__(self):
         nonempty(self.id, "window occurrence id")
         nonempty(self.key, "exact window price key")
+        nonempty(self.device_state, "declared machine state")
         _scope(self.scope)
         integer(self.query_tokens, "query tokens")
         integer(self.kv_padded, "padded KV tokens")
@@ -110,7 +125,7 @@ class RuntimeWindowAction:
                     history=self.history, phase=self.phase, layer=self.layer,
                     op=self.op, covered_nodes=list(self.covered_nodes),
                     forward_index=self.forward_index, global_operation=self.global_operation,
-                    payload_bytes=self.payload_bytes,
+                    payload_bytes=self.payload_bytes, device_state=self.device_state,
                     work_spec=self.work_spec.to_dict() if self.work_spec is not None else None)
 
     @classmethod
@@ -161,12 +176,34 @@ class RuntimeWindowPrice:
     observed_payload_bytes: tuple[int, ...] = (0,)
     work_spec: WindowWorkSpec | None = None
     feature_policy: str = LEGACY_POLICY
+    # One declared multiplier per machine state on the work terms of this key.
+    # The state is an input of the run, not of the request, so it scales the work
+    # and never the intercept: the part of an inclusive response that does not
+    # move with the clock stays where it is.  The reference state is pinned at
+    # one, which is the identification of the whole family: a key measured
+    # entirely in one state cannot separate that state from its own coefficients,
+    # so the coefficients are always in the units of whichever state the
+    # calibration actually ran in, and that state is declared here rather than
+    # assumed to be nominal.
+    state_multipliers: tuple[tuple[str, Fraction], ...] = ((NOMINAL_STATE, 1),)
+    reference_state: str = NOMINAL_STATE
 
     def __post_init__(self):
         nonempty(self.key, "exact window price key")
         _scope(self.scope)
         for name in ("intercept_ns", "per_query_token_ns", "per_attention_pair_ns", "per_payload_byte_ns"):
             object.__setattr__(self, name, rational(getattr(self, name), name))
+        states = []
+        for state, multiplier in self.state_multipliers:
+            nonempty(state, "declared machine state")
+            if state in dict(states):
+                raise InvalidModel("duplicate declared machine state: " + state)
+            states.append((state, rational(multiplier, "state multiplier")))
+        reference = self.reference_state
+        nonempty(reference, "reference machine state of the price table")
+        if dict(states).get(reference) != 1:
+            raise InvalidModel("the reference machine state must be the identification point, multiplier one")
+        object.__setattr__(self, "state_multipliers", tuple(states))
         _observed(self.observed_query_tokens, "observed query tokens")
         _observed(self.observed_kv_padded, "observed padded KV tokens")
         _observed(self.observed_payload_bytes, "observed payload bytes")
@@ -212,9 +249,15 @@ class RuntimeWindowPrice:
             outside.append("history")
         if outside and not allow_extrapolation:
             raise UnknownParameter("window outside observed affine domain: " + ", ".join(outside))
-        mean = (self.intercept_ns + self.per_query_token_ns * action.query_tokens
+        multiplier = 1
+        if state_applies(action.scope):
+            multiplier = dict(self.state_multipliers).get(action.device_state)
+            if multiplier is None:
+                raise UnknownParameter("no calibration in the declared machine state: " + action.device_state)
+        mean = (self.intercept_ns + multiplier * (
+                self.per_query_token_ns * action.query_tokens
                 + self.per_attention_pair_ns * action.query_tokens * action.kv_padded
-                + self.per_payload_byte_ns * action.payload_bytes)
+                + self.per_payload_byte_ns * action.payload_bytes))
         if mean == 0 and not self.zero_duration_approximation:
             raise InvalidModel("zero response needs an explicit resolution-limited approximation")
         if mean != 0 and self.zero_duration_approximation:
@@ -235,7 +278,10 @@ class RuntimeWindowPrice:
                     history_domain=list(self.history_domain), evidence=list(self.evidence),
                     zero_duration_approximation=self.zero_duration_approximation,
                     work_spec=self.work_spec.to_dict() if self.work_spec is not None else None,
-                    feature_policy=self.feature_policy)
+                    feature_policy=self.feature_policy,
+                    reference_state=self.reference_state,
+                    state_multipliers={state: encode_fraction(value)
+                                       for state, value in self.state_multipliers})
 
     @classmethod
     def from_dict(cls, value):
@@ -252,6 +298,11 @@ class RuntimeWindowPrice:
             obj["observed_payload_bytes"] = tuple(obj["observed_payload_bytes"])
         if obj.get("work_spec") is not None:
             obj["work_spec"] = WindowWorkSpec.from_dict(obj["work_spec"])
+        obj.setdefault("reference_state", NOMINAL_STATE)
+        if "state_multipliers" in obj:
+            obj["state_multipliers"] = tuple(
+                (state, decode_fraction(value, "state multiplier"))
+                for state, value in obj["state_multipliers"].items())
         try:
             return cls(**obj)
         except TypeError as error:

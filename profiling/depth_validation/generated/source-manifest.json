@@ -1,0 +1,31 @@
+{
+  "format_version": "depth-executor-fragments-1",
+  "generated_files": {
+    "highlevel_generated.inc": "fc03bc44ee159bfe343c0c5d1a8ef00cd24fdc4ed4572f91e9e8a1403415b786",
+    "numeric_helpers.inc": "775c3c0df93606d058bf4299edb42770e3fbbc74d88ff9b9668d041c251a761e",
+    "single_layer_generated.inc": "ea17360bd3cb04b7ebf147ee762724a041c27256c2dfdc510c0e2b06772e54f0",
+    "state_response_generated.inc": "296647e95a7b25ea04d266172562c4b9256fbf65c0b934516281235c5af5450b",
+    "timing_events.inc": "04a87f7214fdd20bae1dcda70c6004850bdaaaf3410c4b305419a0fc35f739e2"
+  },
+  "executors": {
+    "profiling/native/highlevel_accuracy/highlevel_probe.cpp": "ceeebc81c00a4fb760923c7b1286a7470558250488f93119c7d628dfed0872eb",
+    "profiling/native/single_layer_calibration/probe.cpp": "27f8360fc6e54a090dec777c21a835d1ec29db2810aa4e453e6fb020401cb9a6",
+    "profiling/native/state_calibration/compute.cpp": "bb2ace018e543c706d72563f7c61ccd260a58a4cde79354b76d5dd950959fc78",
+    "profiling/native/state_response/probe.cpp": "97fefd7c21e6b711ab354083bb23098ea06d4e3c72b09f19fa85d69b092a3a7b"
+  },
+  "historical_highlevel_commit": "c3ee2e4",
+  "historical_highlevel_why": "the depth campaigns initialise tensors from a binary asset file; only this blob carries depth_assets::load. The current probe dropped that transport and changed which backing tensors are allocated, so it is a different instrument, not a newer one.",
+  "injections": [
+    {
+      "anchor": "struct Executor {",
+      "inserted": "#include \"initial_assets.hpp\""
+    },
+    {
+      "anchor": "            if(program.at(\"initial_values\").contains(id)){",
+      "inserted": "if(program.contains(\"initial_assets\") && program.at(\"initial_assets\").at(\"tensors\").contains(id)){"
+    }
+  ],
+  "unchanged_fragments": "single_layer, state_response, timing_events and numeric_helpers are what the current pinned executors produce; they match profiling/native/steady_costs/build-release-v2 byte for byte.",
+  "regenerate": "python -m profiling.depth_validation.generate_sources --out profiling/depth_validation/generated",
+  "verify": "python -m profiling.depth_validation.generate_sources --check"
+}

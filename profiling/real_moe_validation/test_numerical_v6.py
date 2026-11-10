@@ -5,10 +5,19 @@ import unittest
 from .numerical_v6 import native_v6,ORDER,ROOT,prepare_cohort
 from .dataset import read
 
+FROZEN_SOURCE=ROOT/'build/real-moe-validation-20261027/tap-runtime-v5b/source/real_moe_tap_probe.cpp'
+
 class NumericalDriverTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original=(ROOT/'build/real-moe-validation-20261027/tap-runtime-v5b/source/real_moe_tap_probe.cpp').read_text(encoding='utf-8')
+        # The frozen tap source is a build product, not a source file: it is kept
+        # outside the checkout (paper-write/simulator-archive/build/...), so a
+        # fresh clone has nothing to compare against. Skip instead of erroring —
+        # a missing fixture is not a failure of the transform under test.
+        if not FROZEN_SOURCE.is_file():
+            raise unittest.SkipTest('%s is not in the checkout; the frozen tap sources '
+                                    'are archived under paper-write/simulator-archive/' % FROZEN_SOURCE)
+        cls.original=FROZEN_SOURCE.read_text(encoding='utf-8')
         cls.result=native_v6(cls.original)
 
     def test_new_schema_and_host_export_after_end_tick(self):

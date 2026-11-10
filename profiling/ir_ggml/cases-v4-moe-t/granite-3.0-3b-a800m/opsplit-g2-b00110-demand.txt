@@ -1,0 +1,56 @@
+case opsplit-g2-b00110-demand
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 copy pcie 1 bytes=393216,dir=cpu>gpu,tensor=g:request0-prefill-layer0:op:layer0:request0:proj
+node 3 attn gpu 2 
+node 4 copy pcie 3 bytes=245760,dir=cpu>gpu,tensor=w:layer0:W_router
+node 5 router gpu 3,4 
+node 6 copy pcie 3 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer0:op:layer0:request0:attn
+node 7 copy pcie 5 bytes=10240,dir=gpu>cpu,tensor=g:request0-prefill-layer0:op:layer0:request0:router
+node 8 expert cpu 6,7 
+node 9 combine cpu 8,6,7 
+node 10 proj cpu 9,0 
+node 11 copy pcie 10 bytes=393216,dir=cpu>gpu,tensor=g:request0-prefill-layer1:op:layer1:request0:proj
+node 12 attn gpu 11 
+node 13 copy pcie 12 bytes=245760,dir=cpu>gpu,tensor=w:layer1:W_router
+node 14 router gpu 12,13 
+node 15 copy pcie 12 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:request0:attn
+node 16 copy pcie 14 bytes=10240,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:request0:router
+node 17 expert cpu 15,16 
+node 18 combine cpu 17,15,16 
+node 19 proj cpu 18,0 
+node 20 attn cpu 19 
+node 21 router cpu 20 
+node 22 expert cpu 20,21 
+node 23 combine cpu 22,20,21 
+node 24 proj cpu 23,0 
+node 25 attn cpu 24 
+node 26 router cpu 25 
+node 27 expert cpu 25,26 
+node 28 combine cpu 27,25,26 

@@ -1,0 +1,106 @@
+case ssd-g4-v2
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+vram_bytes 127733760
+ssd_bytes 255467520
+reclaim release_clean_weights
+release_order lru
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 copy pcie 0 bytes=393216,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 2 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 3 copy ssd 1,2 bytes=6144,dir=cpu>ssd,tensor=w:layer0:W_input_norm
+node 4 copy ssd 3 bytes=6144,dir=ssd>gpu,tensor=w:layer0:W_input_norm
+node 5 copy ssd 1,2 bytes=1327104,dir=cpu>ssd,tensor=w:layer0:W_q
+node 6 copy ssd 5 bytes=1327104,dir=ssd>gpu,tensor=w:layer0:W_q
+node 7 copy ssd 1,2 bytes=442368,dir=cpu>ssd,tensor=w:layer0:W_k
+node 8 copy ssd 7 bytes=442368,dir=ssd>gpu,tensor=w:layer0:W_k
+node 9 copy ssd 1,2 bytes=645120,dir=cpu>ssd,tensor=w:layer0:W_v
+node 10 copy ssd 9 bytes=645120,dir=ssd>gpu,tensor=w:layer0:W_v
+node 11 proj gpu 1,2,4,6,8,10 
+node 12 attn gpu 11 
+node 13 copy ssd 12 bytes=245760,dir=cpu>ssd,tensor=w:layer0:W_router
+node 14 copy ssd 13 bytes=245760,dir=ssd>gpu,tensor=w:layer0:W_router
+node 15 router gpu 12,14 
+node 16 copy ssd 12,15 bytes=61194240,dir=cpu>ssd,tensor=w:layer0:E0
+node 17 copy ssd 16 bytes=61194240,dir=ssd>gpu,tensor=w:layer0:E0
+node 18 expert gpu 12,15,17 
+node 19 combine gpu 18,12,15 
+node 20 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 21 copy ssd 19,20 bytes=6144,dir=cpu>ssd,tensor=w:layer1:W_input_norm
+node 22 copy ssd 21 bytes=6144,dir=ssd>gpu,tensor=w:layer1:W_input_norm
+node 23 copy ssd 19,20 bytes=1327104,dir=cpu>ssd,tensor=w:layer1:W_q
+node 24 copy ssd 23 bytes=1327104,dir=ssd>gpu,tensor=w:layer1:W_q
+node 25 copy ssd 19,20 bytes=442368,dir=cpu>ssd,tensor=w:layer1:W_k
+node 26 copy ssd 25 bytes=442368,dir=ssd>gpu,tensor=w:layer1:W_k
+node 27 copy ssd 19,20 bytes=645120,dir=cpu>ssd,tensor=w:layer1:W_v
+node 28 copy ssd 27 bytes=645120,dir=ssd>gpu,tensor=w:layer1:W_v
+node 29 proj gpu 19,20,22,24,26,28 
+node 30 attn gpu 29 
+node 31 copy ssd 30 bytes=245760,dir=cpu>ssd,tensor=w:layer1:W_router
+node 32 copy ssd 31 bytes=245760,dir=ssd>gpu,tensor=w:layer1:W_router
+node 33 router gpu 30,32 
+node 34 copy ssd 30,33 bytes=61194240,dir=cpu>ssd,tensor=w:layer1:E0
+node 35 copy ssd 34 bytes=61194240,dir=ssd>gpu,tensor=w:layer1:E0
+node 36 expert gpu 30,33,35 
+node 37 combine gpu 36,30,33 
+node 38 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 39 copy ssd 37,38 bytes=6144,dir=cpu>ssd,tensor=w:layer2:W_input_norm
+node 40 copy ssd 39 bytes=6144,dir=ssd>gpu,tensor=w:layer2:W_input_norm
+node 41 copy ssd 37,38 bytes=1327104,dir=cpu>ssd,tensor=w:layer2:W_q
+node 42 copy ssd 41 bytes=1327104,dir=ssd>gpu,tensor=w:layer2:W_q
+node 43 copy ssd 37,38 bytes=442368,dir=cpu>ssd,tensor=w:layer2:W_k
+node 44 copy ssd 43 bytes=442368,dir=ssd>gpu,tensor=w:layer2:W_k
+node 45 copy ssd 37,38 bytes=645120,dir=cpu>ssd,tensor=w:layer2:W_v
+node 46 copy ssd 45 bytes=645120,dir=ssd>gpu,tensor=w:layer2:W_v
+node 47 proj gpu 37,38,40,42,44,46 
+node 48 attn gpu 47 
+node 49 copy ssd 48 bytes=245760,dir=cpu>ssd,tensor=w:layer2:W_router
+node 50 copy ssd 49 bytes=245760,dir=ssd>gpu,tensor=w:layer2:W_router
+node 51 router gpu 48,50 
+node 52 copy ssd 48,51 bytes=61194240,dir=cpu>ssd,tensor=w:layer2:E0
+node 53 copy ssd 52 bytes=61194240,dir=ssd>gpu,tensor=w:layer2:E0
+node 54 expert gpu 48,51,53 
+node 55 combine gpu 54,48,51 
+node 56 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 57 copy ssd 55,56 bytes=6144,dir=cpu>ssd,tensor=w:layer3:W_input_norm
+node 58 copy ssd 57 bytes=6144,dir=ssd>gpu,tensor=w:layer3:W_input_norm
+node 59 copy ssd 55,56 bytes=1327104,dir=cpu>ssd,tensor=w:layer3:W_q
+node 60 copy ssd 59 bytes=1327104,dir=ssd>gpu,tensor=w:layer3:W_q
+node 61 copy ssd 55,56 bytes=442368,dir=cpu>ssd,tensor=w:layer3:W_k
+node 62 copy ssd 61 bytes=442368,dir=ssd>gpu,tensor=w:layer3:W_k
+node 63 copy ssd 55,56 bytes=645120,dir=cpu>ssd,tensor=w:layer3:W_v
+node 64 copy ssd 63 bytes=645120,dir=ssd>gpu,tensor=w:layer3:W_v
+node 65 proj gpu 55,56,58,60,62,64 
+node 66 attn gpu 65 
+node 67 copy ssd 66 bytes=245760,dir=cpu>ssd,tensor=w:layer3:W_router
+node 68 copy ssd 67 bytes=245760,dir=ssd>gpu,tensor=w:layer3:W_router
+node 69 router gpu 66,68 
+node 70 copy ssd 66,69 bytes=61194240,dir=cpu>ssd,tensor=w:layer3:E0
+node 71 copy ssd 70 bytes=61194240,dir=ssd>gpu,tensor=w:layer3:E0
+node 72 expert gpu 66,69,71 
+node 73 combine gpu 72,66,69 
+node 74 copy pcie 73 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer3:op:layer3:request0:combine

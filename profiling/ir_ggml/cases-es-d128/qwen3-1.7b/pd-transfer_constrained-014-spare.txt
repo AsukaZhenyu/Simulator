@@ -1,0 +1,56 @@
+case pd-transfer_constrained-014-spare
+model qwen3-1.7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+decode_history 128
+gpu 1
+experts 0
+top_k 0
+geometry_hidden 2048
+geometry_intermediate 6144
+geometry_heads 16
+geometry_kv_heads 8
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 1000000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm rms
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn gpu 12,10,9,11,8 
+node 3 ffn gpu 16,14,13,15,2 
+node 4 arrival cpu 17,18 
+node 5 proj gpu 23,24,19,21,20,22 t=1,h=128
+node 6 attn cpu 26,25,27,18,4 t=1,h=128
+node 7 ffn cpu 6 t=1,h=128
+node 8 copy pcie - bytes=2359296,dir=cpu>gpu,tensor=w:layer0:W_output
+node 9 copy pcie 1,0 bytes=524288,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:proj.q
+node 10 copy pcie 1,0 bytes=262144,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:proj.k
+node 11 copy pcie 1,0 bytes=262144,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:proj.v
+node 12 copy pcie 1,0 bytes=524288,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:in.hidden
+node 13 copy pcie - bytes=8192,dir=cpu>gpu,tensor=w:layer0:W_post_attention_norm
+node 14 copy pcie - bytes=7077888,dir=cpu>gpu,tensor=w:layer0:W_gate
+node 15 copy pcie - bytes=7077888,dir=cpu>gpu,tensor=w:layer0:W_up
+node 16 copy pcie - bytes=10321920,dir=cpu>gpu,tensor=w:layer0:W_down
+node 17 copy pcie 2,3 bytes=524288,dir=gpu>cpu,tensor=g:request0-prefill-layer0:t:layer0:request0:ffn
+node 18 copy pcie 2 bytes=256,dir=gpu>cpu,tensor=kv:layer0:request0:0
+node 19 copy pcie - bytes=8192,dir=cpu>gpu,tensor=w:layer0:W_input_norm
+node 20 copy pcie - bytes=2359296,dir=cpu>gpu,tensor=w:layer0:W_q
+node 21 copy pcie - bytes=1179648,dir=cpu>gpu,tensor=w:layer0:W_k
+node 22 copy pcie - bytes=1720320,dir=cpu>gpu,tensor=w:layer0:W_v
+node 23 copy pcie 4 bytes=8192,dir=cpu>gpu,tensor=g:request0-decode0-layer0:t:layer0:request0:in.hidden,t=1,h=128
+node 24 copy pcie 4 bytes=4,dir=cpu>gpu,tensor=g:request0-decode0-layer0:t:layer0:request0:in.positions,t=1,h=128
+node 25 copy pcie 5,2,4 bytes=8192,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.q,t=1,h=128
+node 26 copy pcie 5,2,4 bytes=4096,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.k,t=1,h=128
+node 27 copy pcie 5,2,4 bytes=4096,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.v,t=1,h=128

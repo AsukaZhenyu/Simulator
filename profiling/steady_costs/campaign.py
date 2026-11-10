@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 from .contracts import component_reference,digest,representative_components,require,semantic_program,sha,validate_component,verify_float_output
+from profiling import host
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -150,7 +151,7 @@ def verify_native(program,request,native,oracle):
     require(native.get('program_sha256')==program['program_sha256'] and native.get('request')==request,'native program/request identity differs')
     require(type(native.get('process_id')) is int and native['process_id']>0,'native process identity missing')
     clock=native.get('clock',{});hz=clock.get('frequency_hz')
-    require(clock.get('clock_id')=='windows_qpc' and type(hz) is int and hz>0,'native monotonic clock unknown')
+    require(clock.get('clock_id')==host.measurement_clock_id() and type(hz) is int and hz>0,'native monotonic clock unknown')
     def ticks(row):
         first,last=row.get('begin_tick'),row.get('end_tick')
         require(type(first) is int and type(last) is int and 0<=first<=last,'native monotonic interval differs')

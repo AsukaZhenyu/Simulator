@@ -13,9 +13,11 @@ from pathlib import Path
 
 from .dataset import read,write
 from .run import receipt,sha,require
-from .runtime_window_analysis import extract_windows,fit_prices,predict_inventory,price_fit_diagnostics
+from .device_state import STATES,forward_states,load_clocks,state_census
+from .runtime_window_analysis import (extract_windows,fit_prices,fit_state_multipliers,predict_inventory,
+    price_fit_diagnostics)
 from .runtime_window_io import LABELS,LEGACY_LABELS,LABEL_PLACEMENT
-from llm_infer_model.performance.moe_execution import RuntimeWindowPrice
+from llm_infer_model.performance.moe_execution import NOMINAL_STATE, RuntimeWindowPrice, state_applies
 
 
 def encoded(value):
@@ -31,8 +33,23 @@ def load_job(out,job):
     require(sha(execution['native']['path'])==execution['native']['sha256'],'native output content changed')
     return native,execution
 
+def job_states(out,job,native):
+    """The machine state of every forward of one job, if the campaign sampled it."""
+    clocks=Path(out)/'jobs'/job/'clocks.csv'
+    if not clocks.is_file():return None
+    return forward_states(native,load_clocks(clocks))
+
+def declare_ledger(ledger,states):
+    """Declare the state each window ran in, from the forward it belongs to."""
+    for window in ledger['windows']:
+        inventory=window['inventory']
+        key=(ledger['source_request_id'],inventory['phase'],int(inventory['forward_index']))
+        require(key in states,'no observed machine state for a calibration window forward')
+        inventory['device_state']=states[key]
+    return ledger
+
 def calibrate(out):
-    out=Path(out).resolve();m=read(out/'manifest.json');ledgers=[];evidence=[];records=[]
+    out=Path(out).resolve();m=read(out/'manifest.json');ledgers=[];evidence=[];records=[];census={}
     policy=m.get('feature_policy','mechanism_v1')
     labels=tuple(m.get('labels',LEGACY_LABELS))
     for label in labels:
@@ -40,17 +57,31 @@ def calibrate(out):
         require(native['request']['runtime_window_observer'] is True,'calibration must expose actual scoped windows')
         require(all(r['split']=='calibration' for r in native['request']['requests']),'heldout values cannot train prices')
         evidence.append(str(out/'jobs'/(label+'-calibration-profile')/'result.json'))
+        states=job_states(out,label+'-calibration-profile',native)
+        census[label]=state_census(states) if states is not None else None
         for row in native['results']:
             ledger=extract_windows(row,placement=LABEL_PLACEMENT[label],frequency_hz=native['clock']['frequency_hz'],feature_policy=policy)
             ledger['source_process_id']=native['process_id']
+            if states is not None:declare_ledger(ledger,states)
             ledgers.append(ledger)
             records.append(dict(placement=LABEL_PLACEMENT[label],request_id=row['id'],window_count=len(ledger['windows']),CPU_node_windows=ledger['CPU_node_windows'],expert_layers=ledger['expert_layers'],clock_conservation=ledger['clock_conservation_passed'],scopes=dict(Counter(w['inventory']['scope'] for w in ledger['windows'])),
                 work_kinds=dict(Counter(w['inventory']['work_spec']['kind'] for w in ledger['windows']))))
-    prices=fit_prices(ledgers,evidence,policy)
+    # The reference state is whichever state the calibration actually measured
+    # most bridge work in: a key measured entirely in one state cannot separate
+    # that state from its own coefficients, so the table is in that state's units
+    # and every other state is declared relative to it.
+    scoped=[w['inventory'].get('device_state',NOMINAL_STATE) for l in ledgers for w in l['windows']
+            if state_applies(w['inventory']['scope'])]
+    reference=Counter(scoped).most_common(1)[0][0] if scoped else NOMINAL_STATE
+    throttled=sorted(set(scoped)-{reference})
+    state_multipliers,state_errors=(fit_state_multipliers(ledgers,tuple(throttled),reference=reference) if throttled else (None,{}))
+    prices=fit_prices(ledgers,evidence,policy,state_multipliers=state_multipliers,reference_state=reference)
     diagnostics=price_fit_diagnostics(ledgers,prices)
     calibration=[]
     for ledger in ledgers:
-        prediction=predict_inventory(ledger['workload_inventory'],prices)
+        measured={(w['inventory']['phase'],int(w['inventory']['forward_index'])):w['inventory']['device_state']
+                  for w in ledger['windows'] if 'device_state' in w['inventory']}
+        prediction=predict_inventory(ledger['workload_inventory'],prices,declared_states=measured or None)
         calibration.append(dict(request_id=ledger['source_request_id'],predicted_ns=prediction['total_ns'],measured_ns=ledger['total_ns'],APE=abs(float(prediction['total_ns'])/float(ledger['total_ns'])-1)))
     result=dict(schema='real-moe-window-price-catalog-1',created_at_utc=datetime.now(timezone.utc).isoformat(),manifest=receipt(out/'manifest.json'),
         prices=[p.to_dict() for p in prices],price_count=len(prices),evidence=[receipt(p) for p in evidence],window_coverage=records,
@@ -59,11 +90,24 @@ def calibrate(out):
             feature_policy=policy,intercept_policy='per_key',structural_rules=receipt(Path(__file__).resolve().parents[2]/'modeling/llm_infer_model/performance/window_work.py'),
             forbidden_KV_proxies=['ordinary matrix','FFN/expert work','unclassified HOST','sampler','cache','OS/available compute state'],
             unknown_work_retains_conservative_shape_guards=True,
-            whole_model_multiplier=False,heldout_times_read=False,old_heldout_diagnostic_times_used=False,calibration_processes=len(labels),calibration_requests=len(calibration)),calibration_fit_diagnostics=calibration,
+            whole_model_multiplier=False,heldout_times_read=False,old_heldout_diagnostic_times_used=False,calibration_processes=len(labels),calibration_requests=len(calibration)),
+        device_state=None if state_multipliers is None else dict(
+            states=list(STATES),reference_state=reference,
+            reference_is_identification_point=True,
+            multipliers={name:encoded(value) for name,value in state_multipliers.items()},
+            fitted_on='calibration windows only; scaled work terms of each key, intercept never scaled',
+            work_terms_only=True,heldout_times_read=False,
+            forward_census=census,
+            summed_squared_error={name:[[candidate,error] for candidate,error in profile]
+                                  for name,profile in state_errors.items()}),
+        calibration_fit_diagnostics=calibration,
         price_scope='inclusive CPU-node / natural-runtime / host response windows; SAMPLER is partitioned residual tail, not the whole sampling call; not independent device work',
         calibration_fit_diagnostics_are_independent_accuracy=False)
     write(out/'WINDOW_PRICES.json',encoded(result))
     write(out/'PRICE_FREEZE.json',dict(created_at_utc=datetime.now(timezone.utc).isoformat(),prices=receipt(out/'WINDOW_PRICES.json'),calibration_sources=result['evidence'],whole_model_multiplier_fitted=False,heldout_TIMING_used=False,
+        device_state_declared=result['device_state'] is not None,
+        reference_state=result['device_state']['reference_state'] if result['device_state'] is not None else None,
+        state_multipliers=None if result['device_state'] is None else result['device_state']['multipliers'],
         feature_policy=policy,structural_rules=result['fit']['structural_rules'],rules_selected_from_work_metadata_not_target_errors=True))
     return dict(prices=receipt(out/'WINDOW_PRICES.json'),price_count=len(prices),hardware_executed=False)
 
@@ -72,6 +116,13 @@ def forecast(out,allow_extrapolation=False):
     require(sha(frozen['prices']['path'])==frozen['prices']['sha256'],'frozen calibration prices changed')
     table=read(frozen['prices']['path']);prices=tuple(RuntimeWindowPrice.from_dict(p) for p in table['prices'])
     policy=table['fit']['feature_policy']
+    # The coefficients are in the units of the state the calibration ran in, so a
+    # planning run that has no state observation has exactly one defensible
+    # assumption: the table's own identification state. Declaring nothing would
+    # leave every bridge window at ``NOMINAL_STATE``, which for a table identified
+    # in p4 would apply an uncancelled factor of 1/theta(nominal) to all of them.
+    reference=prices[0].reference_state if prices else NOMINAL_STATE
+    require(all(p.reference_state==reference for p in prices),'one table carries one reference state')
     labels=tuple(read(out/'manifest.json').get('labels',LEGACY_LABELS))
     forecasts=[];inventories=[]
     for label in labels:
@@ -85,13 +136,14 @@ def forecast(out,allow_extrapolation=False):
             path=out/'workload-inventories'/(label+'-'+row['id']+'.json');path.parent.mkdir(exist_ok=True);write(path,inventory);inventories.append(receipt(path))
             record=dict(placement=inventory['placement'],request_id=row['id'],inventory=receipt(path),status='unsupported')
             try:
-                prediction=predict_inventory(read(path)['windows'],prices,allow_extrapolation=allow_extrapolation)
+                prediction=predict_inventory(read(path)['windows'],prices,allow_extrapolation=allow_extrapolation,declared_states=reference)
                 record.update(status='predicted',predicted_total_ns=prediction['total_ns'],predicted_prefill_ns=prediction['phase_ns']['prefill'],predicted_decode_with_sampling_ns=prediction['phase_ns']['decode'],
                     window_count=len(inventory['windows']),extrapolated_windows=sum(e['extrapolated'] for e in prediction['compiled']['windows']))
                 write(out/'workload-inventories'/(label+'-'+row['id']+'-compiled.json'),encoded(prediction['compiled']))
             except Exception as error:record['reason']=repr(error)
             forecasts.append(record)
     result=dict(schema='real-moe-window-forecasts-1',created_at_utc=datetime.now(timezone.utc).isoformat(),price_freeze=receipt(out/'PRICE_FREEZE.json'),
+        declared_planning_state=reference,
         source_prices=frozen['prices'],workload_inventories=inventories,forecasts=forecasts,allow_extrapolation=allow_extrapolation,
         heldout_elapsed_values_used_for_predictions=False,heldout_routes_and_operator_shapes_are_modeling_workload=True,mapping_receives_future_route_trace=False)
     write(out/'PREDICTIONS.json',encoded(result));write(out/'PREDICTION_FREEZE.json',dict(predictions=receipt(out/'PREDICTIONS.json'),prices=frozen['prices'],inventories=inventories,
@@ -103,10 +155,12 @@ def evaluate(out):
     out=Path(out).resolve();freeze=read(out/'PREDICTION_FREEZE.json');require(sha(freeze['predictions']['path'])==freeze['predictions']['sha256'],'predictions changed after freeze')
     predictions=read(freeze['predictions']['path']);lookup={(p['placement'],p['request_id']):p for p in predictions['forecasts']};rows=[]
     labels=tuple(read(out/'manifest.json').get('labels',LEGACY_LABELS))
+    prices=tuple(RuntimeWindowPrice.from_dict(p) for p in read(freeze['prices']['path'])['prices'])
     for repeat in (0,1):
         for label in labels:
             native,execution=load_job(out,label+'-heldout-r'+str(repeat))
             require(native['request']['runtime_window_observer'] is False,'bare validation must disable window observation')
+            observed=job_states(out,label+'-heldout-r'+str(repeat),native)
             for row in native['results']:
                 p=lookup[LABEL_PLACEMENT[label],row['id']];base=dict(placement=LABEL_PLACEMENT[label],request_id=row['id'],repeat=repeat,status='unsupported',reference=execution['native'])
                 if p['status']!='predicted':base['reason']=p.get('reason');rows.append(base);continue
@@ -121,10 +175,28 @@ def evaluate(out):
                 def number(v):return Fraction(v['numerator'],v['denominator']) if isinstance(v,dict) else Fraction(v)
                 ape={k:abs(float(number(forecast[k]))/truth[k]-1) for k in truth}
                 base.update(status='evaluated',measured_ns=truth,predicted_ns=forecast,APE=ape,mean_time_target_passed=all(v<=0.1 for v in ape.values()),actual_prefix_equal=True,final_full_logits_equal=True,extrapolated_windows=p['extrapolated_windows'])
+                # Prediction B declares the state the device was actually in while
+                # this request ran. It is computed after the run from a sampler that
+                # never touched the probe, and is reported only as conditional on
+                # that observation; prediction A above is the frozen forecast.
+                if observed is not None:
+                    declared_states={(phase,index):state for (request_id,phase,index),state in observed.items() if request_id==row['id']}
+                    base['observed_states']=dict(total=state_census(declared_states))
+                    try:
+                        conditional=predict_inventory(inventory['windows'],prices,allow_extrapolation=bool(p.get('extrapolated_windows')),declared_states=declared_states)
+                        proposed=dict(total=conditional['total_ns'],prefill=conditional['phase_ns']['prefill'],decode_with_sampling=conditional['phase_ns']['decode'])
+                        base['state_conditional_ns']=proposed
+                        base['state_conditional_APE']={k:abs(float(number(proposed[k]))/truth[k]-1) for k in truth}
+                    except Exception as error:base['state_conditional_reason']=repr(error)
                 rows.append(base)
     scored=[r for r in rows if r['status']=='evaluated']
+    conditional=[r for r in scored if 'state_conditional_APE' in r]
     declared=12*len(labels)
     result=dict(schema='real-moe-independent-runtime-window-evaluation-1',predictions=freeze['predictions'],rows=rows,declared=declared,evaluated=len(scored),
+        state_conditional=dict(rows=len(conditional),mean_APE={k:sum(r['state_conditional_APE'][k] for r in conditional)/len(conditional) if conditional else None for k in ('total','prefill','decode_with_sampling')},
+            worst_APE={k:max((r['state_conditional_APE'][k] for r in conditional),default=None) for k in ('total','prefill','decode_with_sampling')},
+            passed=sum(all(v<=0.1 for v in r['state_conditional_APE'].values()) for r in conditional),
+            declaration='the state observed beside each bare run; conditional, not a forecast; no heldout time used to choose it'),
         all_declared_evaluated=len(scored)==declared,mean_APE={k:sum(r['APE'][k] for r in scored)/len(scored) if scored else None for k in ('total','prefill','decode_with_sampling')},
         worst_APE={k:max((r['APE'][k] for r in scored),default=None) for k in ('total','prefill','decode_with_sampling')},
         passed=sum(r['mean_time_target_passed'] for r in scored),target_APE=0.1,all_passed=len(scored)==declared and all(r['mean_time_target_passed'] for r in scored),

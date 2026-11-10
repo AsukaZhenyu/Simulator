@@ -13,7 +13,7 @@ without network access after installation**.
 |---|---|
 | Python | 3.10 – 3.13 (CI runs 3.10, 3.12, 3.13) |
 | OS | Linux, macOS or Windows; CI runs Ubuntu and Windows |
-| Third-party runtime dependencies | none for the simulator. `numpy`, `scipy` and `jinja2` come with the `profiling` extra, which only the measurement suites need; the `gguf` extra adds `gguf` and `numpy` for the GGUF import path |
+| Third-party runtime dependencies | none for the simulator. `numpy`, `scipy`, `jinja2` and `psutil` come with the `profiling` extra, which only the measurement suites need (`psutil` only for the real-model request window campaign); the `gguf` extra adds `gguf` and `numpy` for the GGUF import path |
 | GPU, CUDA, drivers | not needed by any test suite |
 | Network | only for `git clone` and `pip install` |
 
@@ -176,7 +176,8 @@ GPU half) a CUDA device; the `profiling` suite covers its Python and its data.
 
 None of these suites measures hardware. A green run means the simulator is
 internally consistent with the references those suites encode; it says nothing
-about how close a prediction is to a real machine.
+about how close a prediction is to a real machine. Measuring that is a separate
+procedure, one device at a time: see [DEVICE_ACCURACY.md](DEVICE_ACCURACY.md).
 
 ## Run the simulator
 

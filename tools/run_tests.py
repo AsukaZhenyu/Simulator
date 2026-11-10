@@ -32,8 +32,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# A suite whose fourth field is MODULES names its test modules explicitly instead
+# of discovering them; see build_command.
+MODULES = "modules"
+
 # (name, start directory, pattern, top-level directory)
 SUITES: list[tuple[str, str, str, str | None]] = [
+    ("campaign-driver", "tools/tests", "test*.py", None),
     ("public-library", "tests", "test_library.py", None),
     ("analytical-inputs", "tests", "test_analytical_inputs.py", None),
     ("dense-subbatches", "tests", "test_dense_subbatches.py", None),
@@ -50,6 +55,10 @@ SUITES: list[tuple[str, str, str, str | None]] = [
     ("accuracy-suite", "profiling/accuracy_suite/tests", "test*.py", None),
     ("chain-calibration", "profiling/chain_calibration/tests", "test*.py", None),
     ("profiling", "profiling/tests", "test*.py", None),
+    ("ir-ggml", "profiling/ir_ggml/tests", "test*.py", None),
+    ("depth-validation", "profiling/depth_validation/tests", "test*.py", None),
+    ("real-moe-validation", "profiling/real_moe_validation", "test_*.py", MODULES),
+    ("dac-validation", "profiling/dac_validation", "test*.py", None),
     ("storage-measurement", "profiling/storage/tests", "test*.py", None),
     ("workload-accuracy", "profiling/workload_accuracy/tests", "test*.py", None),
     ("overlap-accuracy", "profiling/overlap_accuracy/tests", "test*.py", None),
@@ -84,6 +93,16 @@ SUITES: list[tuple[str, str, str, str | None]] = [
 
 
 def build_command(start: str, pattern: str, top: str | None) -> list[str]:
+    if top == MODULES:
+        # A directory whose tests import their siblings relatively (`from .tap_v4
+        # import ...`) cannot be discovered: `discover` imports each file as a
+        # top-level module, and a relative import has no parent package. Those
+        # directories have no `__init__.py` either, so `discover -t` refuses
+        # them. Naming every module by its dotted path puts each one inside
+        # `profiling.<name>` the way the campaign itself imports it.
+        modules = sorted(".".join(Path(path).relative_to(ROOT).with_suffix("").parts)
+                         for path in (ROOT / start).glob(pattern))
+        return [sys.executable, "-m", "unittest", *modules]
     command = [sys.executable, "-m", "unittest", "discover", "-s", start, "-p", pattern]
     if top is not None:
         command += ["-t", top]
@@ -274,7 +293,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.list:
         for name, start, pattern, top in suites:
-            print("%-30s %s  %s%s" % (name, start, pattern, "  -t " + top if top else ""))
+            print("%-30s %s  %s%s" % (name, start, pattern,
+                                      "  " + top if top == MODULES else ("  -t " + top if top else "")))
         return 0
 
     results: list[dict] = []

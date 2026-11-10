@@ -67,3 +67,33 @@ Build manifests bind pinned source helpers, GGML event ABI files, CUDA headers,
 runtime DLLs, compiler, cache and new source bytes. `--self-test` exercises data
 and parser invariants only; it constructs no Executor or backend and performs
 no hardware benchmark.
+
+## Building on the host you are measuring
+
+The target is `steady-costs-probe`. It needs a llama.cpp tree (for `ggml`), a
+CUDA toolkit and, at run time, the directory holding the ggml/CUDA shared
+libraries it loads. The build writes `build-manifest.json` beside the binary,
+which is what `prepare_portable` binds a campaign to.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+      -DLLAMA_ROOT=PATH/llama.cpp -DCUDA_ROOT=PATH/CUDA -DRUNTIME_DIR=PATH/CUDA/bin
+cmake --build build --config Release -j
+```
+
+`profiling.dac_validation.build_probe` runs exactly those two steps, refuses an
+existing binary and a runtime directory that holds no library the loader can
+use, then requires the probe's `build-manifest.json`. Visual Studio is a
+multi-config generator (the binary lands in `Release/`, and `--config Release`
+belongs to the build command); Ninja and Unix Makefiles are single-config (the
+binary lands in the build root, and `-DCMAKE_BUILD_TYPE=Release` is required or
+the measurement is compiled unoptimised).
+
+macOS builds with `-DPROBE_BACKEND=metal` and needs no toolkit: the CUDA event
+vocabulary the pinned fragments use is answered by
+`profiling/native/backend/metal/include`, which the project puts first on the
+include path and uses as `CUDA_ROOT`'s default. The e2a column itself still
+needs its strict-F32 runtime, and that runtime's patch is a CUDA bypass router
+with no Metal counterpart yet -- the probe builds, the column is not ready, and
+`tools.device_check` says so. Linux and Windows build with
+`-DPROBE_BACKEND=cuda`; on Linux the probe links `pthread` and `dl`.

@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[2]
 for directory in (ROOT, ROOT/'profiling',ROOT/'mapping',ROOT/'modeling'):
     if str(directory) not in sys.path:sys.path.insert(0,str(directory))
 from state_calibration.telemetry import DeviceTelemetrySampler,NativeClock,align_intervals
+from profiling import host
 
 def utc():return datetime.now(timezone.utc).isoformat()
 def read(path):return json.loads(Path(path).read_text(encoding='utf-8'))
@@ -45,7 +46,7 @@ def sources(binary,runtime_dirs):
     for folder in (ROOT/'modeling/llm_infer_model',ROOT/'mapping/tensor_mapping',ROOT/'src/llm_simulator'):
         paths.update(folder.rglob('*.py'))
     for folder in runtime_dirs:
-        paths.update(p for p in Path(folder).iterdir() if p.is_file() and p.suffix.lower()=='.dll')
+        paths.update(p for p in Path(folder).iterdir() if p.is_file() and p.match(host.shared_library_pattern()))
         private=Path(folder)/'strict-f32-runtime.json'
         if private.is_file():
             paths.add(private)
@@ -145,15 +146,37 @@ def validate_numeric(native,reference):
     return dict(passed=True,maximum_absolute_error=maximum,atol=5e-5,rtol=5e-5,oracle='independent NumPy reference_ports outside all timed native work')
 
 def _affinity(process,mask):
-    if os.name!='nt':return dict(applied=False,reason='not requested on POSIX')
-    import ctypes
-    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
-    kernel.SetProcessAffinityMask.argtypes=[ctypes.c_void_p,ctypes.c_size_t];kernel.SetProcessAffinityMask.restype=ctypes.c_int
-    kernel.GetProcessAffinityMask.argtypes=[ctypes.c_void_p,ctypes.POINTER(ctypes.c_size_t),ctypes.POINTER(ctypes.c_size_t)];kernel.GetProcessAffinityMask.restype=ctypes.c_int
-    if not kernel.SetProcessAffinityMask(int(process._handle),mask):raise OSError('owned-child affinity set failed')
-    observed=ctypes.c_size_t();system=ctypes.c_size_t()
-    if not kernel.GetProcessAffinityMask(int(process._handle),__import__('ctypes').byref(observed),__import__('ctypes').byref(system)) or observed.value!=mask:raise OSError('owned-child affinity readback differs')
-    return dict(applied=True,requested_mask=mask,observed_mask=observed.value)
+    """Pin the owned child, or record that the platform cannot.
+
+    On Windows the mask is enforced on the child's handle and read back. Linux
+    has the same call as `os.sched_setaffinity`, with one difference the receipt
+    names: it sets the affinity of one thread, not of the process, so a thread
+    the child starts later is not covered by it. macOS has no enforced process
+    affinity at all -- THREAD_AFFINITY_POLICY is a scheduling hint -- so the
+    record says `applied=False` with the reason rather than putting a condition
+    in the receipt that was never imposed.
+    """
+    if os.name=='nt':
+        import ctypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.SetProcessAffinityMask.argtypes=[ctypes.c_void_p,ctypes.c_size_t];kernel.SetProcessAffinityMask.restype=ctypes.c_int
+        kernel.GetProcessAffinityMask.argtypes=[ctypes.c_void_p,ctypes.POINTER(ctypes.c_size_t),ctypes.POINTER(ctypes.c_size_t)];kernel.GetProcessAffinityMask.restype=ctypes.c_int
+        if not kernel.SetProcessAffinityMask(int(process._handle),mask):raise OSError('owned-child affinity set failed')
+        observed=ctypes.c_size_t();system=ctypes.c_size_t()
+        if not kernel.GetProcessAffinityMask(int(process._handle),__import__('ctypes').byref(observed),__import__('ctypes').byref(system)) or observed.value!=mask:raise OSError('owned-child affinity readback differs')
+        return dict(applied=True,requested_mask=mask,observed_mask=observed.value)
+    if not hasattr(os,'sched_setaffinity'):
+        return dict(applied=False,reason='this platform exposes no enforced process affinity; '
+                    + sys.platform + ' offers only a scheduling hint')
+    cpus={cpu for cpu in range(64) if (mask>>cpu)&1}
+    if not cpus:raise OSError('owned-child affinity mask names no CPU')
+    os.sched_setaffinity(process.pid,cpus)
+    observed=os.sched_getaffinity(process.pid)
+    if observed!=cpus:
+        raise OSError('owned-child affinity readback differs: requested '
+                      + format(mask,'x') + ', observed ' + format(sum(1<<cpu for cpu in observed),'x'))
+    return dict(applied=True,requested_mask=mask,observed_mask=sum(1<<cpu for cpu in observed),
+                scope='owned child main thread; sched_setaffinity has no process-wide form')
 
 def launch(command,env,stdout,stderr,mask):
     out=stdout.open('x',encoding='utf-8');err=stderr.open('x',encoding='utf-8')
@@ -178,10 +201,19 @@ def _wait_ready(process,path,timeout=30):
             time.sleep(.02)
 
 def child_environment(runtime_dirs,fixed_iterations=256):
-    """Set precision flags before Windows loads native CUDA dependencies."""
+    """Set precision flags before the loader resolves native CUDA dependencies.
+
+    The runtime directories go first on whichever variable this platform's
+    loader reads -- `PATH` on Windows, `LD_LIBRARY_PATH` on Linux -- because
+    putting them on `PATH` alone makes a Linux child fail to start with a
+    loader error naming a library that is right there in the list.
+    """
     from highlevel_accuracy.bridge import RUNTIME_FLAGS
     env=dict(os.environ)
-    env['PATH']=os.pathsep.join([*map(str,runtime_dirs),env.get('PATH','')])
+    directories=os.pathsep.join([*map(str,runtime_dirs),env.get('PATH','')])
+    env['PATH']=directories
+    search=host.shared_library_variable()
+    if search!='PATH':env[search]=directories
     env['STATE_PROBE_FIXED_ITERATIONS']=str(fixed_iterations)
     env['STATE_PROBE_EXECUTION_BOUNDARY']='legacy_double_sync'
     env.update({key:value for key,value in RUNTIME_FLAGS.items()if key!='matmul_precision'})

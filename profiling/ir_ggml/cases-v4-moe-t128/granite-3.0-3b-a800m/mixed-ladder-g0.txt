@@ -1,0 +1,91 @@
+case mixed-ladder-g0
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+request_tokens 16,64,256
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 t=16,h=0
+node 2 attn cpu 1 t=16,h=0
+node 3 router cpu 2 t=16,h=0
+node 4 expert cpu 2,3 t=16,h=0
+node 5 combine cpu 4,2,3 t=16,h=0
+node 6 proj cpu 5,0 t=16,h=0
+node 7 attn cpu 6 t=16,h=0
+node 8 router cpu 7 t=16,h=0
+node 9 expert cpu 7,8 t=16,h=0
+node 10 combine cpu 9,7,8 t=16,h=0
+node 11 proj cpu 10,0 t=16,h=0
+node 12 attn cpu 11 t=16,h=0
+node 13 router cpu 12 t=16,h=0
+node 14 expert cpu 12,13 t=16,h=0
+node 15 combine cpu 14,12,13 t=16,h=0
+node 16 proj cpu 15,0 t=16,h=0
+node 17 attn cpu 16 t=16,h=0
+node 18 router cpu 17 t=16,h=0
+node 19 expert cpu 17,18 t=16,h=0
+node 20 combine cpu 19,17,18 t=16,h=0
+node 21 arrival cpu - 
+node 22 proj cpu 21 
+node 23 attn cpu 22 
+node 24 router cpu 23 
+node 25 expert cpu 23,24 
+node 26 combine cpu 25,23,24 
+node 27 proj cpu 26,21 
+node 28 attn cpu 27 
+node 29 router cpu 28 
+node 30 expert cpu 28,29 
+node 31 combine cpu 30,28,29 
+node 32 proj cpu 31,21 
+node 33 attn cpu 32 
+node 34 router cpu 33 
+node 35 expert cpu 33,34 
+node 36 combine cpu 35,33,34 
+node 37 proj cpu 36,21 
+node 38 attn cpu 37 
+node 39 router cpu 38 
+node 40 expert cpu 38,39 
+node 41 combine cpu 40,38,39 
+node 42 arrival cpu - 
+node 43 proj cpu 42 t=256,h=0
+node 44 attn cpu 43 t=256,h=0
+node 45 router cpu 44 t=256,h=0
+node 46 expert cpu 44,45 t=256,h=0
+node 47 combine cpu 46,44,45 t=256,h=0
+node 48 proj cpu 47,42 t=256,h=0
+node 49 attn cpu 48 t=256,h=0
+node 50 router cpu 49 t=256,h=0
+node 51 expert cpu 49,50 t=256,h=0
+node 52 combine cpu 51,49,50 t=256,h=0
+node 53 proj cpu 52,42 t=256,h=0
+node 54 attn cpu 53 t=256,h=0
+node 55 router cpu 54 t=256,h=0
+node 56 expert cpu 54,55 t=256,h=0
+node 57 combine cpu 56,54,55 t=256,h=0
+node 58 proj cpu 57,42 t=256,h=0
+node 59 attn cpu 58 t=256,h=0
+node 60 router cpu 59 t=256,h=0
+node 61 expert cpu 59,60 t=256,h=0
+node 62 combine cpu 61,59,60 t=256,h=0

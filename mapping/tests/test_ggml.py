@@ -33,6 +33,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from tensor_mapping import (
     load_and_validate,
@@ -101,8 +102,23 @@ EXPORTER_ENV = "TENSOR_MAPPING_GGML_EXPORTER"
 EXPORTER_BUILD = Path(__file__).resolve().parent.parent / "ggml" / "build"
 
 
+def exporter_names(platform: str = sys.platform) -> tuple[str, ...]:
+    """The file names the exporter can have on `platform`.
+
+    A Windows PE is not an exporter on a POSIX host even though the file is
+    there: WSL starts it through binfmt, it prints the graph it was built from,
+    and then fails to write an absolute `/tmp/...` path, because to a Windows
+    process that string is not a path. Counting it as a candidate turns "no
+    native build" -- which must skip and say the export was not regenerated --
+    into a red run of the wrong binary, with the wrong binary's error.
+    """
+    if platform == "win32":
+        return ("ggml-export-workload.exe", "ggml-export-workload")
+    return ("ggml-export-workload",)
+
+
 def exporter_candidates() -> list[Path]:
-    names = ("ggml-export-workload.exe", "ggml-export-workload")
+    names = exporter_names()
     roots = (
         EXPORTER_BUILD / "bin" / "Release",
         EXPORTER_BUILD / "bin" / "RelWithDebInfo",
@@ -122,11 +138,32 @@ EXPORTER_SKIP = (
 )
 
 
+def is_windows_pe(path: Path) -> bool:
+    """Whether `path` starts with the MS-DOS header every Windows image has.
+
+    Two bytes are enough to tell: a PE is not a program on a POSIX host, and
+    asking binfmt is how the wrong binary gets run.
+    """
+    try:
+        with open(path, "rb") as handle:
+            return handle.read(2) == b"MZ"
+    except OSError:
+        return False
+
+
 def exporter_or_skip(case: unittest.TestCase) -> Path:
     """The binary, or a skip that says exactly what went unverified."""
     override = os.environ.get(EXPORTER_ENV)
     if override:
         candidate = Path(override)
+        if sys.platform != "win32" and candidate.is_file() and is_windows_pe(candidate):
+            # A typed path is the one place the name check above cannot help:
+            # on a POSIX host a copy of the Windows build under any name runs
+            # far enough to print and then fails on its output path.
+            case.skipTest(
+                f"${EXPORTER_ENV} is {candidate}, a Windows executable: this host "
+                f"cannot use it, so the artifacts were NOT regenerated here. Build "
+                "ggml-export-workload on this host (mapping/ggml/README.md).")
         if candidate.is_file():
             return candidate
         case.skipTest(f"${EXPORTER_ENV} is {candidate}, which is not a file")
@@ -460,6 +497,47 @@ class ExportedSearchTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # 4. The exporter itself
 # ---------------------------------------------------------------------------
+
+
+class ExporterCandidateTests(unittest.TestCase):
+    """Which file this host is allowed to call an exporter."""
+
+    def test_windows_accepts_both_spellings(self) -> None:
+        self.assertEqual(("ggml-export-workload.exe", "ggml-export-workload"),
+                         exporter_names("win32"))
+
+    def test_a_posix_host_never_takes_a_windows_binary(self) -> None:
+        for platform in ("linux", "darwin"):
+            with self.subTest(platform=platform):
+                self.assertEqual(("ggml-export-workload",), exporter_names(platform))
+
+    def test_the_candidate_list_holds_nothing_this_host_cannot_run(self) -> None:
+        suffixes = {path.suffix for path in exporter_candidates()}
+        if sys.platform != "win32":
+            self.assertNotIn(".exe", suffixes)
+
+    def test_a_windows_header_is_recognised_by_its_first_two_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            image = Path(raw_dir) / "exporter"
+            image.write_bytes(b"MZ\x90\x00rest of a PE")
+            self.assertTrue(is_windows_pe(image))
+            image.write_bytes(b"\x7fELF\x02\x01\x01")
+            self.assertFalse(is_windows_pe(image))
+            self.assertFalse(is_windows_pe(Path(raw_dir) / "absent"))
+
+    @unittest.skipIf(sys.platform == "win32", "a PE is the exporter on Windows")
+    def test_a_typed_path_to_a_windows_image_is_refused_not_run(self) -> None:
+        names = exporter_names("win32")
+        with tempfile.TemporaryDirectory() as raw_dir:
+            image = Path(raw_dir) / names[0]
+            image.write_bytes(b"MZ\x90\x00rest of a PE")
+            with mock.patch.dict(os.environ, {EXPORTER_ENV: str(image)}):
+                with self.assertRaises(unittest.SkipTest) as raised:
+                    exporter_or_skip(unittest.TestCase())
+        message = str(raised.exception)
+        self.assertIn("a Windows executable", message)
+        self.assertIn("NOT regenerated", message)
+        self.assertIn("mapping/ggml/README.md", message)
 
 
 class ExporterRerunTests(unittest.TestCase):

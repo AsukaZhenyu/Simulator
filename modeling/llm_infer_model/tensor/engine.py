@@ -2033,6 +2033,12 @@ def _m1_candidates(scenario: Scenario) -> list[Action]:
                 candidates.append(Action(ACTION_WRITE_SSD, tensor_id))
             else:
                 if scenario.architecture.is_shared:
+                    # A shared pool offers two physically different actions and
+                    # both belong in the space: SHARE aliases the one allocation
+                    # (0 bytes, no engine), while COPY really duplicates the bytes
+                    # (it allocates, it takes time, and it leaves an independent
+                    # backup). Only SHARE is *new* here; removing COPY would
+                    # forbid a plan that a UMA machine can really execute.
                     candidates.append(Action(ACTION_SHARE, tensor_id, src=source, dst=destination))
                 candidates.append(
                     Action(ACTION_COPY, tensor_id, src=source, dst=destination)

@@ -1,0 +1,65 @@
+case quant-offload-g2-q4_0-kvq8_0
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+price_signature_override q=q4_0,k=q4_0,v=q4_0,output=q4_0,gate=q4_0,up=q4_0,down=q4_0,kv=q8_0
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_0
+dtype_k q4_0
+dtype_v q4_0
+dtype_o q4_0
+dtype_gate q4_0
+dtype_up q4_0
+dtype_down q4_0
+dtype_kv q8_0
+node 0 arrival cpu - 
+node 1 copy pcie 0 bytes=393216,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 2 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 3 copy pcie 1,2 bytes=6144,dir=cpu>gpu,tensor=w:layer0:W_input_norm
+node 4 copy pcie 1,2 bytes=1327104,dir=cpu>gpu,tensor=w:layer0:W_q
+node 5 copy pcie 1,2 bytes=442368,dir=cpu>gpu,tensor=w:layer0:W_k
+node 6 copy pcie 1,2 bytes=442368,dir=cpu>gpu,tensor=w:layer0:W_v
+node 7 proj gpu 1,2,3,4,5,6 
+node 8 attn gpu 7 
+node 9 copy pcie 8 bytes=245760,dir=cpu>gpu,tensor=w:layer0:W_router
+node 10 router gpu 8,9 
+node 11 copy pcie 8,10 bytes=53084160,dir=cpu>gpu,tensor=w:layer0:E0
+node 12 expert gpu 8,10,11 
+node 13 combine gpu 12,8,10 
+node 14 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 15 copy pcie 13,14 bytes=6144,dir=cpu>gpu,tensor=w:layer1:W_input_norm
+node 16 copy pcie 13,14 bytes=1327104,dir=cpu>gpu,tensor=w:layer1:W_q
+node 17 copy pcie 13,14 bytes=442368,dir=cpu>gpu,tensor=w:layer1:W_k
+node 18 copy pcie 13,14 bytes=442368,dir=cpu>gpu,tensor=w:layer1:W_v
+node 19 proj gpu 13,14,15,16,17,18 
+node 20 attn gpu 19 
+node 21 copy pcie 20 bytes=245760,dir=cpu>gpu,tensor=w:layer1:W_router
+node 22 router gpu 20,21 
+node 23 copy pcie 20,22 bytes=53084160,dir=cpu>gpu,tensor=w:layer1:E0
+node 24 expert gpu 20,22,23 
+node 25 combine gpu 24,20,22 
+node 26 copy pcie 25 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:request0:combine
+node 27 proj cpu 26,0 
+node 28 attn cpu 27 
+node 29 router cpu 28 
+node 30 expert cpu 28,29 
+node 31 combine cpu 30,28,29 
+node 32 proj cpu 31,0 
+node 33 attn cpu 32 
+node 34 router cpu 33 
+node 35 expert cpu 33,34 
+node 36 combine cpu 35,33,34 

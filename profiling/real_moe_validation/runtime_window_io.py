@@ -6,10 +6,11 @@ temporary allocation even for the real model and large CUDA DLL.
 """
 from __future__ import annotations
 
-import ctypes
 import hashlib
 import os
 from pathlib import Path
+
+from profiling import host
 
 
 # Request placements to their campaign job-label prefix. The third placement
@@ -75,22 +76,17 @@ def child_environment(runtime_dirs, request):
     require(request['cuda_graph_policy'] in GRAPH_POLICIES
         and request['tf32_override'] == '0', 'unknown explicit native flags')
     environment = dict(os.environ)
-    environment['PATH'] = os.pathsep.join([*map(str, runtime_dirs), environment.get('PATH', '')])
+    search = os.pathsep.join([*map(str, runtime_dirs), environment.get('PATH', '')])
+    environment['PATH'] = search
+    # Windows finds a probe's libraries through PATH; Linux and macOS use a
+    # variable of their own. Setting only PATH would find nothing on either of
+    # them, and the probe would fail by loading no library at all.
+    environment[host.shared_library_variable()] = search
     environment.pop('GGML_CUDA_DISABLE_GRAPHS', None)
     environment['NVIDIA_TF32_OVERRIDE'] = '0'
     return environment
 
 
-class _Memory(ctypes.Structure):
-    _fields_ = [('length', ctypes.c_uint32), ('load', ctypes.c_uint32)] + [
-        (name, ctypes.c_uint64) for name in (
-            'total', 'available', 'page_total', 'page_available',
-            'virtual_total', 'virtual_available', 'ext')]
-
-
 def available():
-    state = _Memory()
-    state.length = ctypes.sizeof(state)
-    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(state)):
-        raise OSError('GlobalMemoryStatusEx failed')
-    return state.available
+    """Bytes an allocating process can still get, asked of the host in its own terms."""
+    return host.available_memory_bytes()

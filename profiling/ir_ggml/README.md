@@ -96,7 +96,40 @@ declared a different band and its readings are not compared.
 Environment: `IR_RUNNER`, `IR_DLL_DIR`, `IR_RESULTS` (default `results/`, gitignored).
 The instantiator reads `IR_CASES` and `IR_PRICES` (defaults `cases-es/` and `prices/`).
 
-## 5. The other corpus generator
+## 5. A decode chain whose KV grows
+
+`instantiate.py` already gives multi-round decode its physical history: with
+`--decode-history chain` (the default) round `r` of a request that prefilled `T` tokens is
+priced and executed at `visible_history = T + r`. The frozen table prices decode at
+`visible_history` 0/128/512/1024 and nowhere else, so the second round of a chain files
+`no_price_at`. `expand_decode.py` puts the rounds in, `growth_prices.py` measures the
+depths they visit, and `growth_report.py` reads the result per round:
+
+```bash
+python profiling/ir_ggml/expand_decode.py --corpus cases-es --out /tmp/cases-r8 --rounds 8
+python profiling/ir_ggml/growth_prices.py suite --model qwen3-0.6b --tokens 64 --rounds 8 --out /tmp/g
+python profiling/run_dense_layer_measurements.py --suite /tmp/g/cpu-qwen3-0.6b-t64.json \
+    --process-scope per_suite --output /tmp/g/run ...             # one process for the window
+python profiling/ir_ggml/growth_prices.py export --model qwen3-0.6b --tokens 64 --rounds 8 \
+    --cpu-run /tmp/g/run --out /tmp/g/prices.json
+python profiling/ir_ggml/instantiate.py --model qwen3-0.6b --tokens 64 --cases /tmp/cases-r8 --out /tmp/i
+python profiling/ir_ggml/run.py --model qwen3-0.6b --tokens 64 --cases-dir /tmp/i --prices /tmp/g/prices.json
+python profiling/ir_ggml/growth_report.py --result results/a1a2-qwen3-0.6b-t64.json --prices /tmp/g/prices.json
+```
+
+Three rules are enforced by the tools rather than left to the caller: the tranche
+**extends the depth axis only** (a `(kind, phase)` the frozen table priced nowhere is
+refused, because pricing it would give this campaign a placement the corpus lacks), each
+cell is held to **its own device's cv rule** (CPU carries an unstable cell only under
+`--allow-unstable` and with the export's flag; the accelerator refuses it), and a depth is
+**either measured or absent** (nothing is interpolated or borrowed from a neighbouring
+depth). `PREREG-growth-decode.md` fixes the gates before the run, and records what one
+model produced.
+
+The report reads A1 per round, so a window covered at seven depths and missing the eighth
+shows up as one round outside the rule rather than an acceptable aggregate.
+
+## 6. The other corpus generator
 
 `corpus_v4.py` generates an **edge-heterogeneous** corpus from its own axes — a block
 stack of `D` layers with the first `g` pinned on the accelerator, which the 1-layer,

@@ -20,6 +20,18 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 PINNED_ROUTER_SHA256 = "65389d299a774b8a777ac07b1a6558a46322638b3f99d337452d3f6f3d0cd50b"
+# What the same requirement runs into on a Mac, read out of the pinned tree rather than
+# measured here. `ggml_metal_op_mul_mat` sends an F32 matmul with more than 8 columns
+# (`ne11_mm_min`) to `kernel_mul_mm_f32_f32`, which is instantiated with `half` operand
+# tiles and `simdgroup_half8x8` fragments (`dequantize_f32` writes `half` into threadgroup
+# memory), so both multiplicands are rounded to fp16 before the multiply; a one-token
+# decode takes `kernel_mul_mv_f32_f32`, `<float, float>`, and is already exact. A
+# strict-F32 route on Metal is therefore a new fp32-fragment matmul kernel plus a dispatch
+# switch, not this one-line patch -- and no Mac has run either here.
+METAL_STRICT_F32_KERNELS = (
+    "ggml-metal sends an F32 matmul with more than 8 columns to kernel_mul_mm_f32_f32, "
+    "whose operand tiles are `half` (fp16 rounding before the multiply), while a "
+    "one-token decode already takes kernel_mul_mv_f32_f32 and is exact")
 PATCH_OLD = """    bool use_mul_mat_f     = !ggml_is_quantized(src0->type)
         && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32;"""
 PATCH_NEW = """    // Strict F32 requests must bypass MMF's explicit TF32 MMA instructions.

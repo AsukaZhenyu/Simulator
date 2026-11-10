@@ -136,6 +136,55 @@ class DenseBoundary(unittest.TestCase):
             native_arguments(case(threads=2), 2, 5, 17, evict_bytes=-1)
 
 
+class DenseAttentionBias(unittest.TestCase):
+    """A stored projection bias is a different graph, so it is a declared property."""
+
+    def biased(self):
+        raw = config()
+        raw["attention_bias"] = True
+        raw["weight_dtypes"].update(q_bias="f32", k_bias="f32", v_bias="f32")
+        return raw
+
+    def test_bias_roles_are_one_row_per_output_channel(self):
+        shapes = weight_shapes(self.biased())
+        self.assertEqual(shapes["q_bias"], (16,))
+        self.assertEqual(shapes["k_bias"], (8,))
+        self.assertEqual(shapes["v_bias"], (8,))
+        self.assertNotIn("q_bias", weight_shapes(config()))
+
+    def test_the_stage_must_declare_the_bias_it_reads(self):
+        raw = self.biased()
+        self.assertEqual(set(stage_weight_roles(raw, "projection")) - set(stage_weight_roles(config(), "projection")),
+                         {"q_bias", "k_bias", "v_bias"})
+        raw["weight_dtypes"].pop("k_bias")
+        with self.assertRaisesRegex(InvalidInput, "k_bias"):
+            validate_case(dict(id="b", kind="projection", phase="decode", batch=1, tokens=1,
+                               visible_history=0, config=raw))
+
+    def test_declaring_false_is_the_unbiased_graph(self):
+        raw = config(); raw["attention_bias"] = False
+        self.assertEqual(validate_config(raw), validate_config(config()))
+        raw["attention_bias"] = 1
+        with self.assertRaisesRegex(InvalidInput, "boolean"):
+            validate_config(raw)
+
+    def test_the_bias_adds_operations_and_a_native_flag(self):
+        checked = self.biased()
+        self.assertIn("Q_bias_add", operations(checked, "projection"))
+        self.assertNotIn("Q_bias_add", operations(config(), "projection"))
+        self.assertNotIn("Q_bias_add", operations(checked, "attention"))
+        command = native_arguments(case(threads=2, config=checked), 2, 5, 17)
+        self.assertIn("--attention-bias", command)
+        self.assertNotIn("--attention-bias", native_arguments(case(threads=2), 2, 5, 17))
+
+    def test_the_signature_separates_biased_from_unbiased(self):
+        one = signature(self.biased(), "projection", "decode", 1, 0, 2)
+        self.assertNotEqual(one, signature(config(), "projection", "decode", 1, 0, 2))
+        self.assertIn("Q_bias_add", one["operations"])
+        resident = resident_accounting(self.biased(), "projection", 1, 0)
+        self.assertEqual(resident["weight_roles_bytes"]["q_bias"], 16 * 4)
+
+
 class DenseContract(unittest.TestCase):
     def test_matrix_rows_and_norm_vectors_follow_declared_geometry(self):
         actual = weight_shapes(config(hidden=13))

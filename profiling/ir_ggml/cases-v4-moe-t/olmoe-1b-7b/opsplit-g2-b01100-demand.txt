@@ -1,0 +1,58 @@
+case opsplit-g2-b01100-demand
+model olmoe-1b-7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 64
+top_k 8
+geometry_hidden 2048
+geometry_intermediate 1024
+geometry_heads 16
+geometry_kv_heads 16
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-05
+geometry_qk_norm rms_hidden
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1 
+node 3 copy pcie 2 bytes=524288,dir=cpu>gpu,tensor=g:request0-prefill-layer0:op:layer0:request0:attn
+node 4 copy pcie 3 bytes=524288,dir=cpu>gpu,tensor=w:layer0:W_router
+node 5 router gpu 3,4 
+node 6 copy pcie 3,5 bytes=261095424,dir=cpu>gpu,tensor=w:layer0:E0
+node 7 expert gpu 3,5,6 
+node 8 copy pcie 7 bytes=524288,dir=gpu>cpu,tensor=g:request0-prefill-layer0:op:layer0:__moe_batch__:expert.0
+node 9 copy pcie 5 bytes=16384,dir=gpu>cpu,tensor=g:request0-prefill-layer0:op:layer0:request0:router
+node 10 combine cpu 8,2,9 
+node 11 proj cpu 10,0 
+node 12 attn cpu 11 
+node 13 copy pcie 12 bytes=524288,dir=cpu>gpu,tensor=g:request0-prefill-layer1:op:layer1:request0:attn
+node 14 copy pcie 13 bytes=524288,dir=cpu>gpu,tensor=w:layer1:W_router
+node 15 router gpu 13,14 
+node 16 copy pcie 13,15 bytes=261095424,dir=cpu>gpu,tensor=w:layer1:E0
+node 17 expert gpu 13,15,16 
+node 18 copy pcie 17 bytes=524288,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:__moe_batch__:expert.0
+node 19 copy pcie 15 bytes=16384,dir=gpu>cpu,tensor=g:request0-prefill-layer1:op:layer1:request0:router
+node 20 combine cpu 18,12,19 
+node 21 proj cpu 20,0 
+node 22 attn cpu 21 
+node 23 router cpu 22 
+node 24 expert cpu 22,23 
+node 25 combine cpu 24,22,23 
+node 26 proj cpu 25,0 
+node 27 attn cpu 26 
+node 28 router cpu 27 
+node 29 expert cpu 27,28 
+node 30 combine cpu 29,27,28 

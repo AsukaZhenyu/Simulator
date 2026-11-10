@@ -1,0 +1,74 @@
+case mixed-longshort-g0
+model qwen1.5-moe-a2.7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+request_tokens 16,256
+gpu 1
+experts 60
+top_k 4
+geometry_hidden 2048
+geometry_intermediate 1408
+geometry_heads 16
+geometry_kv_heads 16
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 1000000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q8_0
+dtype_kv f16
+shared 5632
+dtype_gate_shexp q4_k
+dtype_up_shexp q4_k
+dtype_down_shexp q6_k
+node 0 arrival cpu - 
+node 1 proj cpu 0 t=16,h=0
+node 2 attn cpu 1 t=16,h=0
+node 3 router cpu 2 t=16,h=0
+node 4 expert cpu 2,3 t=16,h=0
+node 5 combine cpu 4,2,3 t=16,h=0
+node 6 proj cpu 5,0 t=16,h=0
+node 7 attn cpu 6 t=16,h=0
+node 8 router cpu 7 t=16,h=0
+node 9 expert cpu 7,8 t=16,h=0
+node 10 combine cpu 9,7,8 t=16,h=0
+node 11 proj cpu 10,0 t=16,h=0
+node 12 attn cpu 11 t=16,h=0
+node 13 router cpu 12 t=16,h=0
+node 14 expert cpu 12,13 t=16,h=0
+node 15 combine cpu 14,12,13 t=16,h=0
+node 16 proj cpu 15,0 t=16,h=0
+node 17 attn cpu 16 t=16,h=0
+node 18 router cpu 17 t=16,h=0
+node 19 expert cpu 17,18 t=16,h=0
+node 20 combine cpu 19,17,18 t=16,h=0
+node 21 arrival cpu - 
+node 22 proj cpu 21 t=256,h=0
+node 23 attn cpu 22 t=256,h=0
+node 24 router cpu 23 t=256,h=0
+node 25 expert cpu 23,24 t=256,h=0
+node 26 combine cpu 25,23,24 t=256,h=0
+node 27 proj cpu 26,21 t=256,h=0
+node 28 attn cpu 27 t=256,h=0
+node 29 router cpu 28 t=256,h=0
+node 30 expert cpu 28,29 t=256,h=0
+node 31 combine cpu 30,28,29 t=256,h=0
+node 32 proj cpu 31,21 t=256,h=0
+node 33 attn cpu 32 t=256,h=0
+node 34 router cpu 33 t=256,h=0
+node 35 expert cpu 33,34 t=256,h=0
+node 36 combine cpu 35,33,34 t=256,h=0
+node 37 proj cpu 36,21 t=256,h=0
+node 38 attn cpu 37 t=256,h=0
+node 39 router cpu 38 t=256,h=0
+node 40 expert cpu 38,39 t=256,h=0
+node 41 combine cpu 40,38,39 t=256,h=0

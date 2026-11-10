@@ -40,6 +40,18 @@ def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def receipt(path):return dict(path=str(Path(path).resolve()),sha256=sha(path),bytes=Path(path).stat().st_size)
 def write(path,value):
     with Path(path).open('x',encoding='utf-8',newline='\n') as f:json.dump(value,f,ensure_ascii=False,allow_nan=False,indent=2);f.write('\n')
+# The two inline accessors the observer reads from the internal context. They are
+# named here, not inline in `prepare`, so a second build path (the Linux chain)
+# inserts the same bytes instead of a second transcription of them.
+CONTEXT_NEEDLE='    uint32_t graph_max_nodes(uint32_t n_tokens) const;'
+CONTEXT_METHODS='''    // Private read-only inline accessors; no field/layout/runtime changes.
+    llm_graph_result * simulator_tap_graph_result() const { return gf_res_prev.get(); }
+    ggml_backend_sched_t simulator_tap_scheduler() const { return sched.get(); }
+'''
+def private_context_header(text):
+    """`llama-context.h` with the two accessors added, or a refusal."""
+    if text.count(CONTEXT_NEEDLE)!=1:raise ValueError('pinned internal context accessor anchor differs')
+    return text.replace(CONTEXT_NEEDLE,CONTEXT_METHODS+CONTEXT_NEEDLE)
 def patched_cpu(source):
     if source.count(ANCHOR)!=1:raise ValueError('pinned CPU dispatch anchor differs')
     marker='// ggml_compute_forward_mul_mat_id\n'
@@ -56,13 +68,8 @@ def prepare(out,llama_root,native_dir=None):
     (out/'cpu-consumer-tap.patch').write_text(''.join(difflib.unified_diff(text.splitlines(True),patched.splitlines(True),fromfile='original/ggml-cpu.c',tofile='private/ggml-cpu.c')),encoding='utf-8',newline='\n')
     for name in ('route_tap_api.h','route_tap_pod.hpp','route_context_inspect.hpp','real_moe_tap_probe.cpp'):
         shutil.copy2(native/name,out/'source'/name)
-    h=llama_root/'src/llama-context.h';ht=h.read_text(encoding='utf-8');needle='    uint32_t graph_max_nodes(uint32_t n_tokens) const;'
-    if ht.count(needle)!=1:raise ValueError('pinned internal context accessor anchor differs')
-    methods='''    // Private read-only inline accessors; no field/layout/runtime changes.
-    llm_graph_result * simulator_tap_graph_result() const { return gf_res_prev.get(); }
-    ggml_backend_sched_t simulator_tap_scheduler() const { return sched.get(); }
-'''
-    (out/'source/private_llama_context.h').write_text(ht.replace(needle,methods+needle),encoding='utf-8',newline='\n')
+    h=llama_root/'src/llama-context.h';ht=h.read_text(encoding='utf-8')
+    (out/'source/private_llama_context.h').write_text(private_context_header(ht),encoding='utf-8',newline='\n')
     objects=sorted((llama_root/'build/ggml/src/ggml-cpu.dir/Release').rglob('*.obj'))
     original_object=llama_root/'build/ggml/src/ggml-cpu.dir/Release/ggml-cpu/ggml-cpu.c.obj'
     if original_object not in objects:raise ValueError('matching original CPU object unavailable')

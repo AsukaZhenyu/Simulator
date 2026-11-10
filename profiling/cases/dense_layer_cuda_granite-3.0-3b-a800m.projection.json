@@ -1,0 +1,198 @@
+{
+ "gpu_granite-3.0-3b-a800m_attention_decode_q1_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_decode_q1_h128": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_decode_q1_h512": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_decode_q1_h1024": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_prefill_q16_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_prefill_q64_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_attention_prefill_q256_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_decode_q1_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_decode_q1_h128": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_decode_q1_h512": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_decode_q1_h1024": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_prefill_q16_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_prefill_q64_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ },
+ "gpu_granite-3.0-3b-a800m_projection_prefill_q256_h0": {
+  "dropped_keys": [
+   "experts",
+   "normalize_topk",
+   "shared_intermediate",
+   "top_k"
+  ],
+  "dropped_weight_roles": [
+   "down_exps",
+   "gate_exps",
+   "router",
+   "up_exps"
+  ]
+ }
+}

@@ -1,0 +1,199 @@
+case concurrency-n8-g0
+model qwen1.5-moe-a2.7b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 60
+top_k 4
+geometry_hidden 2048
+geometry_intermediate 1408
+geometry_heads 16
+geometry_kv_heads 16
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 1000000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q8_0
+dtype_kv f16
+shared 5632
+dtype_gate_shexp q4_k
+dtype_up_shexp q4_k
+dtype_down_shexp q6_k
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1 
+node 3 router cpu 2 
+node 4 expert cpu 2,3 
+node 5 combine cpu 4,2,3 
+node 6 proj cpu 5,0 
+node 7 attn cpu 6 
+node 8 router cpu 7 
+node 9 expert cpu 7,8 
+node 10 combine cpu 9,7,8 
+node 11 proj cpu 10,0 
+node 12 attn cpu 11 
+node 13 router cpu 12 
+node 14 expert cpu 12,13 
+node 15 combine cpu 14,12,13 
+node 16 proj cpu 15,0 
+node 17 attn cpu 16 
+node 18 router cpu 17 
+node 19 expert cpu 17,18 
+node 20 combine cpu 19,17,18 
+node 21 arrival cpu - 
+node 22 proj cpu 21 
+node 23 attn cpu 22 
+node 24 router cpu 23 
+node 25 expert cpu 23,24 
+node 26 combine cpu 25,23,24 
+node 27 proj cpu 26,21 
+node 28 attn cpu 27 
+node 29 router cpu 28 
+node 30 expert cpu 28,29 
+node 31 combine cpu 30,28,29 
+node 32 proj cpu 31,21 
+node 33 attn cpu 32 
+node 34 router cpu 33 
+node 35 expert cpu 33,34 
+node 36 combine cpu 35,33,34 
+node 37 proj cpu 36,21 
+node 38 attn cpu 37 
+node 39 router cpu 38 
+node 40 expert cpu 38,39 
+node 41 combine cpu 40,38,39 
+node 42 arrival cpu - 
+node 43 proj cpu 42 
+node 44 attn cpu 43 
+node 45 router cpu 44 
+node 46 expert cpu 44,45 
+node 47 combine cpu 46,44,45 
+node 48 proj cpu 47,42 
+node 49 attn cpu 48 
+node 50 router cpu 49 
+node 51 expert cpu 49,50 
+node 52 combine cpu 51,49,50 
+node 53 proj cpu 52,42 
+node 54 attn cpu 53 
+node 55 router cpu 54 
+node 56 expert cpu 54,55 
+node 57 combine cpu 56,54,55 
+node 58 proj cpu 57,42 
+node 59 attn cpu 58 
+node 60 router cpu 59 
+node 61 expert cpu 59,60 
+node 62 combine cpu 61,59,60 
+node 63 arrival cpu - 
+node 64 proj cpu 63 
+node 65 attn cpu 64 
+node 66 router cpu 65 
+node 67 expert cpu 65,66 
+node 68 combine cpu 67,65,66 
+node 69 proj cpu 68,63 
+node 70 attn cpu 69 
+node 71 router cpu 70 
+node 72 expert cpu 70,71 
+node 73 combine cpu 72,70,71 
+node 74 proj cpu 73,63 
+node 75 attn cpu 74 
+node 76 router cpu 75 
+node 77 expert cpu 75,76 
+node 78 combine cpu 77,75,76 
+node 79 proj cpu 78,63 
+node 80 attn cpu 79 
+node 81 router cpu 80 
+node 82 expert cpu 80,81 
+node 83 combine cpu 82,80,81 
+node 84 arrival cpu - 
+node 85 proj cpu 84 
+node 86 attn cpu 85 
+node 87 router cpu 86 
+node 88 expert cpu 86,87 
+node 89 combine cpu 88,86,87 
+node 90 proj cpu 89,84 
+node 91 attn cpu 90 
+node 92 router cpu 91 
+node 93 expert cpu 91,92 
+node 94 combine cpu 93,91,92 
+node 95 proj cpu 94,84 
+node 96 attn cpu 95 
+node 97 router cpu 96 
+node 98 expert cpu 96,97 
+node 99 combine cpu 98,96,97 
+node 100 proj cpu 99,84 
+node 101 attn cpu 100 
+node 102 router cpu 101 
+node 103 expert cpu 101,102 
+node 104 combine cpu 103,101,102 
+node 105 arrival cpu - 
+node 106 proj cpu 105 
+node 107 attn cpu 106 
+node 108 router cpu 107 
+node 109 expert cpu 107,108 
+node 110 combine cpu 109,107,108 
+node 111 proj cpu 110,105 
+node 112 attn cpu 111 
+node 113 router cpu 112 
+node 114 expert cpu 112,113 
+node 115 combine cpu 114,112,113 
+node 116 proj cpu 115,105 
+node 117 attn cpu 116 
+node 118 router cpu 117 
+node 119 expert cpu 117,118 
+node 120 combine cpu 119,117,118 
+node 121 proj cpu 120,105 
+node 122 attn cpu 121 
+node 123 router cpu 122 
+node 124 expert cpu 122,123 
+node 125 combine cpu 124,122,123 
+node 126 arrival cpu - 
+node 127 proj cpu 126 
+node 128 attn cpu 127 
+node 129 router cpu 128 
+node 130 expert cpu 128,129 
+node 131 combine cpu 130,128,129 
+node 132 proj cpu 131,126 
+node 133 attn cpu 132 
+node 134 router cpu 133 
+node 135 expert cpu 133,134 
+node 136 combine cpu 135,133,134 
+node 137 proj cpu 136,126 
+node 138 attn cpu 137 
+node 139 router cpu 138 
+node 140 expert cpu 138,139 
+node 141 combine cpu 140,138,139 
+node 142 proj cpu 141,126 
+node 143 attn cpu 142 
+node 144 router cpu 143 
+node 145 expert cpu 143,144 
+node 146 combine cpu 145,143,144 
+node 147 arrival cpu - 
+node 148 proj cpu 147 
+node 149 attn cpu 148 
+node 150 router cpu 149 
+node 151 expert cpu 149,150 
+node 152 combine cpu 151,149,150 
+node 153 proj cpu 152,147 
+node 154 attn cpu 153 
+node 155 router cpu 154 
+node 156 expert cpu 154,155 
+node 157 combine cpu 156,154,155 
+node 158 proj cpu 157,147 
+node 159 attn cpu 158 
+node 160 router cpu 159 
+node 161 expert cpu 159,160 
+node 162 combine cpu 161,159,160 
+node 163 proj cpu 162,147 
+node 164 attn cpu 163 
+node 165 router cpu 164 
+node 166 expert cpu 164,165 
+node 167 combine cpu 166,164,165 

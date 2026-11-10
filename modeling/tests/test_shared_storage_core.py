@@ -247,5 +247,30 @@ class SharedPoolKeepsTheDiskItself(unittest.TestCase):
         self.assertEqual(used_bytes(value, state, "ssd"), 32)
 
 
+class MemoryModeTests(unittest.TestCase):
+    """The one word that decides whether the accelerator shares the host's memory.
+
+    It is not decoration: `shared` adds SHARE to the action space and makes the
+    pool ledger one number instead of two. A value the parser merely accepted as
+    a string would be read as `separate`, so a typo would run a whole campaign on
+    a UMA machine with discrete-memory semantics and report nothing.
+    """
+
+    def test_a_misspelt_memory_mode_is_refused_and_named(self):
+        workload, document = documents()
+        for wrong in ("Shared", "uma", "unified", "shared "):
+            document["architecture"]["memory_mode"] = wrong
+            with self.assertRaises(InvalidInput) as raised:
+                build_scenario(deepcopy(workload), deepcopy(document))
+            self.assertIn("memory_mode", str(raised.exception))
+            self.assertIn("separate", str(raised.exception))
+
+    def test_the_two_modes_are_accepted(self):
+        for mode in ("shared", "separate"):
+            workload, document = documents(mode=mode)
+            document["architecture"]["memory_mode"] = mode
+            build_scenario(workload, document)
+
+
 if __name__ == "__main__":
     unittest.main()

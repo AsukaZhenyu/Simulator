@@ -10,7 +10,7 @@ import copy
 import unittest
 
 from profiling.multimodel import suite
-from llm_infer_model.m2 import dense_contract, moe_contract
+from llm_infer_model.m2 import dense_contract, moe_contract, moe_cuda_contract
 from llm_infer_model.tensor.spec import InvalidInput, Unsupported, ggml_contiguous_layout
 import contracts
 
@@ -294,6 +294,124 @@ class TheContractDispatchCannotSilentlyPickDense(unittest.TestCase):
         self.assertIs(contracts.for_layer(dense), dense_contract)
         with self.assertRaisesRegex(ValueError, "unknown block contract"):
             contracts.for_contract("something-else")
+
+
+class TheCUDAEnvelopeChangesOnlyTheDevice(unittest.TestCase):
+    """The accelerator envelope must not restate the block, only where it ran."""
+
+    def plan(self, **case):
+        raw = {"id": "c", "kind": "moe_ffn", "phase": "decode", "batch": 1, "tokens": 1,
+               "visible_history": 0, "config": config()}
+        raw.update(case)
+        return moe_cuda_contract.build_plan(
+            {"schema_version": moe_contract.SUITE_SCHEMA, "cases": [raw]}, 0,
+            kv_dtype="f16")
+
+    def test_the_variant_names_the_stage_and_the_cache_type(self):
+        self.assertEqual(moe_cuda_contract.variant("moe_ffn", "f16"),
+                         "ggml_cuda_moe_materialized_moe_ffn_v2")
+        self.assertEqual(moe_cuda_contract.variant("projection", "f32"),
+                         "ggml_cuda_moe_materialized_projection_v1")
+        with self.assertRaises(Unsupported):
+            moe_cuda_contract.variant("moe_ffn", "bf16")
+
+    def test_the_signature_moves_the_process_fields_and_nothing_else(self):
+        cfg = config()
+        cpu = moe_contract.signature(cfg, "moe_ffn", "decode", 1, 0, threads=1)
+        gpu = moe_cuda_contract.signature(cfg, "moe_ffn", "decode", 1, 0, cuda_device=0,
+                                          kv_dtype="f16")
+        self.assertEqual(gpu["contract"], moe_cuda_contract.CONTRACT)
+        self.assertEqual((gpu["device"], gpu["backend"]), ("gpu", "CUDA0"))
+        self.assertEqual(gpu["timing_scope"], "single_completed_cuda_graph_wall_ns")
+        self.assertEqual(gpu["implementation_variant"],
+                         "ggml_cuda_moe_materialized_moe_ffn_v2")
+        for field in ("threads_requested", "threads_applied", "thread_management"):
+            self.assertNotIn(field, gpu)
+        for field in ("config", "operations", "scope", "tokens", "visible_history",
+                      "activation_dtype", "position_dtype", "excluded_operations"):
+            self.assertEqual(gpu[field], cpu[field], field)
+
+    def test_the_cache_type_is_part_of_the_price_identity(self):
+        cfg = config()
+        f32 = moe_cuda_contract.signature(cfg, "moe_ffn", "decode", 1, 0, cuda_device=0,
+                                          kv_dtype="f32")
+        f16 = moe_cuda_contract.signature(cfg, "moe_ffn", "decode", 1, 0, cuda_device=0,
+                                          kv_dtype="f16")
+        self.assertNotEqual(f32, f16)
+
+    def test_an_enabled_graph_is_refused_rather_than_timed(self):
+        with self.assertRaises(Unsupported):
+            moe_cuda_contract.signature(config(), "moe_ffn", "decode", 1, 0, cuda_device=0,
+                                        cuda_graphs="enabled")
+        with self.assertRaises(Unsupported):
+            moe_cuda_contract.build_plan(
+                {"schema_version": moe_contract.SUITE_SCHEMA, "cases": []}, 0,
+                cuda_graphs="enabled")
+
+    def test_a_cuda_case_carries_no_cpu_thread_parameter(self):
+        with self.assertRaises(Unsupported):
+            moe_cuda_contract.build_plan({"schema_version": moe_contract.SUITE_SCHEMA, "cases": [
+                {"id": "c", "kind": "moe_ffn", "phase": "decode", "batch": 1, "tokens": 1,
+                 "visible_history": 0, "config": config(), "threads": 2}]}, 0)
+
+    def test_the_build_plan_declares_the_device_and_refuses_a_disagreeing_case(self):
+        case = self.plan()[0]
+        self.assertEqual((case["cuda_device"], case["cuda_graphs"], case["kv_dtype"]),
+                         (0, "disabled", "f16"))
+        with self.assertRaisesRegex(InvalidInput, "CUDA device"):
+            moe_cuda_contract.build_plan({"schema_version": moe_contract.SUITE_SCHEMA, "cases": [
+                {"id": "c", "kind": "moe_ffn", "phase": "decode", "batch": 1, "tokens": 1,
+                 "visible_history": 0, "config": config(), "cuda_device": 1}]}, 0)
+        with self.assertRaisesRegex(InvalidInput, "schema_version"):
+            moe_cuda_contract.build_plan({"schema_version": dense_contract.SUITE_SCHEMA,
+                                          "cases": []}, 0)
+
+    def test_the_native_command_is_the_cpu_graph_on_the_accelerator(self):
+        case = self.plan(kind="moe_ffn")[0]
+        arguments = moe_cuda_contract.native_arguments(case, 1, 3, 7)
+        self.assertNotIn("--threads", arguments)
+        for flag, value in (("--cuda-device", "0"), ("--cuda-graphs", "disabled"),
+                            ("--kv-dtype", "f16"), ("--experts", "4"), ("--top-k", "2")):
+            self.assertEqual(arguments[arguments.index(flag) + 1], value, flag)
+        math_case = {key: value for key, value in case.items()
+                     if key not in ("cuda_device", "cuda_graphs", "kv_dtype")}
+        cpu = moe_contract.native_arguments({**math_case, "threads": 1}, 1, 3, 7)
+
+        def without(arguments, flags):
+            kept, index = [], 0
+            while index < len(arguments):
+                if arguments[index] in flags:
+                    index += 2
+                    continue
+                kept.append(arguments[index])
+                index += 1
+            return kept
+
+        self.assertEqual(
+            sorted(without(arguments, {"--cuda-device", "--cuda-graphs", "--kv-dtype"})),
+            sorted(without(cpu, {"--threads", "--kv-dtype"})))
+
+    def test_a_biased_sparse_model_passes_its_bias_types(self):
+        case = self.plan(kind="projection", config=config(attention_bias=True))[0]
+        arguments = moe_cuda_contract.native_arguments(case, 1, 3, 7)
+        for flag in ("--q-bias-dtype", "--k-bias-dtype", "--v-bias-dtype"):
+            self.assertEqual(arguments[arguments.index(flag) + 1], "f32", flag)
+
+    def test_the_cache_element_type_reaches_the_accounting(self):
+        cfg = config(heads=2, kv_heads=1, head_dim=4)
+        f16 = moe_cuda_contract.resident_accounting(cfg, "attention", 1, 32, kv_dtype="f16")
+        f32 = moe_cuda_contract.resident_accounting(cfg, "attention", 1, 32, kv_dtype="f32")
+        per_token = 2 * cfg["kv_heads"] * cfg["head_dim"]
+        self.assertEqual(f32["kv_cache_bytes"] - f16["kv_cache_bytes"],
+                         33 * per_token * 2)
+        sparse = moe_cuda_contract.resident_accounting(cfg, "moe_ffn", 1, 32, kv_dtype="f16")
+        self.assertEqual(sparse["kv_cache_bytes"], 0)
+
+    def test_the_sparse_stage_declares_one_materialized_input_and_output(self):
+        inputs, outputs = moe_cuda_contract.ports(config(), "moe_ffn", 4)
+        self.assertEqual(list(inputs), ["attention_hidden"])
+        self.assertEqual(list(outputs), ["hidden_out"])
+        self.assertNotIn("key_cache", outputs)
 
 
 if __name__ == "__main__":

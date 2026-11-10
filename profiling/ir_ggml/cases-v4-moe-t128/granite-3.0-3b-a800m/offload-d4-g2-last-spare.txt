@@ -1,0 +1,64 @@
+case offload-d4-g2-last-spare
+model granite-3.0-3b-a800m
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+gpu 1
+experts 40
+top_k 8
+geometry_hidden 1536
+geometry_intermediate 512
+geometry_heads 24
+geometry_kv_heads 8
+geometry_head_dim 64
+geometry_rope_dims 64
+geometry_rope_base 10000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm none
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj cpu 0 
+node 2 attn cpu 1 
+node 3 router cpu 2 
+node 4 expert cpu 2,3 
+node 5 combine cpu 4,2,3 
+node 6 proj cpu 5,0 
+node 7 attn cpu 6 
+node 8 router cpu 7 
+node 9 expert cpu 7,8 
+node 10 combine cpu 9,7,8 
+node 11 copy pcie 10 bytes=393216,dir=cpu>gpu,tensor=g:request0-prefill-layer1:op:layer1:request0:combine
+node 12 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 13 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer2:W_input_norm
+node 14 copy pcie - bytes=1327104,dir=cpu>gpu,tensor=w:layer2:W_q
+node 15 copy pcie - bytes=442368,dir=cpu>gpu,tensor=w:layer2:W_k
+node 16 copy pcie - bytes=645120,dir=cpu>gpu,tensor=w:layer2:W_v
+node 17 proj gpu 11,12,13,14,15,16 
+node 18 attn gpu 17 
+node 19 copy pcie - bytes=245760,dir=cpu>gpu,tensor=w:layer2:W_router
+node 20 router gpu 18,19 
+node 21 copy pcie - bytes=61194240,dir=cpu>gpu,tensor=w:layer2:E0
+node 22 expert gpu 18,20,21 
+node 23 combine gpu 22,18,20 
+node 24 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0:request_arrival
+node 25 copy pcie - bytes=6144,dir=cpu>gpu,tensor=w:layer3:W_input_norm
+node 26 copy pcie - bytes=1327104,dir=cpu>gpu,tensor=w:layer3:W_q
+node 27 copy pcie - bytes=442368,dir=cpu>gpu,tensor=w:layer3:W_k
+node 28 copy pcie - bytes=645120,dir=cpu>gpu,tensor=w:layer3:W_v
+node 29 proj gpu 23,24,25,26,27,28 
+node 30 attn gpu 29 
+node 31 copy pcie - bytes=245760,dir=cpu>gpu,tensor=w:layer3:W_router
+node 32 router gpu 30,31 
+node 33 copy pcie - bytes=61194240,dir=cpu>gpu,tensor=w:layer3:E0
+node 34 expert gpu 30,32,33 
+node 35 combine gpu 34,30,32 
+node 36 copy pcie 35 bytes=393216,dir=gpu>cpu,tensor=g:request0-prefill-layer3:op:layer3:request0:combine

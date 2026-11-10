@@ -1,0 +1,50 @@
+case pd-transfer_constrained-013-demand
+model qwen3-4b
+threads 2
+cpu_mask 2,4
+tokens 64
+history 0
+decode_history 128
+gpu 1
+experts 0
+top_k 0
+geometry_hidden 2560
+geometry_intermediate 9728
+geometry_heads 32
+geometry_kv_heads 8
+geometry_head_dim 128
+geometry_rope_dims 128
+geometry_rope_base 1000000.0
+geometry_norm_eps 1e-06
+geometry_qk_norm rms
+geometry_attention_gate none
+dtype_q q4_k
+dtype_k q4_k
+dtype_v q6_k
+dtype_o q4_k
+dtype_gate q4_k
+dtype_up q4_k
+dtype_down q6_k
+dtype_kv f16
+node 0 arrival cpu - 
+node 1 proj gpu 12,13,8,10,9,11 
+node 2 attn gpu 12,14,1 
+node 3 ffn cpu 15 
+node 4 arrival cpu 16,3 
+node 5 proj gpu 17,18,8,10,9,11 t=1,h=128
+node 6 attn cpu 20,19,21,16,4 t=1,h=128
+node 7 ffn cpu 6 t=1,h=128
+node 8 copy pcie - bytes=10240,dir=cpu>gpu,tensor=w:layer0:W_input_norm
+node 9 copy pcie - bytes=5898240,dir=cpu>gpu,tensor=w:layer0:W_q
+node 10 copy pcie - bytes=1474560,dir=cpu>gpu,tensor=w:layer0:W_k
+node 11 copy pcie - bytes=2150400,dir=cpu>gpu,tensor=w:layer0:W_v
+node 12 copy pcie 0 bytes=655360,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:in.hidden
+node 13 copy pcie 0 bytes=256,dir=cpu>gpu,tensor=g:request0-prefill-layer0:t:layer0:request0:in.positions
+node 14 copy pcie 1,0 bytes=5898240,dir=cpu>gpu,tensor=w:layer0:W_output
+node 15 copy pcie 2 bytes=655360,dir=gpu>cpu,tensor=g:request0-prefill-layer0:t:layer0:request0:attn
+node 16 copy pcie 2 bytes=256,dir=gpu>cpu,tensor=kv:layer0:request0:0
+node 17 copy pcie 4 bytes=10240,dir=cpu>gpu,tensor=g:request0-decode0-layer0:t:layer0:request0:in.hidden,t=1,h=128
+node 18 copy pcie 4 bytes=4,dir=cpu>gpu,tensor=g:request0-decode0-layer0:t:layer0:request0:in.positions,t=1,h=128
+node 19 copy pcie 5,2,4 bytes=16384,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.q,t=1,h=128
+node 20 copy pcie 5,2,4 bytes=4096,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.k,t=1,h=128
+node 21 copy pcie 5,2,4 bytes=4096,dir=gpu>cpu,tensor=g:request0-decode0-layer0:t:layer0:request0:proj.v,t=1,h=128

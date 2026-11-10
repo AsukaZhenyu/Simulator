@@ -28,6 +28,32 @@ def write_once_json(path, value):
         stream.write("\n")
 
 
+# The provenance sentence of the 2026 cohort, verbatim. It names the machine the
+# frozen numbers came from, so it is only true where that build is the one being
+# reported. `native_reproducibility` runs immediately before this report and
+# records which compiler the campaign actually used; a run on another device
+# gets a sentence about *its* build instead of inheriting this one.
+ARCHIVED_NATIVE_BUILD = (
+    "Native build: MSVC 19.44.35217.0/v143, Release/MaxSpeed, C++17, CUDA SDK 12.6.0, "
+    "NVCC 12.6.20, CUDA runtime 12.6.37, compute architecture 89.")
+
+
+def native_build(record):
+    """The sentence a report may claim, given what this campaign recorded."""
+    if record is None:
+        return ARCHIVED_NATIVE_BUILD
+    version = record.get("compiler_version")
+    if version is not None and str(version) in ARCHIVED_NATIVE_BUILD:
+        return ARCHIVED_NATIVE_BUILD
+    if version is None:
+        return ("Native build: the build manifest beside the probe records no compiler "
+                "version, so flags, CUDA SDK and compute architecture are not claimed.")
+    return ("Native build: %s %s, as the build manifest beside the probe records it; "
+            "optimization flags, CUDA SDK and compute architecture are not recorded "
+            "there and are not claimed here."
+            % (record.get("compiler") or "an unrecorded compiler", version))
+
+
 def quality_breakdown(summary):
     programs = summary["programs"]
     processes = [dict(workload=p["workload"], strategy=p["strategy"], **r)
@@ -70,6 +96,8 @@ def main():
     args = parser.parse_args()
     out = args.out.resolve()
     summary = read(out / "summary.json")
+    record = out / "native-reproducibility.json"
+    build = native_build(read(record) if record.is_file() else None)
     quality = quality_breakdown(summary)
     write_once_json(out / "quality-breakdown.json", quality)
     counts = summary["counts"]
@@ -167,8 +195,7 @@ def main():
         "are fixed backend contracts; copy coalescing was not evaluated. A finite priority-rule "
         "audit does not prove that such untested lower-level choices cannot alter strategy rankings.", "",
         "## Reproducibility and artifacts", "",
-        "Native build: MSVC 19.44.35217.0/v143, Release/MaxSpeed, C++17, CUDA SDK 12.6.0, "
-        "NVCC 12.6.20, CUDA runtime 12.6.37, compute architecture 89. The source asset is labelled "
+        build + " The source asset is labelled "
         "llama.cpp-b8705 but has no verified exact git revision (build-info says unknown). "
         "File hashes bind the supplied sources and binary. The private F32 router runtime reused "
         "Release objects and rebuilt one patched translation unit; it is not a clean GGML rebuild. "

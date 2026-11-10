@@ -195,6 +195,12 @@ def signature_cpu_ids(declared: Any, threads: int) -> list[int] | None:
 CONFIG_KEYS = {"hidden", "intermediate", "heads", "kv_heads", "head_dim",
                "attention_gate", "qk_norm", "rope_mode", "rope_dims", "rope_base",
                "norm_epsilon", "weight_dtypes"}
+# Some checkpoints store a bias on the query/key/value projections (Qwen2-MoE does). It is
+# a different graph from the unbiased one, so it is part of the config when declared. The
+# key is optional and a declared ``false`` normalizes to absent: both describe the same
+# graph and therefore keep one signature.
+OPTIONAL_KEYS = {"attention_bias"}
+BIAS_ROLES = ("q_bias", "k_bias", "v_bias")
 # Declared only by the two boundary stages. The two vocabulary-wide matrices are
 # declared separately because real checkpoints quantize them separately: a
 # Q4_K_M file stores the token embedding as q4_k and the LM head as q6_k.
@@ -235,6 +241,9 @@ def weight_shapes(config: Mapping[str, Any]) -> dict[str, tuple[int, ...]]:
         result.update(q_norm=(d,), k_norm=(d,))
     elif config["qk_norm"] == "rms_hidden":
         result.update(q_norm=(h,), k_norm=(h,))
+    # A projection bias is one row per output channel: it broadcasts over the token axis.
+    if config.get("attention_bias"):
+        result.update(q_bias=(q,), k_bias=(kv,), v_bias=(kv,))
     if "vocab" in config:
         result.update(final_norm=(h,), lm_head=(h, config["vocab"]),
                       token_embd=(h, config["vocab"]))
@@ -244,6 +253,8 @@ def weight_shapes(config: Mapping[str, Any]) -> dict[str, tuple[int, ...]]:
 def stage_weight_roles(config: Mapping[str, Any], kind: str) -> tuple[str, ...]:
     if kind == "projection":
         roles = ["input_norm", "q", "k", "v"]
+        if config.get("attention_bias"):
+            roles += list(BIAS_ROLES)
         if config["attention_gate"] == "sigmoid":
             roles.append("gate_proj")
         if config["qk_norm"] != "none":
@@ -263,7 +274,7 @@ def stage_weight_roles(config: Mapping[str, Any], kind: str) -> tuple[str, ...]:
 
 
 def validate_config(raw: Any) -> dict[str, Any]:
-    allowed = CONFIG_KEYS | WORD_KEYS
+    allowed = CONFIG_KEYS | WORD_KEYS | OPTIONAL_KEYS
     if not isinstance(raw, dict) or not (CONFIG_KEYS <= set(raw) <= allowed):
         raise InvalidInput(f"dense config must declare exactly {sorted(CONFIG_KEYS)}")
     word = WORD_KEYS & set(raw)
@@ -289,14 +300,41 @@ def validate_config(raw: Any) -> dict[str, Any]:
     if raw["rope_mode"] != "normal":
         raise Unsupported("this dense contract supports normal adjacent-pair RoPE only; no fallback")
     config["rope_mode"] = "normal"
+    if "attention_bias" in raw:
+        if not isinstance(raw["attention_bias"], bool):
+            raise InvalidInput("config.attention_bias must be a boolean")
+        # Absent and false describe the same graph; declaring true is what changes it.
+        if raw["attention_bias"]:
+            config["attention_bias"] = True
     config["rope_base"] = float32_parameter(raw["rope_base"], "config.rope_base", 1.0)
     config["norm_epsilon"] = float32_parameter(raw["norm_epsilon"], "config.norm_epsilon")
     shapes = weight_shapes(config)
     dtypes = raw["weight_dtypes"]
-    if not isinstance(dtypes, dict) or set(dtypes) != set(shapes):
-        raise InvalidInput(f"weight_dtypes must declare exactly {sorted(shapes)}")
+    # A case may declare only the roles its stages use.  This is what lets a model whose
+    # feed-forward is sparse -- and therefore has no dense gate/up/down at all -- still
+    # declare its projection and attention weights.  `validate_case` then requires the
+    # declared set to cover exactly the stage the case names, so a case cannot be measured
+    # while silently missing a weight its stage touches.
+    if not isinstance(dtypes, dict) or not dtypes or not set(dtypes) <= set(shapes):
+        raise InvalidInput(f"weight_dtypes must declare a nonempty subset of {sorted(shapes)}")
+    # The subset may only drop roles that a stage can choose not to run.  A role the config
+    # turns on -- the sigmoid gate, QK norm, the vocabulary matrices, the projection bias --
+    # is part of every graph that declares it, so it cannot be left undeclared.
+    implied = set()
+    if config["attention_gate"] == "sigmoid":
+        implied.add("gate_proj")
+    if config["qk_norm"] != "none":
+        implied |= {"q_norm", "k_norm"}
+    if config.get("attention_bias"):
+        implied |= set(BIAS_ROLES)
+    if word:
+        implied |= {"token_embd", "lm_head"}
+    if implied - set(dtypes):
+        raise InvalidInput(f"weight_dtypes omits {sorted(implied - set(dtypes))}, "
+                           f"which the declared config turns on")
     config["weight_dtypes"] = {}
-    for role, shape in shapes.items():
+    for role in dtypes:
+        shape = shapes[role]
         dtype = dtypes[role]
         if dtype not in ("f32", "f16", "q4_k", "q6_k"):
             raise InvalidInput(f"unsupported weight dtype for {role}: {dtype!r}")
@@ -338,6 +376,12 @@ def validate_case(raw: Any) -> dict[str, Any]:
             raise InvalidInput("embedding/head cases must declare config.vocab and config.word_dtype")
     elif "vocab" in result["config"]:
         raise InvalidInput("decoder-block stages must not declare config.vocab")
+    # The declared subset must cover the stage the case names: a case that lacks one of
+    # its own weights would otherwise measure a different graph under this stage's name.
+    needed = set(stage_weight_roles(result["config"], raw["kind"]))
+    missing = needed - set(result["config"]["weight_dtypes"])
+    if missing:
+        raise InvalidInput(f"{raw['kind']} case declares no weight dtype for {sorted(missing)}")
     if "threads" in raw:
         result["threads"] = integer(raw["threads"], "case.threads")
     for key in ("comment", "source"):
@@ -371,6 +415,8 @@ def build_plan(suite: Any, threads: int) -> list[dict[str, Any]]:
 def operations(config: Mapping[str, Any], kind: str) -> list[str]:
     if kind == "projection":
         result = ["input_RMSNorm", "input_norm_scale", "Q_projection", "K_projection", "V_projection"]
+        if config.get("attention_bias"):
+            result += ["Q_bias_add", "K_bias_add", "V_bias_add"]
         if config["attention_gate"] == "sigmoid":
             result += ["gate_projection"]
         if config["qk_norm"] == "rms":
@@ -524,8 +570,11 @@ def native_arguments(case: dict[str, Any], warmup: int, samples: int, seed: int,
                       ("rope_mode", "rope-mode"), ("rope_dims", "rope-dims"),
                       ("rope_base", "rope-base"), ("norm_epsilon", "norm-eps")):
         args += ["--"+flag, str(config[key])]
+    if config.get("attention_bias"):
+        args += ["--attention-bias", "1"]
     flags = {"q": "q-dtype", "k": "k-dtype", "v": "v-dtype", "gate_proj": "gate-proj-dtype",
-             "output": "o-dtype", "gate": "ffn-gate-dtype", "up": "up-dtype", "down": "down-dtype"}
+             "output": "o-dtype", "gate": "ffn-gate-dtype", "up": "up-dtype", "down": "down-dtype",
+             "q_bias": "q-bias-dtype", "k_bias": "k-bias-dtype", "v_bias": "v-bias-dtype"}
     for role, flag in flags.items():
         if role in config["weight_dtypes"]:
             args += ["--"+flag, config["weight_dtypes"][role]]

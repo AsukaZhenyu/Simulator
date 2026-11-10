@@ -22,7 +22,7 @@
 //
 // Case file (one directive per line, '#' starts a comment):
 //   case <name> | model <name> | threads <n> | tokens <n> | history <n>
-//   gpu <0|1> | experts <n> | top_k <n>
+//   gpu <0|1> | experts <n> | top_k <n> | shared <n>
 //   dtype_<role> <name>          # q k v o gate up down router kv
 //   node <idx> <op> <machine> <deps|-> <k=v,...>
 //
@@ -42,6 +42,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#include "gguf.h"
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"
 #endif
@@ -52,6 +53,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -77,9 +79,13 @@ static int64_t now_ns() {
 }
 
 struct Options {
-    std::string case_path, out_path, ssd_dir;
+    std::string case_path, out_path, ssd_dir, gguf_path, dump_dir;
+    int64_t x_token = -1;               // --x-token: seed the input row from a real embedding
     int replicas = 1, threads = 2, cuda_device = 0;
     bool empty_overhead = false, verbose = false, no_gpu = false;
+    bool copy_staging_only = false;   // regression instrument: the old, wrong copy path
+    std::string dump_weight;          // --dump-weight role:file -- dequantise one weight to F32
+    std::string dump_side = "last";   // --dump-side cpu|gpu -- read that copy of a port
 };
 
 // ---------------------------------------------------------------- case model
@@ -101,7 +107,7 @@ struct Node {
 struct Case {
     std::string name, model;
     int threads = 2, tokens = 1, history = 0, cuda_device = 0;
-    int64_t experts = 0, top_k = 0;
+    int64_t experts = 0, top_k = 0, shared = 0;
     bool gpu = true;
     std::vector<int> cpu_ids;          // strict placement, one per thread, as the tables used
     std::map<std::string, std::string> dtype;
@@ -142,6 +148,7 @@ static Case read_case(const std::string & path) {
         else if (d == "cpu_mask") for (auto & x : split(w[1], ',')) c.cpu_ids.push_back(std::stoi(x));
         else if (d == "experts") c.experts = std::stoll(w[1]);
         else if (d == "top_k") c.top_k = std::stoll(w[1]);
+        else if (d == "shared") c.shared = std::stoll(w[1]);
         else if (d == "vram_bytes") c.vram_bytes = std::stoll(w[1]);
         else if (d == "dram_bytes") c.dram_bytes = std::stoll(w[1]);
         else if (d == "ssd_bytes") c.ssd_bytes = std::stoll(w[1]);
@@ -179,6 +186,11 @@ struct Geometry {
     std::string qk_norm = "rms", attention_gate = "none", key_cache_layout = "head_major";
     int64_t q_dim() const { return heads * head_dim; }
     int64_t kv_dim() const { return kv_heads * head_dim; }
+    // Width of the Q/K norm gain.  `rms` normalizes each head on its own (one gain per
+    // head_dim); `rms_hidden` normalizes the whole projection before it is split into heads
+    // (one gain per hidden unit) -- that is what llama.cpp's olmoe/olmo2 builders do.
+    int64_t qk_norm_width() const { return qk_norm == "rms_hidden" ? hidden : head_dim; }
+    bool has_qk_norm() const { return qk_norm == "rms" || qk_norm == "rms_hidden"; }
 
     static ggml_type dtype_of(const std::string & n) {
         if (n.empty() || n == "f32") return GGML_TYPE_F32;
@@ -308,6 +320,19 @@ struct Session {
     ggml_context * weights_ctx = nullptr;
     ggml_backend_buffer_t weights_cpu_buf = nullptr, weights_gpu_buf = nullptr;
     std::map<std::string, ggml_tensor *> w_cpu, w_gpu;
+    // Provenance of the bytes behind `w_cpu`.  Empty when they are the deterministic
+    // pattern (the default, and what every published price was measured on); the file path
+    // when they are the model's own layer-0 tensors (`--gguf`).
+    std::string gguf_path;                  // --gguf; empty = every weight is the pattern
+    int64_t x_token = -1;                   // --x-token; -1 = the input row is the pattern
+    std::string weights_source, weights_pattern;
+    int64_t experts_in_file = 0, experts_loaded = 0;
+    bool x_real = false;                    // the input row is token N's embedding, not the pattern
+    int64_t weights_real_roles = 0, weights_bytes_real = 0;
+    // FNV-1a over every byte taken from the file, in role-name order.  Emitted so an
+    // independent reader of the same file can recompute it: "the times did not change" is
+    // consistent with loading nothing at all, and this is what separates the two.
+    uint64_t weights_fnv = 14695981039346656037ULL;
     // One port set per distinct (tokens, history).  Every graph writes its outputs with
     // `ggml_cpy`, whose destination must have exactly the source's shape, so a pd case --
     // a prefill round at t tokens and a decode round at t=1 against the prefill's KV --
@@ -316,6 +341,39 @@ struct Session {
     std::vector<std::pair<int64_t, int64_t>> shapes;   // in order of first use
     std::map<std::pair<int64_t, int64_t>, std::map<std::string, Port>> ports;
     std::map<std::pair<int64_t, int64_t>, KVScatter> scatter;
+    // [top_k, tokens] expert indices, one set per shape.  The executor has no learned
+    // routing, so the routed set is the first `top_k` experts for every token; what the
+    // tensor is for is that the experts run as one batched `mul_mat_id` (see routed_experts).
+    std::map<std::pair<int64_t, int64_t>, ggml_tensor *> expert_ids_cpu, expert_ids_gpu;
+    // DIAGNOSTIC (2026-11-09): the block runs over every expert the model has, with the
+    // tokens routed onto it the way real routing spreads them.  Both are what a MoE
+    // runtime does and both change the cost by 2-4x on the same arithmetic:
+    // IR_MOE_EXPERTS=topk runs only the selected experts' weights (the old lowering, and
+    // 2x fast on the same kernel) and IR_MOE_ROUTE=arange puts every token on the same
+    // experts (another 1.8-3x fast, because each expert then gets a full dense block).
+    bool moe_all_experts = true, moe_scatter = true;
+    // How many expert planes the block holds resident, which is also how many it reads.
+    // `T*k` tokens-expert pairs spread over `E` experts: at one token only the `k` routed
+    // experts are needed, at prefill 64 nearly every expert is touched and the block holds
+    // the whole stack.  The probe prices the same rule (`--stack`), and the two must agree
+    // or the price describes a graph the executor does not build.
+    int64_t moe_stream = 1;   // IR_MOE_STREAM=0 pins the whole stack, as before
+    int64_t moe_stack_for(int64_t tokens) const {
+        int64_t all = moe_all_experts ? c.experts : (c.top_k > 0 ? c.top_k : 1);
+        if (!moe_all_experts || !moe_stream) return all;
+        const int64_t k = c.top_k > 0 ? c.top_k : 1;
+        const int64_t reachable = std::max<int64_t>(1, tokens) * k;   // distinct experts
+        return std::max<int64_t>(k, std::min(all, reachable));
+    }
+    int64_t moe_stack() const { return moe_stack_for(T()); }
+    // The weights are allocated once for every shape the case runs, so the resident stack is
+    // the largest one any of its shapes needs -- a case that also prefills holds the whole
+    // stack, because prefill touches nearly every expert.
+    int64_t moe_stack_peak() const {
+        int64_t peak = 0;
+        for (const auto & sh : shapes) peak = std::max(peak, moe_stack_for(sh.first));
+        return peak;
+    }
     size_t cur_shape = 0;                              // set while a node graph is built
     std::pair<int64_t, int64_t> shape() const { return shapes[cur_shape]; }
     int64_t T() const { return shapes[cur_shape].first; }    // tokens executed at once
@@ -325,6 +383,9 @@ struct Session {
     ggml_tensor * kcache_gpu = nullptr, * vcache_gpu = nullptr;
     ggml_tensor * stage_host = nullptr, * stage_dev = nullptr;
     int64_t stage_bytes = 0;
+    int64_t deliver_short = 0;     // copies whose declared bytes did not fit the port
+    bool copy_staging_only = false;
+    std::string dump_side = "last";
     int verify_failures = 0;
     // third tier: a file the `ssd` machine reads and writes.  Opened only when the case
     // declares one; an unbuffered handle so a repeated stream cannot be served from the
@@ -424,6 +485,33 @@ static void move_pair(Session & s, ggml_tensor * host, ggml_tensor * dev, bool t
 static void move_staging(Session & s, bool to_gpu, int64_t bytes, bool alt = false) {
     if (alt) move_pair(s, s.ssd_stage_host, s.ssd_stage_dev, to_gpu, bytes);
     else move_pair(s, s.stage_host, s.stage_dev, to_gpu, bytes);
+}
+
+// Which ports a copy's IR tensor names.  `instantiate.py:bytes_for` enumerates exactly the
+// activations a copy may name; each is one of the executor's ports except the weights and
+// the position vector.  An empty answer sends the copy down the staging path, where its
+// bytes come from the pattern and land where no node reads them -- right for a weight, a
+// silent lie for an activation.
+//
+// The fused `proj` is the one tensor that lands in three ports, in this order.  Its declared
+// size has to be q + k + v; when it was one hidden's worth, the copy delivered `query` and
+// left `new_key`/`new_value` holding whatever the receiver had before, so an attention on
+// the far side computed from zeros.  The delivery walks the ports in order and spends the
+// declared bytes across them, so a declaration that is too small shows up as `short` rather
+// than as silence.
+static std::vector<std::string> port_roles(const std::string & role) {
+    if (role == "in.hidden" || role == "in") return {"x"};
+    if (role == "proj") return {"query", "new_key", "new_value"};
+    if (role == "proj.q") return {"query"};
+    if (role == "proj.k") return {"new_key"};
+    if (role == "proj.v") return {"new_value"};
+    if (role == "attn") return {"attention_hidden"};
+    if (role == "attn.scores") return {"scores"};
+    if (role == "attn.probabilities") return {"probs"};
+    if (role == "attn.context") return {"attended"};
+    if (role == "router") return {"moe_probs"};
+    if (role == "combine" || role == "ffn") return {"hidden_output"};
+    return {};
 }
 
 #if defined(_WIN32)
@@ -554,6 +642,226 @@ static const std::string & dtype_of_role(const Case & c, const std::string & rol
     return scratch;
 }
 
+// ---------------------------------------------------------------- real weights
+//
+// Every weight tensor is built from a deterministic byte pattern: same shape, same dtype,
+// same number of bytes, same kernels.  That is enough to *time* a block.  It is not the
+// model.  `--gguf <file>` replaces the pattern with layer 0's real tensors, which is the
+// difference between "a graph shaped like the model" and "the model".
+//
+// The file and the case must agree.  A tensor the case expects but the file does not have,
+// or one whose shape or dtype differs, aborts the run: substituting a pattern there would
+// leave every number downstream unverifiable, which is exactly the doubt this flag removes.
+
+static std::string fnv_hex(uint64_t v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(v));
+    return buf;
+}
+
+// 64-bit file offsets.  `long` is 32 bits on Windows and the smallest MoE file here is
+// 4.2 GB, so fseek() would land somewhere else and every tensor past 2 GiB would read as a
+// "short read".  The offset is a gguf tensor offset, always non-negative.
+static int seek64(std::FILE * f, int64_t off) {
+#if defined(_WIN32)
+    return _fseeki64(f, off, SEEK_SET);
+#else
+    return fseeko(f, static_cast<off_t>(off), SEEK_SET);
+#endif
+}
+
+static std::string weight_tensor_name(const std::string & role) {
+    const std::string b = "blk.0.";
+    if (role == "input_norm")          return b + "attn_norm.weight";
+    if (role == "post_attention_norm") return b + "ffn_norm.weight";
+    if (role == "final_norm")          return "output_norm.weight";
+    if (role == "q_norm")              return b + "attn_q_norm.weight";
+    if (role == "k_norm")              return b + "attn_k_norm.weight";
+    if (role == "q")                   return b + "attn_q.weight";
+    if (role == "k")                   return b + "attn_k.weight";
+    if (role == "v")                   return b + "attn_v.weight";
+    if (role == "output")              return b + "attn_output.weight";
+    if (role == "gate")                return b + "ffn_gate.weight";
+    if (role == "up")                  return b + "ffn_up.weight";
+    if (role == "down")                return b + "ffn_down.weight";
+    if (role == "router")              return b + "ffn_gate_inp.weight";
+    if (role == "gate_exps")           return b + "ffn_gate_exps.weight";
+    if (role == "up_exps")             return b + "ffn_up_exps.weight";
+    if (role == "down_exps")           return b + "ffn_down_exps.weight";
+    if (role == "gate_inp_shexp")      return b + "ffn_gate_inp_shexp.weight";
+    if (role == "gate_shexp")          return b + "ffn_gate_shexp.weight";
+    if (role == "up_shexp")            return b + "ffn_up_shexp.weight";
+    if (role == "down_shexp")          return b + "ffn_down_shexp.weight";
+    return "";
+}
+
+static int64_t gguf_int(const gguf_context * g, const char * key, int64_t dflt) {
+    const int64_t id = gguf_find_key(g, key);
+    if (id < 0) return dflt;
+    switch (gguf_get_kv_type(g, id)) {
+        case GGUF_TYPE_UINT8:  return gguf_get_val_u8(g, id);
+        case GGUF_TYPE_INT8:   return gguf_get_val_i8(g, id);
+        case GGUF_TYPE_UINT16: return gguf_get_val_u16(g, id);
+        case GGUF_TYPE_INT16:  return gguf_get_val_i16(g, id);
+        case GGUF_TYPE_UINT32: return gguf_get_val_u32(g, id);
+        case GGUF_TYPE_INT32:  return gguf_get_val_i32(g, id);
+        case GGUF_TYPE_UINT64: return static_cast<int64_t>(gguf_get_val_u64(g, id));
+        case GGUF_TYPE_INT64:  return gguf_get_val_i64(g, id);
+        default:               return dflt;
+    }
+}
+
+// Fill `s.w_cpu` from the model's own tensors.  `tmp` is scratch of the caller's, so a run
+// that loads every weight does not allocate a second time per tensor.
+static void load_real_weights(Session & s, const std::string & path, std::vector<uint8_t> & tmp) {
+    std::FILE * f = std::fopen(path.c_str(), "rb");
+    if (!f) throw std::runtime_error("cannot open weights " + path);
+    ggml_context * meta = nullptr;
+    gguf_init_params ip;
+    ip.no_alloc = true;      // tensor stubs only: the bytes are read by offset below
+    ip.ctx = &meta;
+    gguf_context * g = gguf_init_from_file(path.c_str(), ip);
+    if (!g || !meta) {
+        if (g) gguf_free(g);
+        std::fclose(f);
+        throw std::runtime_error("not a readable gguf file: " + path);
+    }
+    const int64_t data_off = static_cast<int64_t>(gguf_get_data_offset(g));
+
+    std::vector<std::string> problems, synthetic;
+    int64_t real_roles = 0, real_bytes = 0;
+    uint64_t fnv = 14695981039346656037ULL;   // FNV-1a, in the role order the map gives
+    for (auto & kv : s.w_cpu) {
+        ggml_tensor * dst = kv.second;
+        const std::string name = weight_tensor_name(kv.first);
+        ggml_tensor * src = name.empty() ? nullptr : ggml_get_tensor(meta, name.c_str());
+        if (!src) {
+            // A role the model does not have is legal only where the graph never reads it.
+            // `q_norm`/`k_norm` are allocated unconditionally but only multiplied in under
+            // a `rms`/`rms_hidden` geometry; granite has neither tensor and does not use them.
+            if ((kv.first == "q_norm" || kv.first == "k_norm") && !s.g.has_qk_norm()) {
+                synthetic.push_back(kv.first + " (model has none, graph never reads it)");
+                continue;
+            }
+            problems.push_back("role " + kv.first + " -> "
+                               + (name.empty() ? std::string("<no naming convention>") : name)
+                               + ": not in the file");
+            continue;
+        }
+        if (src->type != dst->type) {
+            problems.push_back("role " + kv.first + " -> " + name + ": dtype "
+                               + ggml_type_name(src->type) + " in the file, "
+                               + ggml_type_name(dst->type) + " in the case");
+            continue;
+        }
+        const bool stack = dst->ne[2] > 1;     // one expert plane per entry of ne[2]
+        if (src->ne[0] != dst->ne[0] || src->ne[1] != dst->ne[1]
+            || (stack && src->ne[2] < dst->ne[2]) || src->ne[3] != dst->ne[3]) {
+            std::ostringstream m;
+            m << "role " << kv.first << " -> " << name << ": file (" << src->ne[0] << ","
+              << src->ne[1] << "," << src->ne[2] << "," << src->ne[3] << ") vs case ("
+              << dst->ne[0] << "," << dst->ne[1] << "," << dst->ne[2] << "," << dst->ne[3] << ")";
+            problems.push_back(m.str());
+            continue;
+        }
+        // The case may hold fewer expert planes than the file (a decode round keeps k of E).
+        // Those planes are contiguous from the start, so the prefix is a plain byte read --
+        // but it is a choice, and `experts_loaded < experts_in_file` reports it.
+        const size_t n = ggml_nbytes(dst);
+        tmp.resize(n);
+        const int64_t at = data_off + static_cast<int64_t>(gguf_get_tensor_offset(g,
+                        gguf_find_tensor(g, name.c_str())));
+        if (seek64(f, at) != 0 || std::fread(tmp.data(), 1, n, f) != n) {
+            problems.push_back("role " + kv.first + " -> " + name + ": short read");
+            continue;
+        }
+        ggml_backend_tensor_set(dst, tmp.data(), 0, n);
+        for (size_t i = 0; i < n; ++i) {
+            fnv ^= tmp[i];
+            fnv *= 1099511628211ULL;
+        }
+        ++real_roles;
+        real_bytes += static_cast<int64_t>(n);
+        if (stack) {
+            s.experts_in_file = src->ne[2];
+            s.experts_loaded = dst->ne[2];
+        }
+    }
+    // The input row is filled in here rather than in the port loop because this is where the
+    // file is open: `--x-token N` puts token N's real embedding where the deterministic
+    // pattern was, which is what makes the block's output comparable to a model's, not just
+    // finite.  Every token of the shape gets the same row; these are sanity runs, not prompts.
+    if (s.x_token >= 0) {
+        const int64_t id = gguf_find_tensor(g, "token_embd.weight");
+        ggml_tensor * src = id < 0 ? nullptr : ggml_get_tensor(meta, "token_embd.weight");
+        const struct ggml_type_traits * tr =
+            src ? ggml_get_type_traits(src->type) : nullptr;
+        if (!src || !tr || !tr->to_float) {
+            problems.push_back("--x-token: the file has no dequantisable token_embd.weight");
+        } else if (s.x_token >= src->ne[1]) {
+            problems.push_back("--x-token " + std::to_string(s.x_token) + " is past the "
+                               + std::to_string(src->ne[1]) + " rows the file has");
+        } else {
+            const size_t row = ggml_row_size(src->type, src->ne[0]);
+            std::vector<uint8_t> qrow(row);
+            const int64_t at = data_off + static_cast<int64_t>(gguf_get_tensor_offset(g, id))
+                             + static_cast<int64_t>(s.x_token) * static_cast<int64_t>(row);
+            if (seek64(f, at) != 0
+                || std::fread(qrow.data(), 1, row, f) != row) {
+                problems.push_back("--x-token: short read of token_embd.weight");
+            } else {
+                std::vector<float> xf(static_cast<size_t>(src->ne[0]));
+                tr->to_float(qrow.data(), xf.data(), src->ne[0]);
+                for (auto & set : s.ports) {
+                    auto it = set.second.find("x");
+                    if (it == set.second.end()) continue;
+                    Port & p = it->second;
+                    if (p.cpu->ne[0] != src->ne[0]) {
+                        problems.push_back("--x-token: the case's hidden size is "
+                                           + std::to_string(p.cpu->ne[0])
+                                           + ", the file's embedding is "
+                                           + std::to_string(src->ne[0]));
+                        break;
+                    }
+                    const int64_t T = p.cpu->ne[1];
+                    std::vector<float> buf(xf.size() * static_cast<size_t>(T));
+                    for (int64_t t = 0; t < T; ++t)
+                        std::copy(xf.begin(), xf.end(),
+                                  buf.begin() + static_cast<size_t>(t) * xf.size());
+                    const size_t bytes = buf.size() * sizeof(float);
+                    ggml_backend_tensor_set(p.cpu, buf.data(), 0, bytes);
+                    if (p.gpu) ggml_backend_tensor_set(p.gpu, buf.data(), 0, bytes);
+                    p.writer = p.gpu ? 2 : 1;
+                }
+                s.x_real = true;
+            }
+        }
+    }
+
+    const std::string arch = gguf_find_key(g, "general.architecture") >= 0
+                           ? gguf_get_val_str(g, gguf_find_key(g, "general.architecture"))
+                           : "";
+    gguf_free(g);
+    ggml_free(meta);
+    std::fclose(f);
+
+    if (!problems.empty()) {
+        std::string msg = "weights and case disagree (" + path + "):";
+        for (size_t i = 0; i < problems.size() && i < 6; ++i) msg += "\n  " + problems[i];
+        if (problems.size() > 6) msg += "\n  ... " + std::to_string(problems.size() - 6) + " more";
+        throw std::runtime_error(msg);
+    }
+    s.weights_source = path;
+    s.weights_real_roles = real_roles;
+    s.weights_bytes_real = real_bytes;
+    s.weights_fnv = fnv;
+    for (size_t i = 0; i < synthetic.size(); ++i)
+        s.weights_pattern += (i ? ", " : "") + synthetic[i];
+    if (s.verbose)
+        std::fprintf(stderr, "weights: %lld roles / %lld bytes from %s (arch %s)\n",
+                     (long long) real_roles, (long long) real_bytes, path.c_str(), arch.c_str());
+}
+
 static void init_session(Session & s) {
     const Case & c = s.c;
     Geometry & g = s.g;
@@ -601,7 +909,16 @@ static void init_session(Session & s) {
 #endif
     (void) dtype_of_role;
 
-    const int64_t nports = 16;
+    {
+        const char * experts = std::getenv("IR_MOE_EXPERTS");
+        const char * route = std::getenv("IR_MOE_ROUTE");
+        const char * stream = std::getenv("IR_MOE_STREAM");
+        s.moe_all_experts = !(experts && std::string(experts) == "topk");
+        s.moe_scatter = !(route && std::string(route) == "arange");
+        s.moe_stream = !(stream && std::string(stream) == "0");
+    }
+
+    const int64_t nports = 18;
     // A node carries its own shape in `t=`/`h=` when that shape differs from the case
     // header's (instantiate.py writes it for the pd family's decode round only), so one
     // execution runs a prefill round and a decode round at their own shapes.
@@ -667,6 +984,18 @@ static void init_session(Session & s) {
             ggml_set_name(sc.positions_gpu, "positions");
         }
         s.scatter[key] = sc;
+
+        if (c.experts > 0) {
+            const int64_t slots = c.top_k > 0 ? c.top_k : 1;
+            auto * ids = ggml_new_tensor_2d(s.resident_cpu, GGML_TYPE_I32, slots, T);
+            ggml_set_name(ids, "expert_ids");
+            s.expert_ids_cpu[key] = ids;
+            if (s.gpu) {
+                auto * u = ggml_new_tensor_2d(s.resident_gpu, GGML_TYPE_I32, slots, T);
+                ggml_set_name(u, "expert_ids");
+                s.expert_ids_gpu[key] = u;
+            }
+        }
     }
 
     // KV caches: K is [head_dim, L, kv_heads], V is [L, head_dim, kv_heads].  One cache
@@ -744,6 +1073,22 @@ static void init_session(Session & s) {
             ggml_backend_tensor_set(sc.positions_gpu, pos.data(), 0,
                                     pos.size() * sizeof(int32_t));
         }
+        if (c.experts > 0) {
+            const int64_t slots = c.top_k > 0 ? c.top_k : 1;
+            const int64_t stack = s.moe_stack_for(T);
+            const int64_t stride = std::max<int64_t>(1, stack / std::max<int64_t>(1, slots));
+            std::vector<int32_t> ids(static_cast<size_t>(slots) * static_cast<size_t>(T));
+            for (int64_t t = 0; t < T; ++t)
+                for (int64_t k = 0; k < slots; ++k)
+                    ids[size_t(k + slots * t)] =
+                        static_cast<int32_t>(s.moe_scatter ? (t + k * stride) % stack : k);
+            auto * ci = s.expert_ids_cpu.at(key);
+            ggml_backend_tensor_set(ci, ids.data(), 0, ids.size() * sizeof(int32_t));
+            if (s.gpu) {
+                auto * gi = s.expert_ids_gpu.at(key);
+                ggml_backend_tensor_set(gi, ids.data(), 0, ids.size() * sizeof(int32_t));
+            }
+        }
     }
     // a deterministic activation, one per shape
     for (auto & set : s.ports) {
@@ -767,26 +1112,45 @@ static void init_session(Session & s) {
         ggml_set_name(t, role.c_str());
         s.w_cpu[role] = t;
     };
+    auto add3 = [&](const std::string & role, ggml_type type, int64_t cols, int64_t rows,
+                    int64_t planes) {
+        auto * t = ggml_new_tensor_3d(s.weights_ctx, type, cols, rows, planes);
+        ggml_set_name(t, role.c_str());
+        s.w_cpu[role] = t;
+    };
     add1("input_norm", g.hidden);
     add1("post_attention_norm", g.hidden);
     add1("final_norm", g.hidden);
-    add1("q_norm", g.head_dim);
-    add1("k_norm", g.head_dim);
+    add1("q_norm", g.qk_norm_width());
+    add1("k_norm", g.qk_norm_width());
     add2("q", Geometry::dtype_of(dtype_of_role(c, "q", "q4_k")), g.hidden, g.q_dim());
     add2("k", Geometry::dtype_of(dtype_of_role(c, "k", "q4_k")), g.hidden, g.kv_dim());
     add2("v", Geometry::dtype_of(dtype_of_role(c, "v", "q6_k")), g.hidden, g.kv_dim());
     add2("output", Geometry::dtype_of(dtype_of_role(c, "o", "q4_k")), g.q_dim(), g.hidden);
     if (c.experts > 0) {
-        // top_k expert matrices, not one: the executor must pay what the IR declares and
-        // what the frozen `moe_ffn` price was measured on (see routed_experts)
-        const int64_t slots = c.top_k > 0 ? c.top_k : 1;
+        // One matrix per expert, stacked along the third dimension: the shape
+        // `ggml_mul_mat_id` wants, and the one the frozen `moe_ffn` price was measured on
+        // (see routed_experts).  Same bytes as top_k 2D matrices.
+        const int64_t slots = s.moe_stack_peak();
         add2("router", GGML_TYPE_F32, g.hidden, c.experts);
-        add2("gate_exps", Geometry::dtype_of(dtype_of_role(c, "gate", "q4_k")), g.hidden,
-             g.intermediate * slots);
-        add2("up_exps", Geometry::dtype_of(dtype_of_role(c, "up", "q4_k")), g.hidden,
-             g.intermediate * slots);
-        add2("down_exps", Geometry::dtype_of(dtype_of_role(c, "down", "q6_k")), g.intermediate,
-             g.hidden * slots);
+        add3("gate_exps", Geometry::dtype_of(dtype_of_role(c, "gate", "q4_k")), g.hidden,
+             g.intermediate, slots);
+        add3("up_exps", Geometry::dtype_of(dtype_of_role(c, "up", "q4_k")), g.hidden,
+             g.intermediate, slots);
+        add3("down_exps", Geometry::dtype_of(dtype_of_role(c, "down", "q6_k")), g.intermediate,
+             g.hidden, slots);
+        // A shared expert is part of the block the `moe_ffn` price was measured on (the
+        // probe builds it inside the same timed graph), so the executor allocates and
+        // runs it too; without it the block executes roughly half the priced work.
+        if (c.shared > 0) {
+            add2("gate_inp_shexp", GGML_TYPE_F32, g.hidden, 1);
+            add2("gate_shexp", Geometry::dtype_of(dtype_of_role(c, "gate_shexp", "q4_k")),
+                 g.hidden, c.shared);
+            add2("up_shexp", Geometry::dtype_of(dtype_of_role(c, "up_shexp", "q4_k")),
+                 g.hidden, c.shared);
+            add2("down_shexp", Geometry::dtype_of(dtype_of_role(c, "down_shexp", "q6_k")),
+                 c.shared, g.hidden);
+        }
     } else {
         add2("gate", Geometry::dtype_of(dtype_of_role(c, "gate", "q4_k")), g.hidden, g.intermediate);
         add2("up", Geometry::dtype_of(dtype_of_role(c, "up", "q4_k")), g.hidden, g.intermediate);
@@ -801,6 +1165,9 @@ static void init_session(Session & s) {
         fill_bytes(tmp.data(), tmp.size(), seed++, kv.second->type);
         ggml_backend_tensor_set(kv.second, tmp.data(), 0, tmp.size());
     }
+    // A real file overwrites every role it covers.  The pattern survives only where the
+    // loader decided the model has no such tensor, and that list is reported, not hidden.
+    if (!s.gguf_path.empty()) load_real_weights(s, s.gguf_path, tmp);
     if (s.gpu) {
         ggml_context * wg = ggml_init({ggml_tensor_overhead() * 64, nullptr, true});
         for (auto & kv : s.w_cpu) {
@@ -819,6 +1186,60 @@ static void init_session(Session & s) {
         static std::vector<ggml_context *> keep;   // freed with the process; one run per process
         keep.push_back(wg);
     }
+}
+
+// ---------------------------------------------------------------- port dump
+//
+// `--dump-dir` writes every port of the executed shape as raw F32 plus a small manifest.
+// Timing runs never need this; it exists so the values a node produced can be looked at,
+// which is the only way to answer "did it compute the right thing" rather than "did it take
+// the right time".  Ports are all F32 by construction, so a dump is a byte copy -- no
+// encoding decisions to get wrong.
+
+static void dump_ports(Session & s, const std::string & dir,
+                       const std::set<std::string> & written) {
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) throw std::runtime_error("cannot create " + dir + ": " + ec.message());
+    const auto & set = s.ports.at(s.shape());
+    std::ostringstream manifest;
+    manifest << "{\n  \"shape\": {\"tokens\": " << s.shape().first
+             << ", \"history\": " << s.shape().second << "},\n  \"ports\": {";
+    bool first = true;
+    for (const auto & kv : set) {
+        // Only ports a node actually wrote.  A case that runs `attn` as one fused node never
+        // touches `scores`/`probs`/`attended`, and dumping them would report an unwritten
+        // tensor as "degenerate" -- a false alarm about a port that carries no claim.
+        if (!written.count(kv.first)) continue;
+        const Port & p = kv.second;
+        // Read the side the last write went to.  A node on the GPU writes the device copy and
+        // leaves the host copy alone; reading `cpu` there reports an unwritten tensor.
+        ggml_tensor * src = p.writer == 2 && p.gpu ? p.gpu : p.cpu;
+        // `--dump-side` forces one copy.  A port the device wrote and a copy delivered to the
+        // host are two tensors with the same name; to check that the transfer landed, the
+        // dump has to be able to ask for the host one.
+        if (s.dump_side == "cpu") src = p.cpu;
+        else if (s.dump_side == "gpu" && p.gpu) src = p.gpu;
+        std::vector<float> data(static_cast<size_t>(ggml_nelements(src)));
+        ggml_backend_tensor_get(src, data.data(), 0, data.size() * sizeof(float));
+        std::ofstream out(dir + "/" + kv.first + ".f32", std::ios::binary);
+        out.write(reinterpret_cast<const char *>(data.data()),
+                  static_cast<std::streamsize>(data.size() * sizeof(float)));
+        // `ne` alone is not enough to read the file: a tensor whose nb does not follow ne is
+        // stored in a different order than its shape suggests, and a reader that assumes
+        // contiguous F32 would report a permutation as a broken computation.  Both are
+        // written out so the check never has to assume.
+        manifest << (first ? "" : ",\n    ") << "\"" << kv.first << "\": {\"ne\": ["
+                 << p.cpu->ne[0] << ", " << p.cpu->ne[1] << ", "
+                 << p.cpu->ne[2] << ", " << p.cpu->ne[3] << "], \"nb\": ["
+                 << src->nb[0] << ", " << src->nb[1] << ", " << src->nb[2] << ", "
+                 << src->nb[3] << "], \"nbytes\": " << ggml_nbytes(src)
+                 << ", \"writer\": " << p.writer << "}";
+        first = false;
+    }
+    manifest << "\n  }\n}\n";
+    std::ofstream f(dir + "/ports.json");
+    f << manifest.str();
 }
 
 // ---------------------------------------------------------------- node graphs
@@ -870,6 +1291,11 @@ static void build_projection(Session & s, ggml_context * ctx, ggml_cgraph * gr, 
     auto * n = ggml_mul(ctx, ggml_rms_norm(ctx, x, float(g.norm_eps)), W(s, "input_norm", cuda));
     auto qkv = [&](const char * role, int64_t heads, bool rotary) {
         auto * projected = ggml_mul_mat(ctx, W(s, role, cuda), n);
+        // `rms_hidden` (OLMoE/OLMo2): the gain multiplies the whole projection while it is
+        // still [hidden, T]; llama.cpp reshapes into heads only afterwards.
+        if (rotary && g.qk_norm == "rms_hidden")
+            projected = ggml_mul(ctx, ggml_rms_norm(ctx, projected, float(g.norm_eps)),
+                                 W(s, role[0] == 'q' ? "q_norm" : "k_norm", cuda));
         auto * v = ggml_reshape_3d(ctx, projected, g.head_dim, heads, T);
         if (rotary) {
             if (g.qk_norm == "rms")
@@ -1012,39 +1438,52 @@ static void build_router(Session & s, ggml_context * ctx, ggml_cgraph * gr, bool
     writes = {"normed", "moe_probs"};
 }
 
-// One expert's slice of a `*_exps` weight: the tensor holds `slots` expert matrices stacked
-// along the second dimension, so slot i is rows [i*rows, (i+1)*rows).
-static ggml_tensor * expert_slice(ggml_context * ctx, ggml_tensor * w, int64_t slot, int64_t rows) {
-    return ggml_view_2d(ctx, w, w->ne[0], rows, w->nb[1], size_t(slot) * size_t(rows) * size_t(w->nb[1]));
-}
-
-static ggml_tensor * expert_path(Session & s, ggml_context * ctx, bool cuda, const char * tag,
-                                 int64_t slot) {
-    auto * n = P(s, "normed", cuda);
-    const int64_t ffn = s.g.intermediate;
-    auto * gate = ggml_mul_mat(ctx, expert_slice(ctx, W(s, std::string(tag) + "gate_exps", cuda),
-                                                 slot, ffn), n);
-    auto * up = ggml_mul_mat(ctx, expert_slice(ctx, W(s, std::string(tag) + "up_exps", cuda),
-                                               slot, ffn), n);
-    auto * act = ggml_mul(ctx, ggml_silu(ctx, gate), up);
-    return ggml_mul_mat(ctx, expert_slice(ctx, W(s, std::string(tag) + "down_exps", cuda),
-                                          slot, s.g.hidden), act);
-}
-
-// The case header declares `top_k`, and the frozen `moe_ffn` price was measured on the
-// model's real routed set.  Executing one expert set would under-execute by exactly top_k.
-static ggml_tensor * routed_experts(Session & s, ggml_context * ctx, bool cuda, const char * tag) {
+// The routed experts as one batched product per matrix, which is how a MoE layer actually
+// runs them (`ggml_mul_mat_id` over the 3D expert stack, as in dense_layer_cuda_probe.cpp)
+// and how the frozen `moe_ffn` price was measured.  Building top_k separate dense paths
+// instead costs a launch each: the resulting expert node was top_k * ~230 us (prefill) and
+// top_k * ~150 us (decode) whatever the expert's width, i.e. dispatch rather than work.
+//
+// The ids are the first `top_k` experts for every token (the executor has no learned
+// routing).  The sum over the selected experts is what the IR's `expert` node returns; the
+// per-expert routing weights it does not model are not applied here either.
+static ggml_tensor * routed_experts(Session & s, ggml_context * ctx, bool cuda, const char *) {
     const int64_t slots = s.c.top_k > 0 ? s.c.top_k : 1;
-    ggml_tensor * sum = expert_path(s, ctx, cuda, tag, 0);
+    auto * ids = cuda ? s.expert_ids_gpu.at(s.shape()) : s.expert_ids_cpu.at(s.shape());
+    // [hidden, 1, tokens]: one input row per token, which is the layout mul_mat_id expects
+    auto * cur = ggml_reshape_3d(ctx, P(s, "normed", cuda), s.g.hidden, 1, s.T());
+    auto * up = ggml_mul_mat_id(ctx, W(s, "up_exps", cuda), cur, ids);
+    auto * gate = ggml_mul_mat_id(ctx, W(s, "gate_exps", cuda), cur, ids);
+    auto * act = ggml_mul(ctx, ggml_silu(ctx, gate), up);
+    auto * down = ggml_mul_mat_id(ctx, W(s, "down_exps", cuda), act, ids);   // [hidden, k, T]
+    ggml_tensor * sum = ggml_view_2d(ctx, down, s.g.hidden, s.T(), down->nb[2], 0);
     for (int64_t slot = 1; slot < slots; ++slot)
-        sum = ggml_add(ctx, sum, expert_path(s, ctx, cuda, tag, slot));
+        sum = ggml_add(ctx, sum,
+                       ggml_view_2d(ctx, down, s.g.hidden, s.T(), down->nb[2],
+                                    size_t(slot) * size_t(down->nb[1])));
     return sum;
+}
+
+// The shared expert that every token runs, in the shape the priced block was measured on:
+// a sigmoid gate on the normed hidden, a swiglu feed-forward, then the gate scaling.  The
+// `moe_ffn` price covers it -- the probe builds it inside the timed graph -- so every
+// lowering of the block must run it, not only the one that lowers `moe_ffn` as one node.
+static ggml_tensor * shared_expert(Session & s, ggml_context * ctx, bool cuda,
+                                   ggml_tensor * n) {
+    auto * sg = ggml_sigmoid(ctx, ggml_mul_mat(ctx, W(s, "gate_inp_shexp", cuda), n));
+    auto * sh = ggml_mul(ctx,
+                         ggml_silu(ctx, ggml_mul_mat(ctx, W(s, "gate_shexp", cuda), n)),
+                         ggml_mul_mat(ctx, W(s, "up_shexp", cuda), n));
+    return ggml_mul(ctx, ggml_mul_mat(ctx, W(s, "down_shexp", cuda), sh), sg);
 }
 
 static void build_expert(Session & s, ggml_context * ctx, ggml_cgraph * gr, bool cuda,
                          std::vector<std::string> & writes) {
-    auto * out = ggml_cpy(ctx, routed_experts(s, ctx, cuda, ""), P(s, "expert_out", cuda));
-    ggml_build_forward_expand(gr, out);
+    auto * out = routed_experts(s, ctx, cuda, "");
+    if (s.c.shared > 0)
+        out = ggml_add(ctx, out, shared_expert(s, ctx, cuda, P(s, "normed", cuda)));
+    auto * cpy = ggml_cpy(ctx, out, P(s, "expert_out", cuda));
+    ggml_build_forward_expand(gr, cpy);
     writes = {"expert_out"};
 }
 
@@ -1065,6 +1504,7 @@ static void build_moe_ffn(Session & s, ggml_context * ctx, ggml_cgraph * gr, boo
     ggml_soft_max(ctx, logits);   // routing probabilities; the priced weight of the
                                   // expert path is the routed top_k, executed in full
     auto * expert = routed_experts(s, ctx, cuda, "");
+    if (s.c.shared > 0) expert = ggml_add(ctx, expert, shared_expert(s, ctx, cuda, n));
     auto * out = ggml_cpy(ctx, ggml_add(ctx, expert, h), P(s, "hidden_output", cuda));
     ggml_build_forward_expand(gr, out);
 }
@@ -1111,6 +1551,7 @@ struct NodeRun {
     int64_t begin_ns = 0, end_ns = 0, build_ns = 0, bytes = 0;
     int64_t evicted = 0;        // bytes this node forced out of a tier to make room
     int64_t moved = 0;          // bytes actually moved (0 under uma)
+    bool delivered = false;     // a copy that landed in the tensor it names
     bool ok = false;
     std::string status;
 };
@@ -1204,6 +1645,72 @@ static void run_machine(Session & s, Schedule & sc, const std::string & machine,
                     r.ok = true;
                     r.status = "copy";
                 } else {
+                // Where the bytes have to land.  A copy that names an activation must write
+                // that activation's tensor on the receiving side: the node across the
+                // boundary reads the port, and a transfer through the staging pool leaves
+                // that port holding whatever it held before -- zeros at best.  Only copies
+                // of a weight go through the staging pool.
+                std::vector<std::pair<ggml_tensor *, ggml_tensor *>> deliver;
+                {
+                    const size_t colon = key.rfind(':');
+                    const std::string role = colon == std::string::npos ? "" : key.substr(colon + 1);
+                    const auto want = port_roles(role);
+                    const auto shape_key = std::make_pair(n.num("t", s.c.tokens),
+                                                          n.num("h", s.c.history));
+                    const auto set = s.ports.find(shape_key);
+                    if (role == "in.positions") {
+                        // Not a port, but still a tensor the plan moves: the rope reads this
+                        // one on the device.  It is filled at setup too, so the copy changes
+                        // no value -- it lands where it says it lands instead of in a pool.
+                        const auto sc = s.scatter.find(shape_key);
+                        if (sc != s.scatter.end() && sc->second.positions && sc->second.positions_gpu)
+                            deliver.emplace_back(to_gpu ? sc->second.positions : sc->second.positions_gpu,
+                                                 to_gpu ? sc->second.positions_gpu : sc->second.positions);
+                    } else if (!want.empty() && set != s.ports.end()) {
+                        bool complete = true;
+                        for (const auto & name : want) {
+                            const auto it = set->second.find(name);
+                            if (it == set->second.end() || !it->second.gpu) { complete = false; break; }
+                            deliver.emplace_back(to_gpu ? it->second.cpu : it->second.gpu,
+                                                 to_gpu ? it->second.gpu : it->second.cpu);
+                        }
+                        if (!complete) deliver.clear();
+                    }
+                }
+                if (s.copy_staging_only) deliver.clear();
+                if (!deliver.empty()) {
+                    if (s.gpu) ggml_backend_synchronize(s.gpu);
+                    ggml_backend_synchronize(s.cpu);
+                    const int64_t b0 = now_ns();
+                    if (ledger_on) r.evicted = acquire(s, dev_of(dst), key, bytes).evicted;
+                    ggml_context * vctx = ggml_init({ggml_tensor_overhead() * 16, nullptr, true});
+                    int64_t left = bytes;
+                    for (auto & pr : deliver) {
+                        if (left <= 0) break;
+                        const int64_t avail = static_cast<int64_t>(ggml_nbytes(pr.second));
+                        const int64_t n_bytes = std::min(left, avail);
+                        ggml_tensor * from = pr.first, * to = pr.second;
+                        if (n_bytes < avail) {
+                            from = ggml_view_1d(vctx, pr.first, n_bytes, 0);
+                            to = ggml_view_1d(vctx, pr.second, n_bytes, 0);
+                            if (!from->buffer && ggml_backend_view_init(from) != GGML_STATUS_SUCCESS)
+                                throw std::runtime_error("port view init failed");
+                            if (!to->buffer && ggml_backend_view_init(to) != GGML_STATUS_SUCCESS)
+                                throw std::runtime_error("port view init failed");
+                        }
+                        ggml_backend_tensor_copy(from, to);
+                        left -= n_bytes;
+                    }
+                    if (s.gpu) ggml_backend_synchronize(s.gpu);
+                    ggml_backend_synchronize(s.cpu);
+                    const int64_t b1 = now_ns();
+                    ggml_free(vctx);
+                    if (left > 0) ++s.deliver_short;
+                    r.begin_ns = b0; r.end_ns = b1; r.bytes = bytes; r.moved = bytes;
+                    r.delivered = true;
+                    r.ok = true;
+                    r.status = "copy";
+                } else {
                 if (bytes > s.stage_bytes) throw std::runtime_error("copy larger than staging pool");
                 ggml_context * vctx = ggml_init({ggml_tensor_overhead() * 8, nullptr, true});
                 auto * from = ggml_view_1d(vctx, to_gpu ? s.stage_host : s.stage_dev, bytes, 0);
@@ -1228,6 +1735,7 @@ static void run_machine(Session & s, Schedule & sc, const std::string & machine,
                 r.begin_ns = b0; r.end_ns = b1; r.bytes = bytes; r.moved = bytes;
                 r.ok = true;
                 r.status = "copy";
+                }
                 }
             } else {
                 // Graphs are built once, ahead of the timed region, exactly as a compiler
@@ -1370,6 +1878,15 @@ int main(int argc, char ** argv) {
             else if (a == "--verbose") o.verbose = true;
             else if (a == "--no-gpu") o.no_gpu = true;
             else if (a == "--ssd-dir") o.ssd_dir = next("--ssd-dir");
+            else if (a == "--gguf") o.gguf_path = next("--gguf");
+            else if (a == "--x-token") o.x_token = std::stoll(next("--x-token"));
+            else if (a == "--dump-dir") o.dump_dir = next("--dump-dir");
+            // The pre-2026-11-09 copy path: every copy went through the staging pool and none
+            // of them reached the tensor it named.  Kept only so a regression measurement can
+            // put the two paths in one session; a case run this way computes wrong values.
+            else if (a == "--copy-staging-only") o.copy_staging_only = true;
+            else if (a == "--dump-weight") o.dump_weight = next("--dump-weight");
+            else if (a == "--dump-side") o.dump_side = next("--dump-side");
             else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); return 2; }
         }
         if (o.empty_overhead) {
@@ -1420,7 +1937,39 @@ int main(int argc, char ** argv) {
                 else if (k == "geometry_attention_gate") s.g.attention_gate = w[1];
             }
         }
+        s.gguf_path = o.gguf_path;
+        s.x_token = o.x_token;
+        s.copy_staging_only = o.copy_staging_only;
+        s.dump_side = o.dump_side;
+        if (s.x_token >= 0 && s.gguf_path.empty())
+            throw std::runtime_error("--x-token needs --gguf: the embedding is read from it");
         init_session(s);
+        if (!o.dump_weight.empty()) {
+            // One weight role, dequantised by ggml's own `to_float` and written as F32 with
+            // ne[0] fastest.  This exists so a reference computation downstream does not have
+            // to re-implement a block format: a hand-written Q4_K decoder that disagrees with
+            // the loader would look exactly like a bug in the graph.
+            const size_t colon = o.dump_weight.find(':');
+            const std::string role = o.dump_weight.substr(0, colon);
+            const std::string path = colon == std::string::npos ? "" : o.dump_weight.substr(colon + 1);
+            const auto it = s.w_cpu.find(role);
+            if (it == s.w_cpu.end() || path.empty())
+                throw std::runtime_error("--dump-weight wants role:file and a known role");
+            ggml_tensor * t = it->second;
+            const struct ggml_type_traits * tr = ggml_get_type_traits(t->type);
+            if (!tr || !tr->to_float) throw std::runtime_error("no dequantiser for " + role + " type "
+                                                         + std::to_string((int) t->type));
+            std::vector<uint8_t> raw(ggml_nbytes(t));
+            ggml_backend_tensor_get(t, raw.data(), 0, raw.size());
+            std::vector<float> f(static_cast<size_t>(ggml_nelements(t)));
+            tr->to_float(raw.data(), f.data(), static_cast<int64_t>(f.size()));
+            std::ofstream dw(path, std::ios::binary);
+            if (!dw) throw std::runtime_error("cannot write " + path);
+            dw.write(reinterpret_cast<const char *>(f.data()),
+                     static_cast<std::streamsize>(f.size() * sizeof(float)));
+            std::fprintf(stderr, "dumped weight %s -> %s (%lld floats)\n", role.c_str(),
+                         path.c_str(), static_cast<long long>(f.size()));
+        }
 
         std::vector<Built> prepared;
         std::vector<int64_t> built_build_ns;
@@ -1440,9 +1989,44 @@ int main(int argc, char ** argv) {
                 break;
             }
         }
+        // How the copies travelled.  A copy that lands in the tensor it names is the only
+        // kind that can feed the node on the far side; the rest move the declared bytes
+        // through the staging pool, which is right for a weight and an unfinished job for
+        // an activation.  Naming the roles is the difference between a report and a claim.
+        int64_t copies_delivered = 0, copies_staged = 0;
+        std::set<std::string> staged_acts;
+        if (!replica_runs.empty()) {
+            const auto & runs = replica_runs[0];
+            for (size_t i = 0; i < runs.size() && i < s.c.nodes.size(); ++i) {
+                const Node & n = s.c.nodes[i];
+                if (n.op != "copy" || runs[i].status == "uma_alias") continue;
+                if (runs[i].delivered) { ++copies_delivered; continue; }
+                ++copies_staged;
+                const std::string & key = n.str("tensor", n.id);
+                const size_t colon = key.rfind(':');
+                const std::string role = colon == std::string::npos ? key : key.substr(colon + 1);
+                if (!port_roles(role).empty() || role == "proj" || role == "expert.0" || role == "0")
+                    staged_acts.insert(role);
+            }
+        }
+        if (!o.dump_dir.empty()) {
+            std::set<std::string> written = {"x"};
+            for (const auto & b : prepared)
+                for (const auto & w : b.writes) written.insert(w);
+            dump_ports(s, o.dump_dir, written);
+        }
         release_graphs(prepared);
         int64_t build_total = 0;
         for (int64_t b : built_build_ns) build_total += b;
+        auto js_escape = [](const std::string & in) {
+            std::string out;
+            for (char ch : in) {
+                if (ch == '\n') { out += ' '; continue; }
+                if (ch == '"' || ch == '\\') out += '\\';
+                out += ch;
+            }
+            return out;
+        };
         std::ostringstream js;
         js << "{\n  \"case\": \"" << s.c.name << "\",\n  \"model\": \"" << s.c.model
            << "\",\n  \"threads\": " << s.c.threads
@@ -1470,6 +2054,27 @@ int main(int argc, char ** argv) {
            << ", \"ssd_peak\": " << s.ledger.peak[DEV_SSD]
            << ", \"evictions\": " << s.ledger.evictions
            << ", \"evicted_bytes\": " << s.ledger.evicted_bytes << "}"
+           // Which bytes the weights were: the model's own layer-0 tensors, or the pattern.
+           // A reader must not have to infer this from a note somewhere else.
+           << ",\n  \"weights\": {\"real\": " << (s.weights_source.empty() ? "false" : "true")
+           << ", \"source\": \"" << js_escape(s.weights_source) << "\""
+           << ", \"roles_real\": " << s.weights_real_roles
+           << ", \"bytes_real\": " << s.weights_bytes_real
+           << ", \"fnv64\": \"" << fnv_hex(s.weights_fnv) << "\""
+           << ", \"experts_in_file\": " << s.experts_in_file
+           << ", \"experts_loaded\": " << s.experts_loaded
+           << ", \"pattern_roles\": \"" << js_escape(s.weights_pattern) << "\"}"
+           << ",\n  \"copy_delivery\": {\"port\": " << copies_delivered
+           << ", \"staged\": " << copies_staged
+           << ", \"short\": " << s.deliver_short << ", \"staged_activations\": \"";
+        {
+            bool first = true;
+            for (const auto & r : staged_acts) {
+                js << (first ? "" : ",") << js_escape(r);
+                first = false;
+            }
+        }
+        js << "\"}"
            << ",\n  \"all_ok\": " << (all_ok ? "true" : "false")
            << ",\n  \"build_ns_total\": " << build_total
            << ",\n  \"wall_ns\": [";
@@ -1479,15 +2084,6 @@ int main(int argc, char ** argv) {
         // way to read it was `--verbose` on a hand-run -- so a whole campaign could record
         // `all_ok=false` with no auditable cause.  `decline` plans fail *by design*, so the
         // reason is a result, not a diagnostic.
-        auto js_escape = [](const std::string & in) {
-            std::string out;
-            for (char ch : in) {
-                if (ch == '\n') { out += ' '; continue; }
-                if (ch == '"' || ch == '\\') out += '\\';
-                out += ch;
-            }
-            return out;
-        };
         for (size_t i = 0; i < s.c.nodes.size(); ++i) {
             const Node & n = s.c.nodes[i];
             js << (i ? ",\n    " : "\n    ") << "{\"index\": " << n.index << ", \"op\": \"" << n.op

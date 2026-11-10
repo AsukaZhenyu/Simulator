@@ -14,7 +14,7 @@ import json
 import re
 
 import numpy as np
-from llm_infer_model.performance.moe_execution import RuntimeWindowAction,RuntimeWindowPrice,compile_runtime_windows,MECHANISM_POLICY,MECHANISM_POLICY_V2,MECHANISM_POLICIES
+from llm_infer_model.performance.moe_execution import RuntimeWindowAction,RuntimeWindowPrice,compile_runtime_windows,MECHANISM_POLICY,MECHANISM_POLICY_V2,MECHANISM_POLICIES,state_applies
 from llm_infer_model.performance.window_work import WindowWorkSpec,FEATURES,INTERCEPT,CPU_ATTENTION_STAGE
 
 COEFFICIENT_GRID=1_000_000_000
@@ -211,14 +211,24 @@ def action_from_inventory(w):
     fields=('id','key','scope','query_tokens','kv_padded','history','phase','layer','op','covered_nodes','global_operation','forward_index','payload_bytes')
     d={k:w[k] for k in fields};d['covered_nodes']=tuple(d['covered_nodes'])
     if 'work_spec' in w:d['work_spec']=WindowWorkSpec.from_dict(w['work_spec'])
+    # The machine state is declared on the window, never inferred from a duration.
+    if w.get('device_state') is not None:d['device_state']=w['device_state']
     return RuntimeWindowAction(**d)
 
-def fit_nonnegative(samples,allowed_features=None):
+def design_row(inventory,state_multiplier=1):
+    """One calibration row: the intercept and the work, scaled by its declared state."""
+    return [1.,float(state_multiplier)*inventory['query_tokens'],float(state_multiplier)*inventory['query_tokens']*inventory['kv_padded'],
+            float(state_multiplier)*inventory['payload_bytes']]
+
+def fit_nonnegative(samples,allowed_features=None,state_multipliers=None,reference='nominal'):
     """Tiny explicit active-set least squares, no network/DNN or heldout labels.
 
     Candidate columns are 1, q, q*KV and requested H2D bytes. The actual work
     declaration restricts this set before any calibration times are fitted.
     Missing declarations retain the explicit legacy test/helper contract only.
+    A sample measured in a declared machine state enters as its work terms times
+    that state's multiplier; the intercept is never scaled, which is what keeps
+    the clock-independent part of the response identifiable.
     """
     require(samples,'nonempty calibration windows required')
     if allowed_features is None:
@@ -226,7 +236,7 @@ def fit_nonnegative(samples,allowed_features=None):
         allowed_features=WindowWorkSpec.from_dict(declared).allowed_features if declared else FEATURES
     require(allowed_features and set(allowed_features)<=set(FEATURES) and 'intercept' in allowed_features,'invalid structural feature set')
     allowed_indices={i for i,name in enumerate(FEATURES) if name in allowed_features}
-    x=np.asarray([[1.,s['inventory']['query_tokens'],s['inventory']['query_tokens']*s['inventory']['kv_padded'],s['inventory']['payload_bytes']] for s in samples])
+    x=np.asarray([design_row(s['inventory'],sample_state_multiplier(s,state_multipliers,reference)) for s in samples])
     y=np.asarray([float(s['observed_ns']) for s in samples])
     scales=np.maximum(np.max(np.abs(x),axis=0),1.);design=x/scales
     best=None
@@ -246,6 +256,24 @@ def fit_nonnegative(samples,allowed_features=None):
     # Exact Fraction rounding is within half a grid step of the binary LS value.
     values=[Fraction(round(Fraction.from_float(float(v))*COEFFICIENT_GRID),COEFFICIENT_GRID) for v in best[1]]
     return values
+
+def sample_state_multiplier(sample,state_multipliers,reference='nominal'):
+    """The declared multiplier of one calibration window.
+
+    `state_multipliers` is None for a table that does not declare the machine
+    state at all, which is every cohort before this one; those windows are all
+    priced at one and every earlier table reproduces exactly. The reference
+    state carries one because it is the state the table is priced in, not
+    because it is nominal.
+    """
+    if state_multipliers is None:return 1
+    if not state_applies(sample['inventory']['scope']):return 1
+    state=sample['inventory'].get('device_state',reference)
+    table={name:Fraction(value) for name,value in dict(state_multipliers).items()}
+    table.setdefault(reference,Fraction(1))
+    require(state in table,'calibration window in an undeclared machine state: '+str(state))
+    require(table[state]>0,'a declared state multiplier must be positive')
+    return table[state]
 
 INTERCEPT_POLICIES=('per_key','shared_within_placement')
 
@@ -320,9 +348,26 @@ def fit_shared_intercept(grouped,allowed_by_key,sweeps=60):
         if converged:break
     return a,slopes
 
-def fit_prices(ledgers,evidence,feature_policy=MECHANISM_POLICY,intercept_policy='per_key'):
+def declared_states(state_multipliers,reference='nominal'):
+    """The state family every key of one table is calibrated for.
+
+    The reference state is the identification point: it carries multiplier one
+    because a key measured entirely in one state cannot separate that state from
+    its own coefficients, so the coefficients are in the units of the state the
+    calibration actually ran in. Every other state is stated relative to it.
+    """
+    table={reference:Fraction(1)}
+    if state_multipliers is not None:
+        for name,value in dict(state_multipliers).items():
+            require(name!=reference,'the reference multiplier is the identification point, never supplied')
+            table[name]=Fraction(value)
+            require(table[name]>0,'a declared state multiplier must be positive')
+    return tuple(sorted(table.items()))
+
+def fit_prices(ledgers,evidence,feature_policy=MECHANISM_POLICY,intercept_policy='per_key',state_multipliers=None,reference_state='nominal'):
     require(isinstance(feature_policy,str) and feature_policy in MECHANISM_POLICIES,'unknown mechanism feature policy')
     require(intercept_policy in INTERCEPT_POLICIES,'unknown intercept identification policy')
+    require(state_multipliers is None or intercept_policy=='per_key','a shared intercept has no state-scaled slope identification')
     grouped=defaultdict(list)
     for ledger in ledgers:
         for window in ledger['windows']:grouped[window['inventory']['key']].append(window)
@@ -342,7 +387,7 @@ def fit_prices(ledgers,evidence,feature_policy=MECHANISM_POLICY,intercept_policy
     for key,samples in sorted(grouped.items()):
         first=samples[0]['inventory'];work=works[key]
         if shared is None:
-            a,b,c,d=fit_nonnegative(samples,allowed_by_key[key])
+            a,b,c,d=fit_nonnegative(samples,allowed_by_key[key],state_multipliers,reference_state)
         else:
             if any(float(s['observed_ns'])!=0.0 for s in samples):
                 a=shared
@@ -358,7 +403,8 @@ def fit_prices(ledgers,evidence,feature_policy=MECHANISM_POLICY,intercept_policy
             history_domain=tuple(sorted({s['inventory']['history'] for s in samples})),evidence=tuple(evidence),
             per_payload_byte_ns=d,observed_payload_bytes=tuple(sorted({s['inventory']['payload_bytes'] for s in samples})),
             feature_policy=feature_policy if work is not None else 'legacy_affine_v1',work_spec=work,
-            zero_duration_approximation=all(v==0 for v in (a,b,c,d)))
+            zero_duration_approximation=all(v==0 for v in (a,b,c,d)),
+            state_multipliers=declared_states(state_multipliers,reference_state),reference_state=reference_state)
         prices.append(price)
     return tuple(prices)
 
@@ -393,8 +439,104 @@ def price_fit_diagnostics(ledgers,prices):
             calibration_fit_is_independent_accuracy=False)
     return result
 
-def predict_inventory(inventory,prices, *, allow_extrapolation=False):
-    actions=tuple(action_from_inventory(w) for w in inventory)
+def state_design(ledgers,reference='nominal'):
+    """Unscaled per-key work, its states, and its response, prepared once."""
+    grouped=defaultdict(list)
+    for ledger in ledgers:
+        for window in ledger['windows']:
+            grouped[window['inventory']['key']].append(window)
+    prepared={}
+    for key,samples in grouped.items():
+        declared=samples[0]['inventory'].get('work_spec')
+        allowed=WindowWorkSpec.from_dict(declared).allowed_features if declared else FEATURES
+        work=np.asarray([[s['inventory']['query_tokens'],s['inventory']['query_tokens']*s['inventory']['kv_padded'],
+                          s['inventory']['payload_bytes']] for s in samples],dtype=float)
+        prepared[key]=dict(work=work,state=[s['inventory'].get('device_state',reference) if state_applies(s['inventory']['scope']) else reference for s in samples],
+            y=np.asarray([float(s['observed_ns']) for s in samples]),
+            indices=[i for i,name in enumerate(FEATURES) if name in allowed])
+    mixed=[entry for entry in prepared.values() if len(set(entry['state']))>1]
+    fixed=sum(_key_error(entry,np.ones(len(entry['state']))) for entry in prepared.values()
+              if len(set(entry['state']))==1)
+    return dict(mixed=mixed,fixed=fixed,keys=len(prepared),mixed_keys=len(mixed))
+
+def _key_error(entry,scale):
+    """Best nonnegative active-set error of one key at one per-sample scaling."""
+    x=np.column_stack((np.ones(len(scale)),entry['work']*scale[:,None]))
+    design=x/np.maximum(np.max(np.abs(x),axis=0),1.)
+    y=entry['y'];best=None
+    for mask in range(1,16):
+        selected=[k for k in range(4) if mask&(1<<k)]
+        if not set(selected)<=set(entry['indices']):continue
+        coefficients=np.linalg.lstsq(design[:,selected],y,rcond=None)[0]
+        if np.any(coefficients<-1e-6):continue
+        beta=np.zeros(4);beta[selected]=np.maximum(coefficients,0)
+        error=float(np.sum((design@beta-y)**2))
+        rank=(round(error,6),len(selected),mask)
+        if best is None or rank<best[0]:best=(rank,)
+    require(best is not None,'nonnegative affine estimation failed')
+    return best[0][0]
+
+def _key_sse(prepared,multipliers,reference='nominal'):
+    """Least-squares error of every key at one declared state family.
+
+    A key whose windows all ran in one state cannot identify the state at all:
+    a uniform scale is absorbed exactly by its own coefficients, so its error is
+    fixed and is evaluated once, outside the search.
+    """
+    total=prepared['fixed']
+    for entry in prepared['mixed']:
+        scale=np.asarray([1.0 if state==reference else multipliers[state] for state in entry['state']])
+        total+=_key_error(entry,scale)
+    return total
+
+def fit_state_multipliers(ledgers,states=('p4','p5'),limits=None,step=0.05,iterations=3,reference='nominal'):
+    """One declared multiplier per machine state, on the calibration windows only.
+
+    The reference state is the identification point: it is the state the
+    calibration actually ran in, it carries multiplier one, and every other
+    state is stated relative to it. The multipliers are estimated by coordinate
+    descent on the summed squared error of the same active-set fit each key uses,
+    so the state is part of the price model rather than a correction applied
+    afterwards. Nothing here reads a heldout time.
+    """
+    require(bool(states) and len(set(states))==len(states) and reference not in states,'distinct states away from the reference required')
+    observed={(s['inventory'].get('device_state',reference)) for l in ledgers for s in l['windows']}
+    require(set(states)<=observed,'no calibration window in a declared state: '+repr(sorted(observed)))
+    limits=dict(limits or {})
+    grid={s:[round(limits.get(s,(0.5,6.0))[0]+index*step,4)
+             for index in range(int(round((limits.get(s,(0.5,6.0))[1]-limits.get(s,(0.5,6.0))[0])/step))+1)] for s in states}
+    prepared=state_design(ledgers,reference)
+    multipliers={s:1.0 for s in states}
+    errors={}
+    for _ in range(iterations):
+        for state in states:
+            plateau=[(c,_key_sse(prepared,dict(multipliers,**{state:c}),reference)) for c in grid[state]]
+            errors[state]=plateau
+            # The smallest improving multiplicity wins: equal errors at 1.05 and
+            # 1.60 must not be resolved towards the larger claim.
+            best=min(plateau,key=lambda item:(round(item[1],6),item[0]))
+            multipliers[state]=best[0]
+    return ({state:Fraction(round(multipliers[state]*1000),1000) for state in states},errors)
+
+def declare_states(windows,declared):
+    """Attach the declared machine state to every window of one prediction.
+
+    `declared` is a state name for a uniform declaration, or a mapping from
+    (phase, forward index) to the state observed while that forward ran.
+    """
+    if declared is None:return tuple(windows)
+    out=[]
+    for window in windows:
+        if isinstance(declared,str):
+            state=declared
+        else:
+            state=declared.get((window['phase'],int(window['forward_index'])))
+            require(state is not None,'no declared machine state for window '+str(window['id'])+' in '+window['phase']+'/'+str(window['forward_index']))
+        item=dict(window);item['device_state']=state;out.append(item)
+    return tuple(out)
+
+def predict_inventory(inventory,prices, *, allow_extrapolation=False,declared_states=None):
+    actions=tuple(action_from_inventory(w) for w in declare_states(inventory,declared_states))
     compiled=compile_runtime_windows(actions,tuple(prices),allow_extrapolation=allow_extrapolation)
     total=compiled.evaluate().duration_ns
     phase={}

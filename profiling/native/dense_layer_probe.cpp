@@ -1758,6 +1758,10 @@ static void emit_config(const Options &o) {
                   << ",\"shared_intermediate\":" << o.shared_intermediate
                   << ",\"normalize_topk\":" << (o.normalize_topk ? "true" : "false")
                   << ",\"attention_bias\":" << (o.attention_bias ? "true" : "false");
+    // The dense contract declares the bias only when the projections have one, so an
+    // unbiased case still emits exactly the config it always has.
+    else if (o.attention_bias)
+        std::cout << ",\"attention_bias\":true";
     std::cout << ",\"weight_dtypes\":";
     emit_dtypes(o);
     std::cout << "}";

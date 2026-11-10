@@ -175,19 +175,44 @@ def load_model(model: str) -> dict:
         "qk_norm": config.get("qk_norm", "none"),
         "attention_gate": config.get("attention_gate", "none"),
         "experts": int(moe.get("experts") or 0), "top_k": int(moe.get("top_k") or 0),
+        # a sparse feed-forward may also carry a shared expert that every token runs; the
+        # executor must build it or it executes less than the price it is compared against
+        "shared": int(moe.get("shared_expert_intermediate_size") or 0),
         "dtypes": dtypes,
         "kv_dtype": signature.get("kv_dtype") or config.get("kv_dtype") or "f16",
         "intermediate_dense": int(geo["intermediate_size"] or 0),
     }
 
 
+def expert_planes(spec: dict, tokens: int) -> int:
+    """How many expert planes of one block a step of `tokens` tokens has to hold.
+
+    One token routes to `top_k` experts, so a step reads at most `tokens * top_k` distinct
+    planes and never more than the model has: `S = min(E, max(1, tokens) * k)`.  At decode
+    (one token) that is `k`; at a prefill of 64 tokens with `k` of 4-8 it is every plane,
+    because `64 * k > E` on all three published sparse models.  Dense models have no
+    experts and the count is 1, which is what makes every dense byte count unchanged.
+    """
+    if spec["experts"] <= 0:
+        return 1
+    return min(spec["experts"], max(1, tokens) * max(spec["top_k"], 1))
+
+
 def bytes_for(role: str, direction: str, spec: dict, tokens: int) -> int:
-    """Real bytes of the tensor a copy node names, at this model's geometry."""
+    """Real bytes of the tensor a copy node names, at this model's geometry.
+
+    The four expert roles are the block's *expert* weights, so their size follows the block
+    and not the model: a copy that brings a sparse block onto the accelerator brings
+    `expert_planes(spec, tokens)` of them, and a dense FFN's `W_gate` in a case lowered
+    against a sparse model is that same expert weight -- the case's dense decomposition says
+    what the block computes, not how many matrices it reads.
+    """
     h, i = spec["hidden"], spec["intermediate"]
     qd = spec["heads"] * spec["head_dim"]
     kd = spec["kv_heads"] * spec["head_dim"]
     d = spec["dtypes"]
     act = 4  # activations are f32 throughout, as the tables declare
+    planes = expert_planes(spec, tokens)
     table = {
         "in.hidden": nbytes(tokens * h, "f32"),
         "in": nbytes(tokens * h, "f32"),
@@ -203,7 +228,12 @@ def bytes_for(role: str, direction: str, spec: dict, tokens: int) -> int:
         "combine": nbytes(tokens * h, "f32"),
         "ffn": nbytes(tokens * h, "f32"),
         "expert.0": nbytes(tokens * h, "f32"),
-        "proj": nbytes(tokens * h, "f32"),
+        # The fused projection is one graph node with three outputs -- q, k and v -- and a
+        # copy of it has to carry all three, or the far side's attention runs on a `query`
+        # and two tensors nobody wrote.  This used to say `tokens * h`, which is `query`
+        # alone for a model without GQA and not even that for one with it (qwen3-4b is
+        # 4096 wide against 2560 hidden).
+        "proj": nbytes(tokens * (qd + 2 * kd), "f32"),
         "0": nbytes(tokens, "f32"),
         "W_input_norm": nbytes(h, "f32"),
         "W_post_attention_norm": nbytes(h, "f32"),
@@ -212,13 +242,13 @@ def bytes_for(role: str, direction: str, spec: dict, tokens: int) -> int:
         "W_v": nbytes(kd * h, d["v"]),
         "W_output": nbytes(h * qd, d["output"]),
         "W_proj": nbytes(qd * h, d["q"]),
-        "W_gate": nbytes(i * h, d["gate"]),
-        "W_up": nbytes(i * h, d["up"]),
-        "W_down": nbytes(h * i, d["down"]),
+        "W_gate": nbytes(i * h, d["gate"]) * planes,
+        "W_up": nbytes(i * h, d["up"]) * planes,
+        "W_down": nbytes(h * i, d["down"]) * planes,
         "W_router": nbytes(max(spec["experts"], 1) * h, "f32"),
         "E0": (nbytes(i * h, d.get("gate_exps", d["gate"]))
                + nbytes(i * h, d.get("up_exps", d["up"]))
-               + nbytes(h * i, d.get("down_exps", d["down"]))),
+               + nbytes(h * i, d.get("down_exps", d["down"]))) * planes,
     }
     if role not in table:
         raise KeyError(f"copy role {role!r} ({direction}) has no real byte definition")
@@ -233,17 +263,27 @@ OVERRIDE_KEYS = ("dtypes", "kv_dtype", "request_tokens",
                  "vram_blocks", "dram_blocks", "ssd_blocks", "reclaim", "release_order", "uma")
 
 
-def block_weight_bytes(spec: dict) -> int:
+def block_weight_bytes(spec: dict, tokens: int = 1) -> int:
     """Bytes of one block's resident weights at this model's geometry and precision.
 
     A capacity budget has to be declared in bytes before the model is known, so the corpus
     declares it in *blocks* and it is converted here.  A budget of `k` blocks is the exact
     size of k blocks' weights -- not a round number -- so "does this plan fit" is a
     statement about this model rather than about the rounding.
+
+    A MoE block's experts are what makes its weights big, and how many of them a block must
+    hold at once is a property of its shape, not of the model: one step reads `tokens * k`
+    expert planes, so the resident count is `S = min(experts, max(1, tokens) * k)`.  A
+    decode step of one token needs `k` planes; a prefill step of 64 tokens with `k` of 4-8
+    needs all of them.  `tokens` must therefore be the case's *peak* shape, since the block
+    has to fit at its widest step -- the same `min(E, T*k)` the executor allocates for.
     """
-    roles = ["W_input_norm", "W_q", "W_k", "W_v", "W_post_attention_norm"]
-    roles += ["W_router", "E0"] if spec["experts"] > 0 else ["W_gate", "W_up", "W_down"]
-    return sum(bytes_for(role, "", spec, 1) for role in roles)
+    base = ["W_input_norm", "W_q", "W_k", "W_v", "W_post_attention_norm"]
+    if spec["experts"] <= 0:
+        roles = base + ["W_gate", "W_up", "W_down"]
+        return sum(bytes_for(role, "", spec, 1) for role in roles)
+    return (sum(bytes_for(role, "", spec, 1) for role in base + ["W_router"])
+            + bytes_for("E0", "", spec, tokens))
 
 
 def case_overrides(case_dir: Path) -> dict:
@@ -455,7 +495,8 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
                                       "release_order", "uma")
             if overrides and k in overrides}
     if edge:
-        per_block = block_weight_bytes(spec)
+        # the resident expert count follows the case's widest step, not the model's E
+        per_block = block_weight_bytes(spec, max(m["tokens"] for m in manifest))
         for role, key in (("vram", "vram_blocks"), ("dram", "dram_blocks"), ("ssd", "ssd_blocks")):
             if key in edge:
                 header.append(f"{role}_bytes {edge[key] * per_block}")
@@ -507,6 +548,15 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
         f"dtype_down {spec['dtypes'].get('down', 'q6_k')}",
         f"dtype_kv {spec['kv_dtype']}",
     ]
+    if spec.get("shared"):
+        # Only models that declare one get these lines, so every other case file stays
+        # byte-identical to the ones the earlier tranches were measured from.
+        header += [
+            f"shared {spec['shared']}",
+            f"dtype_gate_shexp {spec['dtypes'].get('gate_shexp', spec['dtypes'].get('gate', 'q4_k'))}",
+            f"dtype_up_shexp {spec['dtypes'].get('up_shexp', spec['dtypes'].get('up', 'q4_k'))}",
+            f"dtype_down_shexp {spec['dtypes'].get('down_shexp', spec['dtypes'].get('down', 'q6_k'))}",
+        ]
     return "\n".join(header + lines) + "\n", manifest
 
 

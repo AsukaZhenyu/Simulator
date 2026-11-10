@@ -2,18 +2,44 @@
 #define main historical_steady_entry_not_called
 #include "../../native/steady_costs/probe.cpp"
 #undef main
+// CUPTI is the third instrumentation -- an observer that timestamps the engine's
+// own stream -- and it is CUDA's. A Metal build refuses `instrument=cupti` (see
+// the request check below) and does not carry the header at all, so nothing here
+// depends on a toolkit it does not have.
+#if !defined(PROBE_BACKEND_METAL)
 #include "../../native/physical_stages/cupti_capture.hpp"
-#include <psapi.h>
+#endif
+// <psapi.h> is the Windows half of what platform.hpp already brings in; the
+// probes' affinity, accounting and system-counter calls are spelled the same on
+// both hosts. See ../../native/portable/platform.hpp.
+#include "../../native/portable/platform.hpp"
 
 namespace history_probe {
+// QPC ticks to floor-converted ns. CUPTI's header carries this on a CUDA build;
+// the conversion is two lines and has nothing to do with CUPTI, so a Metal build
+// states it here rather than pulling in an observer it will not use.
+inline uint64_t ticks_to_ns(uint64_t value, uint64_t hz) {
+    return (value / hz) * 1000000000ULL + (value % hz) * 1000000000ULL / hz;
+}
 static uint64_t filetime(FILETIME value) {
     return (uint64_t(value.dwHighDateTime)<<32)|value.dwLowDateTime;
 }
 static uint64_t absolute_ns(int64_t tick) {
     require(tick>=0,"negative QPC timestamp");
-    return physical_capture::ticks_to_ns(static_cast<uint64_t>(tick),static_cast<uint64_t>(steady::frequency()));
+    return ticks_to_ns(static_cast<uint64_t>(tick),static_cast<uint64_t>(steady::frequency()));
 }
 static json pointer_kind(void *pointer) {
+#if defined(PROBE_BACKEND_METAL)
+    // One memory. "Is this pointer registered with the device?" has no second
+    // answer to give, and inventing one -- either `host` (pinned) or
+    // `unregistered` (pageable) -- would put a category in the receipt that was
+    // never observed. The receipt says what is true instead.
+    (void)pointer;
+    return json{{"status","not_applicable"},{"query","none"},
+        {"reason","unified memory: the accelerator has no separate address space, so "
+                  "there is no pageable/registered distinction to observe"},
+        {"device_memory","shared"}};
+#else
     cudaPointerAttributes attrs{};const auto status=cudaPointerGetAttributes(&attrs,pointer);
     if(status==cudaErrorInvalidValue) {
         cudaGetLastError();
@@ -25,19 +51,33 @@ static json pointer_kind(void *pointer) {
         {"cuda_memory_type",static_cast<int>(attrs.type)},
         {"registered_host",attrs.type==cudaMemoryTypeHost},
         {"unregistered_pageable",attrs.type==cudaMemoryTypeUnregistered}};
+#endif
+}
+static unsigned online_cpus(DWORD_PTR mask) {
+    unsigned count=0;for(int cpu=0;cpu<64;++cpu)if((mask>>cpu)&1)++count;return count;
 }
 static json apply_process_mask(const json &request) {
+    require(PORTABLE_AFFINITY!=0,"this platform exposes no enforced CPU affinity; the history protocol "
+        "pins every CPU and one main thread, and cannot be honoured here");
     const auto requested=static_cast<DWORD_PTR>(steady::positive(request.at("expected_process_mask"),"process mask",INT64_MAX));
-    require(static_cast<uint64_t>(requested)==4294967295ULL,"history context requires explicit all-32 process mask");
     DWORD_PTR initial=0,system=0,observed=0,after_system=0;
     require(GetProcessAffinityMask(GetCurrentProcess(),&initial,&system)!=0,"cannot observe process affinity");
+    // The protocol is "every CPU this host offers, and prove it" -- not "32 CPUs".
+    // Written as 0xFFFFFFFF it could only ever run on a 32-CPU Windows machine,
+    // so a device with 20 cores had no mask to send and the refusal read like a
+    // measurement failure. The requested mask must be exactly the online set,
+    // and the receipt says how many CPUs that turned out to be.
+    require(requested==system,"requested process mask must name every online CPU; this host offers "
+        +std::to_string(online_cpus(static_cast<DWORD_PTR>(system)))+" (0x"
+        +std::to_string(static_cast<unsigned long long>(system))+")");
     require((requested&system)==requested,"requested process mask outside system affinity");
     require(SetProcessAffinityMask(GetCurrentProcess(),requested)!=0,"cannot set owned process mask");
     require(GetProcessAffinityMask(GetCurrentProcess(),&observed,&after_system)!=0&&observed==requested,"owned process mask readback differs");
     return json{{"status","observed"},{"initial_mask",static_cast<uint64_t>(initial)},
         {"requested_mask",static_cast<uint64_t>(requested)},{"observed_mask",static_cast<uint64_t>(observed)},
-        {"system_mask",static_cast<uint64_t>(after_system)},{"enforced",true},
-        {"applied_before_backend_initialization",true},{"scope","owned process only"}};
+        {"system_mask",static_cast<uint64_t>(after_system)},{"online_cpus",online_cpus(requested)},
+        {"mask_semantics","every online CPU of this host, not a fixed width"},{"enforced",true},
+        {"applied_before_backend_initialization",true},{"scope",PORTABLE_AFFINITY_SCOPE}};
 }
 static json finish_process_mask(json receipt) {
     DWORD_PTR observed=0,system=0;
@@ -81,6 +121,22 @@ static json preblock_state(bool gpu) {
     FILETIME idle{},kernel{},user{};
     const bool memory_ok=GlobalMemoryStatusEx(&memory)!=0;
     const bool times_ok=GetSystemTimes(&idle,&kernel,&user)!=0;
+#if defined(PROBE_BACKEND_METAL)
+    // `ggml_backend_dev_memory` is the backend-neutral way to ask the same
+    // question `cudaMemGetInfo` answers, and on a unified machine the answer is
+    // the host's memory: there is no second pool to report.
+    (void)gpu;
+    return json{{"sample_tick",at},{"sample_ns",absolute_ns(at)},
+        {"outside_timed_interval",true},{"sampled_before_untimed_prime",true},
+        {"derived_from_target_duration",false},{"cpu_utilization",nullptr},
+        {"gpu_utilization",nullptr},{"gpu_clock_mhz",nullptr},{"gpu_temperature_c",nullptr},
+        {"utilization_status","unknown; no independent utilization interval sampled"},
+        {"cpu_cumulative_times_100ns",times_ok?json{{"idle",filetime(idle)},{"kernel_including_idle",filetime(kernel)},{"user",filetime(user)}}:json(nullptr)},
+        {"system_memory",memory_ok?json{{"total_bytes",memory.ullTotalPhys},{"available_bytes",memory.ullAvailPhys},{"load_percent",memory.dwMemoryLoad}}:json(nullptr)},
+        {"cuda_memory",nullptr},
+        {"device_memory",json{{"status","not_queried"},{"reason","unified memory: DRAM and the accelerator's memory are one pool, so a free/total pair would be the host's"}}},
+        {"memory_capacity_is_bandwidth",false},{"external_only_state",false}};
+#else
     size_t free_bytes=0,total_bytes=0;cudaError_t status=cudaSuccess;
     if(gpu){status=cudaMemGetInfo(&free_bytes,&total_bytes);if(status!=cudaSuccess)cudaGetLastError();}
     return json{{"sample_tick",at},{"sample_ns",absolute_ns(at)},
@@ -92,6 +148,7 @@ static json preblock_state(bool gpu) {
         {"system_memory",memory_ok?json{{"total_bytes",memory.ullTotalPhys},{"available_bytes",memory.ullAvailPhys},{"load_percent",memory.dwMemoryLoad}}:json(nullptr)},
         {"cuda_memory",!gpu?json(nullptr):status==cudaSuccess?json{{"status","observed"},{"free_bytes",free_bytes},{"total_bytes",total_bytes}}:json{{"status","unknown"},{"runtime_error_code",static_cast<int>(status)}}},
         {"memory_capacity_is_bandwidth",false},{"external_only_state",false}};
+#endif
 }
 
 class ArenaRegistration {
@@ -102,6 +159,22 @@ public:
         require(executor.dram_buffer!=nullptr,"missing owned DRAM arena");
         base_=ggml_backend_buffer_get_base(executor.dram_buffer);size_=ggml_backend_buffer_get_size(executor.dram_buffer);
         require(base_!=nullptr&&size_>0,"empty DRAM arena");
+#if defined(PROBE_BACKEND_METAL)
+        // One memory: the arena the CPU backend owns is already in the address
+        // space the accelerator reads, so there is no pageable/registered pair
+        // to observe or move between. `pageable` is the only mode that names
+        // something real here; `registered` would be a request to change a
+        // category that does not exist, so it is refused rather than reported
+        // as an already-satisfied one.
+        require(mode=="pageable","registered arena requires a pageable/registered distinction; unified memory has none");
+        no_cuda_=true;
+        const json category=pointer_kind(base_);
+        receipt_=json{{"mode",mode},{"arena_bytes",size_},{"before",category},{"during",category},
+            {"scope","owned CPU backend arena; unified memory needs no registration"},{"registration_timed",false},
+            {"registration_is_free_initialization",false},{"cuda_memory_category_verified",false},
+            {"device_memory","shared"},{"registration_status","not_applicable"}};
+        return;
+#else
         no_cuda_=executor.gpu==nullptr;
         if(no_cuda_) {
             require(mode=="pageable","registered arena requires GPU context");
@@ -126,6 +199,7 @@ public:
         }
         receipt_["during"]=pointer_kind(base_);
         require(receipt_.at("during").at(mode=="registered"?"registered_host":"unregistered_pageable")==true,"actual arena category differs from request");
+#endif
     }
     ~ArenaRegistration(){if(registered_)cudaHostUnregister(base_);}
     json finish() {
@@ -213,6 +287,12 @@ static json run(Executor &executor,const steady::Request &sampling,const json &r
     require(intervention=="none"||intervention=="source-read"||intervention=="idle","unknown history intervention");
     require(mode=="full"||mode=="target-hot","unknown history execution mode");
     require(instrument=="bare"||instrument=="stamped"||instrument=="cupti","unknown history instrumentation");
+#if defined(PROBE_BACKEND_METAL)
+    // CUPTI observes CUDA's streams and this build carries neither. Refusing is
+    // the whole reason the request is checked here instead of at a call site:
+    // a receipt must never say "cupti" and mean "no records kept".
+    require(instrument!="cupti","this build is Metal; the cupti observer is CUDA's. Use bare or stamped");
+#endif
     require(sampling.instrumentation=="bare","outer history instrumentation must be bare; use explicit history instrumentation field");
     require(sampling.mode==(mode=="full"?"full":"action"),"sampling mode differs from history execution mode");
     require(mode!="full"||sampling.repeats==8,"full history context requires exactly eight replays per block");
@@ -240,8 +320,13 @@ static json run(Executor &executor,const steady::Request &sampling,const json &r
     std::vector<Block> blocks(sampling.trials);
     std::vector<ActionStamp> stamps(instrument=="bare"?0:static_cast<size_t>(sampling.trials)*sampling.repeats*count);
     std::vector<Intervention> interventions(intervention=="none"?0:static_cast<size_t>(sampling.trials)*sampling.repeats);
+    // The CUPTI observer is compiled in only on a CUDA build. On Metal the
+    // instrumentation check above has already refused `cupti`, so there is no
+    // observer to hold and nothing to bracket the actions with.
+#if !defined(PROBE_BACKEND_METAL)
     std::unique_ptr<physical_capture::Capture> capture;
     if(instrument=="cupti")capture=std::make_unique<physical_capture::Capture>();
+#endif
     uint64_t serial=0;
     for(int trial=0;trial<sampling.trials;++trial) {
         auto &block=blocks[trial];block.state=preblock_state(executor.gpu!=nullptr);
@@ -253,19 +338,30 @@ static json run(Executor &executor,const steady::Request &sampling,const json &r
                 interventions[static_cast<size_t>(trial)*sampling.repeats+repeat]=intervene(executor,actions.at(index),intervention,trial,repeat,index);
             ActionStamp *stamp=instrument=="bare"?nullptr:&stamps[serial];
             if(stamp){stamp->action_index=index;stamp->invocation=repeat;stamp->external_id=serial+1;}
+#if !defined(PROBE_BACKEND_METAL)
             if(capture)capture->push(serial+1);
+#endif
             action(executor,actions.at(index),stamp);
+#if !defined(PROBE_BACKEND_METAL)
             if(capture)capture->pop(serial+1);
+#endif
             ++serial;
         }
         block.end=steady::tick();block.after=cpu_point();
     }
+#if defined(PROBE_BACKEND_METAL)
+    const json activities=json{{"schema","physical-stage-cupti-1"},{"enabled",false},{"records",json::array()},
+        {"hardware_accuracy_qualified",false},
+        {"reason","this build is Metal; the cupti observer is CUDA's and was refused at the request check"}};
+    bool capture_integrity=instrument!="cupti";
+#else
     json activities=capture?capture->finish():json{{"schema","physical-stage-cupti-1"},{"enabled",false},{"records",json::array()},
         {"hardware_accuracy_qualified",false}};
     capture.reset();
     bool capture_integrity=instrument!="cupti"||activities.at("all_requested_records_retained").get<bool>();
     if(instrument=="cupti")for(const auto &record:activities.at("records"))
         if(record.at("kind")!="external_correlation"&&!record.at("timestamp_valid").get<bool>())capture_integrity=false;
+#endif
     const auto final=single_layer::capture_verification(executor);
     const auto registration_receipt=registration.finish();
     json rows=json::array();size_t cursor=0;
@@ -337,8 +433,8 @@ int main(int argc,char **argv) {try {
         {"main_thread_id",state_response::main_thread_id()},
         {"source_sha256",HISTORY_SOURCE_SHA256},{"caller_source_sha256_match",true},
         {"main_thread_affinity",affinity.finish()},{"process_affinity",history_probe::finish_process_mask(process_affinity)},
-        {"clock",json{{"clock_id","windows_qpc"},{"frequency_hz",steady::frequency()}}},
-        {"physical_clock",json{{"clock_id","windows_qpc_floor_ns"},{"clock_origin","absolute_qpc_zero"},
+        {"clock",json{{"clock_id",PORTABLE_CLOCK_ID},{"frequency_hz",steady::frequency()}}},
+        {"physical_clock",json{{"clock_id",PORTABLE_PHYSICAL_CLOCK_ID},{"clock_origin",CLOCK_ORIGIN},
             {"frequency_hz",steady::frequency()},{"conversion","floor(QPC ticks / frequency * 1e9)"}}},
         {"observed_runtime_flags",json{{"GGML_CUDA_DISABLE_GRAPHS","1"},{"NVIDIA_TF32_OVERRIDE","0"},{"matmul_precision","GGML_PREC_F32"}}}});
     state_response::write_new(argv[3],result);std::cout<<json{{"status","ok"},{"process_id",single_layer::pid()}}.dump()<<'\n';return 0;

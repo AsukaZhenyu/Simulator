@@ -123,6 +123,24 @@ class SharedMappingIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(Unsupported, "physical COPY"):
                 compile_command(Decision("COPY", tensor.id, src="dram", dst="vram"), observation)
 
+    def test_share_cannot_compile_where_there_is_no_shared_pool(self):
+        # The same rule in the other direction: SHARE aliases two views of *one*
+        # physical pool, so a machine with DRAM and VRAM as separate pools has no
+        # such action to take. A strategy that asks for one is refused rather
+        # than priced at zero -- which is what it would cost if the compiler
+        # trusted the name of the action instead of the host's pools.
+        demo, _ = make_demo("dense")
+        simulator = Simulator(model=demo.model, hardware=demo.hardware,
+                              workload=demo.workload, cost_model=demo.cost_model)
+        with simulator.compile(scheduling=schedule()) as compiled:
+            session = create_session(compiled.plan._compiled)
+            observation = session.observe()
+            tensor = next(t for t in observation.tensors
+                          if any(price.route == "dram_to_vram" for price in t.transfers))
+            share = Decision("SHARE", tensor.id, src="dram", dst="vram")
+            with self.assertRaisesRegex(Unsupported, "shared physical memory pool"):
+                compile_command(share, observation)
+
     def test_startup_preload_and_cross_layer_prefetch_use_shared_views(self):
         simulator = shared_simulator()
         settings = schedule(prefetch=Prefetch(next_layers=1, max_count=2, include_dense_weights=True))
