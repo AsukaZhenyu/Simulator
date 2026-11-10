@@ -217,6 +217,11 @@ static json self_test() {
     auto zero_json=request.source;zero_json["target_action_index"]=0;Request zero(zero_json);require(zero.target==0,"action zero parser failed");
     bool unknown_mode_rejected=false;try {auto invalid=request.source;invalid["mode"]="implicit";Request rejected(invalid);}catch(const std::exception &){unknown_mode_rejected=true;}
     require(unknown_mode_rejected,"unknown request mode accepted");
+    // The mask reader the history probe uses for `expected_process_mask`. A host
+    // that offers this process all 64 CPUs sends 2^64-1: JSON carries it unsigned,
+    // and a reader that asks for int64_t sees -1 and calls it below the minimum.
+    require(mask(json(18446744073709551615ULL),"mask")==18446744073709551615ULL,"full 64-bit mask reads as itself");
+    require(mask(json(4294967295LL),"mask")==4294967295ULL,"32-bit mask reads as itself");
     return json{{"passed",true},{"backend_or_Executor_constructed",false},{"native_hardware_timing_executed",false},
         {"mix32_seed123_index0_ordinal0",value},{"SHA256_known_vector_passed",true},{"target_zero_accepted",true},{"unknown_request_mode_rejected",true}};
 }

@@ -59,7 +59,7 @@ static unsigned online_cpus(DWORD_PTR mask) {
 static json apply_process_mask(const json &request) {
     require(PORTABLE_AFFINITY!=0,"this platform exposes no enforced CPU affinity; the history protocol "
         "pins every CPU and one main thread, and cannot be honoured here");
-    const auto requested=static_cast<DWORD_PTR>(steady::positive(request.at("expected_process_mask"),"process mask",INT64_MAX));
+    const auto requested=static_cast<DWORD_PTR>(steady::mask(request.at("expected_process_mask"),"process mask"));
     DWORD_PTR initial=0,system=0,observed=0,after_system=0;
     require(GetProcessAffinityMask(GetCurrentProcess(),&initial,&system)!=0,"cannot observe process affinity");
     // The protocol is "every CPU this host offers, and prove it" -- not "32 CPUs".

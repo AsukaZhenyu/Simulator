@@ -21,6 +21,15 @@ static std::string sha256_bytes(const void *data,size_t size) {
 static int64_t positive(const json &value,const char *name,int64_t maximum=1000000000) {
     const auto parsed=state_response::integer(value,name,1);require(parsed<=maximum,std::string(name)+" exceeds component envelope");return parsed;
 }
+// A CPU mask is a bit set, not a signed quantity. A host that offers this
+// process all 64 CPUs sends 2^64-1, which JSON carries as an unsigned integer;
+// read through `positive` -- which asks for int64_t -- it arrives as -1, and
+// every minimum comparison then rejects a mask that is exactly what the
+// protocol asked for. `get<uint64_t>` reads both encodings without narrowing.
+static uint64_t mask(const json &value,const char *name) {
+    require(value.is_number_integer()&&!value.is_boolean(),std::string(name)+" must be an integer");
+    return value.get<uint64_t>();
+}
 static uint64_t product(std::initializer_list<uint64_t> values) {
     uint64_t result=1;for(auto value:values){require(value>0&&result<=1073741824ULL/value,"component shape product exceeds 1 GiB hard envelope");result*=value;}return result;
 }
