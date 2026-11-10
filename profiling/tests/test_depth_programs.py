@@ -78,6 +78,23 @@ class DepthProgramsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'file bytes/hash'):
             materialize(program)
 
+    def test_an_asset_file_that_travelled_away_is_reported_as_missing_not_as_changed(self):
+        # `--cache` hands an earlier cohort's compiled templates to a new root,
+        # and each template names the absolute path of the file its bytes were
+        # written to. A reader told "the bytes changed" goes looking for a
+        # corrupt cache; the fault is that the file is somewhere else.
+        result,program=self.build()
+        Path(result['initial_assets']['path']).unlink()
+        with self.assertRaisesRegex(ValueError,r'is missing: .*\.bin'):
+            validate_compact(program)
+
+    def test_an_asset_file_of_the_wrong_length_names_both_lengths(self):
+        result,program=self.build()
+        path=Path(result['initial_assets']['path'])
+        with path.open('ab') as stream:stream.write(b'\0\0\0\0')
+        with self.assertRaisesRegex(ValueError,'length changed: .* has \\d+ bytes, the program names \\d+'):
+            validate_compact(program)
+
     def test_offset_tampering_cannot_be_rehashed_into_valid_layout(self):
         _,program=self.build()
         changed=deepcopy(program)

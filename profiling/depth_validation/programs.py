@@ -120,8 +120,17 @@ def validate_compact(program):
     asset = program.get('initial_assets', {})
     require(asset.get('schema')==SCHEMA, 'unsupported initializer asset schema')
     path = Path(asset['file']['path'])
-    require(path.is_file() and path.stat().st_size==asset['file']['bytes']
-            and file_sha(path)==asset['file']['sha256'], 'initializer file bytes/hash changed')
+    # Three faults, separated because they send a reader to three places. A
+    # compact program records the absolute path of the file that holds its
+    # initializer bytes, so a template carried to another cohort root -- what
+    # `--cache` does -- names a path that no longer exists; reading that as
+    # "the bytes changed" says the cache is corrupt when it is only elsewhere.
+    require(path.is_file(), 'initializer file is missing: ' + str(path))
+    actual = path.stat().st_size
+    require(actual==asset['file']['bytes'],
+            'initializer file length changed: {} has {} bytes, the program names {}'.format(
+                path, actual, asset['file']['bytes']))
+    require(file_sha(path)==asset['file']['sha256'], 'initializer file bytes/hash changed')
     tensors = {t['id']:t for t in program['graph']['workload']['tensors']}
     expected = {tid for tid,t in tensors.items() if t.get('initial_locations')}
     require(set(asset['tensors'])==expected, 'initializer asset tensor inventory differs')
