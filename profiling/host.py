@@ -296,6 +296,29 @@ def cupti_library_dir(root) -> Path:
     return candidates[0]
 
 
+def cuda_library_dir(root) -> Path | None:
+    """The directory holding a toolkit's shared libraries, on layouts that split them.
+
+    Windows keeps a toolkit's DLLs beside its executables in `bin`, so the
+    question has the same answer as `cuda_dirs` and nothing extra is needed
+    there: this returns `None`. Linux separates them -- `bin` holds `nvcc` and
+    the CUDA runtime while cuBLAS, cuDNN and cuFFT sit in `lib64` -- and an
+    aarch64 install puts them under `targets/aarch64-linux/lib`. A probe that
+    links ggml-cuda loads those before its first action, so a runtime list
+    naming only `bin` lets every child die in the loader with
+    `libcublas.so.12: cannot open shared object file`.
+    """
+    if is_windows():
+        return None
+    root = Path(root)
+    candidates = [root / "targets" / (arch() + "-linux") / "lib",
+                  root / "lib64", root / "lib"]
+    for candidate in candidates:
+        if candidate.is_dir() and any(candidate.glob("libcublas.so*")):
+            return candidate
+    return None
+
+
 def available_memory_bytes() -> int:
     """Bytes an allocating process can still get, asked of the host in its own terms.
 

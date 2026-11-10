@@ -400,6 +400,35 @@ class Requirements(unittest.TestCase):
                 binary, _ = subject.cuda_dirs(mock.Mock(cuda_dir=None))
             self.assertEqual(binary, root / "v12.10" / "bin")
 
+    def test_a_layout_that_splits_its_libraries_names_that_directory_too(self):
+        # `bin` holds nvcc and the CUDA runtime on Linux while cuBLAS sits in
+        # `lib64`; a probe linking ggml-cuda asks the loader for it before its
+        # first action, so leaving the directory out fails every process of the
+        # column with one loader error rather than one bad measurement.
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "bin").mkdir()
+            (root / "extras" / "CUPTI" / "lib64").mkdir(parents=True)
+            (root / "extras" / "CUPTI" / "lib64" / "libcupti.so").write_bytes(b"")
+            (root / "lib64").mkdir()
+            (root / "lib64" / "libcublas.so.12").write_bytes(b"")
+            with mock.patch.object(subject.host, "backend", return_value="cuda"), \
+                 mock.patch.object(subject.host, "is_windows", return_value=False):
+                directories = subject.probe_toolkit_dirs(mock.Mock(cuda_dir=root))
+            self.assertEqual(directories, (root / "bin",
+                                           root / "extras" / "CUPTI" / "lib64",
+                                           root / "lib64"))
+
+    def test_a_layout_that_keeps_libraries_in_bin_names_it_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "bin").mkdir()
+            (root / "extras" / "CUPTI" / "lib64").mkdir(parents=True)
+            (root / "extras" / "CUPTI" / "lib64" / "libcupti.so").write_bytes(b"")
+            with mock.patch.object(subject.host, "backend", return_value="cuda"):
+                directories = subject.probe_toolkit_dirs(mock.Mock(cuda_dir=root))
+            self.assertEqual(directories, (root / "bin", root / "extras" / "CUPTI" / "lib64"))
+
     def test_the_environment_makes_every_source_root_importable(self):
         env = subject.environment()
         parts = env["PYTHONPATH"].split(subject.os.pathsep)

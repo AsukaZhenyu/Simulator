@@ -80,6 +80,24 @@ def default_root(dry_run: bool) -> Path:
     return ROOT / ("build/accuracy-" + stamp + ("-dryrun" if dry_run else ""))
 
 
+def toolkit_root(args) -> Path:
+    """Where this machine's CUDA toolkit is installed.
+
+    Split out of `cuda_dirs` because two different questions are asked of the
+    same root: which directory holds the executables and the CUDA runtime
+    (`bin`), and -- on a layout that separates them -- which holds the
+    libraries a probe links (`lib64`).
+    """
+    named = getattr(args, "cuda_dir", None)
+    if named is not None:
+        return Path(named)
+    installed = host.newest_toolkit()
+    roots = host.cuda_toolkit_roots()
+    # Nothing installed: name the first place this platform would keep one,
+    # so the preflight refusal says where it looked.
+    return installed if installed is not None else Path(roots[0] if roots else "cuda")
+
+
 def cuda_dirs(args) -> tuple[Path, Path]:
     """(runtime bin, CUPTI library dir) of this device's toolkit.
 
@@ -88,15 +106,7 @@ def cuda_dirs(args) -> tuple[Path, Path]:
     where its CUDA lives. `--cuda-dir` names one; otherwise the newest installed
     toolkit wins, so a device with v12.6 beside v12.4 uses v12.6.
     """
-    named = getattr(args, "cuda_dir", None)
-    if named is not None:
-        root = Path(named)
-    else:
-        installed = host.newest_toolkit()
-        roots = host.cuda_toolkit_roots()
-        # Nothing installed: name the first place this platform would keep one,
-        # so the preflight refusal says where it looked.
-        root = installed if installed is not None else Path(roots[0] if roots else "cuda")
+    root = toolkit_root(args)
     return root / "bin", host.cupti_library_dir(root)
 
 
@@ -109,10 +119,19 @@ def probe_toolkit_dirs(args) -> tuple[Path, ...]:
     one would refuse a Mac for the absence of something its probe never links.
     An empty tuple is a statement, not a fallback: it says nothing outside the
     build belongs on this column's artifact and runtime lists.
+
+    A layout that keeps its shared libraries away from `bin` contributes that
+    directory too (`host.cuda_library_dir`), because a probe linking ggml-cuda
+    asks the loader for cuBLAS before it runs an action and a missing directory
+    is then one loader error repeated across every process of the column.
     """
     if host.backend() != "cuda":
         return ()
-    return tuple(cuda_dirs(args))
+    directories = list(cuda_dirs(args))
+    library = host.cuda_library_dir(toolkit_root(args))
+    if library is not None and library not in directories:
+        directories.append(library)
+    return tuple(directories)
 
 DEFAULT_MODEL = ROOT / "build/real-moe-validation-20261026/model-olmoe-v2/OLMoE-1B-7B-0924-Instruct-Q4_K_M.gguf"
 DEFAULT_RUNTIME_BUILD = ROOT / "build/real-moe-validation-20261028/runtime-windows-build-v8"
