@@ -30,6 +30,14 @@
 
 #if defined(_WIN32)
 
+// The generated Executor fragments call `std::max`. A real <windows.h>
+// defines `max` and `min` as function-like macros, which turns the
+// qualified call into `std::` followed by an expansion. The macros are
+// suppressed here, at the first inclusion, so every later include is
+// covered by the header's own #ifndef NOMINMAX.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <psapi.h>
 

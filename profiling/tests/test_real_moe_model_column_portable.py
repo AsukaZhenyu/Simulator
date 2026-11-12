@@ -33,7 +33,8 @@ class ShippedInputs(unittest.TestCase):
     def test_template_rewrites_only_the_device_fields(self):
         template = json.loads(prepare_portable.SHIPPED_TEMPLATE.read_text(encoding="utf-8"))
         model = dict(path="D:/models/olmoe.gguf", sha256="a" * 64, bytes=4213513024)
-        out = prepare_portable.template_for(model, template)
+        contract = prepare_portable.contract_of(prepare_portable.pinned_model("olmoe-1b-7b"))
+        out, _ = prepare_portable.template_for(model, template, contract)
         self.assertEqual(out["model_path"], "D:/models/olmoe.gguf")
         self.assertEqual(out["model_sha256"], "a" * 64)
         for key in template:

@@ -439,7 +439,10 @@ def column_model(campaign: Campaign, args) -> Path:
     step = [python, "-m", "profiling.real_moe_validation.prepare_portable",
             "--out", out, "--build", build, "--model", model,
             "--heldout-index", args.heldout_index,
+            "--model-id", args.model_id,
             "--labels", ",".join(MODEL_LABELS)]
+    if args.model_suite is not None:
+        step += ["--suite", str(Path(args.model_suite).resolve())]
     # The manifest's runtime list is what every collected process reads, so the
     # toolkit's libraries belong in it beside its binaries: a layout that keeps
     # them apart otherwise starts each probe into a loader error.
@@ -707,6 +710,11 @@ def main(argv=None) -> int:
     parser.add_argument("--heldout-index", default="0",
                         help="held-out request stratum; index 0 is the published cohort's, so a "
                              "device that already ran the published campaign passes 1")
+    parser.add_argument("--model-suite", type=Path, default=None,
+                        help="frozen request suite tokenized by --model's own tokenizer; the "
+                             "default is the published OLMoE suite, which only OLMoE may use")
+    parser.add_argument("--model-id", default="olmoe-1b-7b",
+                        help="entry of profiling/multimodel/models.json that --model is pinned to")
     parser.add_argument("--authorization", default=(
         "standalone campaign: operator closed every other program on this machine and ran "
         "tools/run_accuracy_campaign.py, one native process at a time"))

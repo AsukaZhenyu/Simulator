@@ -45,6 +45,21 @@ def forward_kv(events,nodes):
         out[f]=next(iter(values))
     return out
 
+def decode_history(forward, depth_rank, first_decode, closes_request=False):
+    """Name a decode forward by its position among the forwards at its padded KV depth.
+
+    The first two forwards at a depth carry a setup cost the steady state does
+    not, and a generation that crosses a depth pays it again, so the position is
+    read inside the depth rather than inside the request. The window that closes
+    the request is the exception: its identity exists once per request and its
+    cost is the host's response to the sampler, not the device work that enters
+    a depth (see PREREG-decode-depth-windows-v2.md).
+    """
+    if not closes_request and forward in depth_rank:
+        return 'decode:'+{0:'first',1:'settling'}.get(depth_rank[forward],'continuation')
+    return 'decode:'+('first' if forward<=first_decode else 'continuation')
+
+
 def cpu_consumed_ns(left,right,cycles_per_second=None):
     """CPU time the calling thread spent between two observer boundaries.
 
@@ -85,6 +100,21 @@ def extract_windows(row, *, placement,frequency_hz,feature_policy=MECHANISM_POLI
     decode_forwards=[v['index'] for v in actual_forwards if v['phase']=='decode']
     if not decode_forwards:decode_forwards=[v['forward'] for v in events if v['kind']==21 and v.get('phase')=='decode']
     first_decode=min(decode_forwards) if decode_forwards else min(kv)
+    # A decode forward's measured cost depends on how many forwards of the same
+    # padded KV depth preceded it: the first two cost 40-70% more than the steady
+    # state, and the excess reappears whenever the depth changes inside a
+    # generation (see PREREG-decode-depth-windows.md). One price keyed by the
+    # request's first decode forward alone fits a line across both, so the
+    # position within the depth is declared instead.
+    depth_rank={}
+    depth_seen=defaultdict(int)
+    for forward in sorted(set(decode_forwards)):
+        # A forward with no actual Attention geometry has no padded depth to be
+        # positioned in; the per-request fallback in decode_history keeps it out
+        # of a class it was never measured in.
+        if forward not in kv:continue
+        depth_rank[forward]=depth_seen[kv[forward]]
+        depth_seen[kv[forward]]+=1
     prior_cpu_name='request_begin'
     for e in events[1:]:
         kind=e['kind']
@@ -114,7 +144,10 @@ def extract_windows(row, *, placement,frequency_hz,feature_policy=MECHANISM_POLI
             prior=[k for k in kv if k<=f];f=max(prior) if prior else min(kv)
         phase=current_phase
         q=max(1,int(context['query_tokens']));ordinal=int(context['ordinal'])
-        history=phase+(':'+('first' if f==min(kv) else 'continuation') if phase=='prefill' else ':'+('first' if f<=first_decode else 'continuation'))
+        if phase=='prefill':
+            history=phase+':'+('first' if f==min(kv) else 'continuation')
+        else:
+            history=decode_history(f,depth_rank,first_decode,closes_request=(kind==26))
         covered=();layer=None;op=None;global_operation=False
         if left_node is not None:
             scope='CPU_NODE';name=left_node['name'];op='ggml_op_'+str(left_node['op'])
@@ -172,7 +205,7 @@ def extract_windows(row, *, placement,frequency_hz,feature_policy=MECHANISM_POLI
                 mechanism_feature_policy=feature_policy+'; no KV proxy for cache, expert history, CPU availability or ordinary matrix work'
                     +('; bridge KV only through an actual host attention stage in the same forward/layer' if feature_policy==MECHANISM_POLICY_V2 else ''),
                 mechanism_dependency=work.dependency,mechanism_dependency_evidence=list(work.dependency_evidence),
-                history_coordinate='prefill first/continuation or decode first/continuation; not a claim of identical CUDA graph mode',
+                history_coordinate='prefill first/continuation, or decode first/settling/continuation by position among the decode forwards of the same padded KV depth, except the request-closing window which keeps the request position; not a claim of identical CUDA graph mode',
                 sampler_scope='SAMPLER is the residual sampler tail after natural-sync partitioning; HOST/bridge can contain preceding sampler work',
                 GPU_source_forwards=[dict(forward_index=source,query_tokens=pending_gpu[0]['source']['query_tokens'],kv_padded=kv[source]) for source in sorted(gpu_source_forwards)],
                 GPU_source_coordinate='source submission forward, never the later natural-completion boundary; mixed-source bridges are explicitly unsupported',

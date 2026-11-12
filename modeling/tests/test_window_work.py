@@ -111,6 +111,40 @@ class WindowWorkTests(unittest.TestCase):
                     price(s, per_attention_pair_ns=1)
                 self.assertEqual(price(s).estimate(action(s)).mean_ns, 5)
 
+    def test_a_per_head_norm_prices_on_its_rows_not_its_own_prompt_length(self):
+        def per_head(rows, heads=16):
+            return dict(name="norm-0", op=25, ne=[128, heads, rows, 1], type=0,
+                        weight_ne=[128, heads, rows, 1], weight_type=0)
+
+        def layer(rows):
+            return dict(name="norm-0", op=25, ne=[1024, rows, 1, 1], type=0,
+                        weight_ne=[1024, rows, 1, 1], weight_type=0)
+
+        # The heads occupy axis 1 and the prompt chunk occupies axis 2. The
+        # query axis is the chunk; pinning axis 1 instead would put each
+        # request's own length in the signature, so no other request could be
+        # priced from it.
+        node = per_head(126)
+        work = spec(node)
+        self.assertEqual(work.operators[0].query_axis, 2)
+        self.assertEqual(work.query_basis, "actual_pointwise_rows")
+        self.assertEqual(json.loads(work.structural_signature())["operators"][0]
+                         ["fixed_output_axes"], [128, 16, 1])
+        self.assertEqual(work.structural_signature(), spec(per_head(245)).structural_signature())
+        self.assertNotEqual(work.structural_signature(), spec(per_head(126, heads=8)).structural_signature())
+        with self.assertRaises(InvalidModel):
+            work.validate_coordinates(16, 256, 0)
+
+        # An ordinary layer norm and a one-token per-head norm keep the row
+        # axis they had before this rule: previously frozen keys must
+        # reproduce byte for byte.
+        self.assertEqual(json.loads(spec(layer(126)).structural_signature())["operators"][0]
+                         ["fixed_output_axes"], [1024, 1, 1])
+        self.assertEqual(spec(layer(126)).operators[0].query_axis, 1)
+        self.assertEqual(json.loads(spec(per_head(1)).structural_signature())["operators"][0]
+                         ["fixed_output_axes"], [128, 1, 1])
+        self.assertEqual(spec(per_head(1)).operators[0].query_axis, 1)
+
     def test_unknown_host_is_not_declared_shape_independent(self):
         s = WindowWorkSpec.from_metadata("HOST", copy_calls=0)
         self.assertEqual(s.kind, "host_unclassified")

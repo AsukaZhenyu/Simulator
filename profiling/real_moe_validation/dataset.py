@@ -133,7 +133,7 @@ def assemble(sources, tokenizer_config=None):
     return result
 
 
-def rebuild(snapshot_dir, tokenizer_config, out):
+def rebuild(snapshot_dir, tokenizer_config, out, revision='olmoe-v2'):
     folder=Path(snapshot_dir);sources={}
     for domain in ('math','code'):
         records=[json.loads(line) for line in (folder/(domain+'-source.jsonl')).read_text(encoding='utf-8').splitlines() if line.strip()]
@@ -144,7 +144,7 @@ def rebuild(snapshot_dir, tokenizer_config, out):
     write(out,dict(schema='real-moe-request-candidates-2',requests=rows,
         snapshot_manifest_sha256=hashlib.sha256((folder/'source-manifest.json').read_bytes()).hexdigest(),
         tokenizer_config_sha256=hashlib.sha256(Path(tokenizer_config).read_bytes()).hexdigest(),
-        no_routing_or_performance_labels=True,execution_revision='olmoe-v2'))
+        no_routing_or_performance_labels=True,execution_revision=revision))
     return dict(out=str(out),candidates=len(rows),model_run=False)
 
 
@@ -209,10 +209,10 @@ def audit(suite_path, out):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('command',choices=('snapshot','select','rebuild','audit'));p.add_argument('--out',required=True);p.add_argument('--tokenized');p.add_argument('--suite')
-    p.add_argument('--snapshot');p.add_argument('--tokenizer-config')
+    p.add_argument('--snapshot');p.add_argument('--tokenizer-config');p.add_argument('--revision',default='olmoe-v2')
     a=p.parse_args()
     if a.command=='snapshot':result=snapshot(a.out)
-    elif a.command=='rebuild':result=rebuild(a.snapshot,a.tokenizer_config,a.out)
+    elif a.command=='rebuild':result=rebuild(a.snapshot,a.tokenizer_config,a.out,a.revision)
     elif a.command=='audit':result=audit(a.suite,a.out)
     else:
         result=select(a.tokenized,a.out)

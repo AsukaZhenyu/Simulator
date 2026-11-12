@@ -83,7 +83,20 @@ class WindowOperator:
         if self.role in {"matrix", "attention_core"}:
             return 2 if self.op == 30 else 1
         if self.role == "pointwise":
-            return 2 if self.op == 95 else 1
+            if self.op == 95:
+                return 2
+            # A norm reduces along axis 0 and is applied once per row of the
+            # axes above it. An ordinary layer norm carries those rows on axis
+            # 1 ([hidden, rows, 1, 1]); a per-head QK norm carries the heads on
+            # axis 1 and the rows on axis 2 ([head_dim, heads, rows, 1]). The
+            # row axis is the outermost axis that is not a unit: naming any
+            # other axis makes the row count of one request -- its own prompt
+            # chunk length -- part of the work signature, and no completed
+            # window of another length can then be priced.
+            for axis in (3, 2, 1):
+                if self.ne[axis] > 1:
+                    return axis
+            return 1
         return None
 
     def structural_signature(self):

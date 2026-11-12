@@ -16,7 +16,9 @@ depth cohort:
 
   * `--model` is this device's GGUF, verified by SHA-256 and byte count against
     the pinned manifest (`profiling/multimodel/models.json`); the template is
-    rewritten to point at it, and nothing else in the template changes;
+    rewritten to point at it, and its declared model contract becomes this
+    model's pinned geometry -- for the model the template was written for,
+    which is the published cohort, that contract does not change;
   * `--suite` and `--capacity-policy` default to the copies shipped under
     `published/`, whose hashes are the ones the published cohort froze;
   * the two host-memory guards come from the capacity policy's own budget block
@@ -86,13 +88,41 @@ def budget(policy: dict) -> dict:
                 resident_peak_limit_bytes=resident)
 
 
-def template_for(model: dict, template: dict) -> dict:
+def contract_of(pinned: dict) -> dict:
+    """The declared model contract, taken from the pinned geometry.
+
+    The published template declares OLMoE's contract because OLMoE was the model
+    it was written for. A second model answers the same four fields from its own
+    pinned geometry, which `profiling/multimodel` has already compared against
+    the file it names. A dense model declares no expert dimension; the probe
+    then requires the GGUF to carry no expert metadata at all, so this is a
+    claim about the file and not a default.
+    """
+    geometry = pinned.get("geometry")
+    require(isinstance(geometry, dict), f"{pinned['id']} has no pinned geometry block")
+    ffn = geometry.get("ffn") or {}
+    kind = ffn.get("kind")
+    experts = ffn.get("experts") or 0
+    top_k = ffn.get("top_k") or 0
+    require(kind in ("dense", "moe"), f"{pinned['id']} declares no FFN kind")
+    require((kind == "moe") == (experts > 0 and top_k > 0),
+            f"{pinned['id']} FFN kind and expert geometry disagree")
+    for field in ("architecture", "block_count"):
+        require(field in geometry, f"{pinned['id']} geometry lacks {field}")
+    return dict(architecture=geometry["architecture"], layers=int(geometry["block_count"]),
+                experts=int(experts), top_k=int(top_k))
+
+
+def template_for(model: dict, template: dict, contract: dict) -> tuple[dict, list[str]]:
     """The published template with only the device-specific fields replaced."""
     out = dict(template)
-    out["model_path"] = model["path"]
-    out["model_sha256"] = model["sha256"]
-    out["model_bytes"] = model["bytes"]
-    return out
+    changed = []
+    for key, value in (("model_path", model["path"]), ("model_sha256", model["sha256"]),
+                       ("model_bytes", model["bytes"]), ("model_contract", contract)):
+        if out.get(key) != value:
+            changed.append(key)
+        out[key] = value
+    return out, changed
 
 
 def main(argv=None) -> int:
@@ -117,9 +147,10 @@ def main(argv=None) -> int:
     for directory in args.runtime_dir:
         require(Path(directory).is_dir(), f"runtime directory missing: {directory}")
     model = verify_model(args.model, pinned_model(args.model_id))
+    contract = contract_of(pinned_model(args.model_id))
     policy = read(args.capacity_policy)
     suite = read(args.suite)
-    template = template_for(model, read(args.template))
+    template, changed_fields = template_for(model, read(args.template), contract)
     guards = budget(policy)
     if args.native_guard_bytes is not None:
         require(args.native_guard_bytes > guards["native_guard_bytes"],
@@ -163,7 +194,8 @@ def main(argv=None) -> int:
         source=receipt(Path(__file__).resolve()),
         campaign=receipt(Path(campaign.__file__).resolve()),
         replaced_descriptor=dict(path=str(legacy_descriptor), supplied_fields=sorted(supplied_descriptor)),
-        replaced_template=dict(path=str(legacy_template), changed_fields=["model_path", "model_sha256", "model_bytes"]),
+        replaced_template=dict(path=str(legacy_template), changed_fields=changed_fields),
+        model_contract=contract,
         model=model, guards=guards,
         runtime_dirs=[str(Path(d).resolve()) for d in args.runtime_dir],
         prior_profile_or_result_read=False,

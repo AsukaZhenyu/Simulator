@@ -4,6 +4,7 @@ import argparse
 from collections import defaultdict
 from fractions import Fraction
 import json
+import math
 from pathlib import Path
 import shutil
 import statistics
@@ -24,6 +25,107 @@ ROOT=Path(__file__).resolve().parents[2]
 read,write,sha,receipt,require=e2a.read,e2a.write,e2a.sha,e2a.receipt,e2a.require
 RECIPES=(('cpu','cpu','cpu'),('gpu','gpu','gpu'),('gpu','cpu','gpu'))
 FIELDS=['h2d_source_reuse_bucket']
+# Ten timed blocks per process, and an estimate that drops the highest and the
+# lowest of them.  The warmup is unchanged (twenty iterations and 500 ms before
+# any block is timed, enforced by the probe); what changes is how the ten blocks
+# become one number, at the process level and at the action level alike.
+TRIALS=10
+
+
+def trimmed(values):
+    """Mean of the ten block values after the highest and the lowest are dropped."""
+    ordered=sorted(values)
+    require(len(ordered)>=3,'a trimmed mean needs at least three blocks')
+    kept=ordered[1:-1]
+    return Fraction(sum(Fraction(v) for v in kept),len(kept))
+
+
+# The working-set law.  One exponent, shared by every coordinate, says how a
+# coordinate's price grows with the bytes a program touches before its timed
+# region; every stored price is then that coordinate's level at one reference
+# working set, and a program's total is scaled by (ws/ws_ref)**theta.  It is
+# fitted on the profile programs only, so it cannot see a target duration, and
+# it cannot see the held-out split either.
+MINIMUM_SHARED_COORDINATES=10
+
+
+def mean_prices(prices):
+    """{coordinate: {program: mean per-action ns}} from per-action samples."""
+    means={}
+    for h,per in prices.items():
+        row={}
+        for p,values in per.items():
+            if not values:continue
+            price=sum((Fraction(v) for v in values),Fraction(0))/len(values)
+            if price>0:row[p]=float(price)
+        if row:means[h]=row
+    return means
+
+
+def reference_levels(means,x,exponent):
+    """Coordinate prices moved to the reference working set by one exponent.
+
+    A coordinate averaged over several programs keeps the geometric mean of its
+    divided prices, which is what a least-squares fit with one free intercept
+    per coordinate estimates; a coordinate measured in one program is divided
+    by that program's own factor.
+    """
+    levels={};singletons=0
+    for h,row in means.items():
+        if len(row)>=2:
+            levels[h]=math.exp(statistics.mean(math.log(v)-exponent*x[p] for p,v in row.items()))
+        else:
+            p=next(iter(row));levels[h]=row[p]/math.exp(exponent*x[p]);singletons+=1
+    return levels,singletons
+
+
+def working_set_law(prices,working_set,profile_programs,*,minimum_shared=MINIMUM_SHARED_COORDINATES):
+    """One log-log slope for every coordinate, and levels at a reference size.
+
+    For coordinate h and profile program p,
+
+        log price(h, p) = log level(h) + theta * log(ws(p) / ws_ref),
+
+    with ws_ref the median working set of the profile programs and one free
+    intercept per coordinate, so the estimate of theta is the within-coordinate
+    demeaned least squares of log price on log working set.
+
+    `prices` maps coordinate digest to {program key: [per-action ns]} and
+    `working_set` maps program key to the bytes the program touches before its
+    timed region.  Refuses rather than invents: no exponent is reported when the
+    profile programs share one working set (the slope is not identifiable),
+    when too few coordinates are shared by two programs (the slope would be one
+    program's accident), or when the estimate is not finite.
+    """
+    programs=sorted(set(profile_programs))
+    require(len(programs)>=2,'a working-set law needs at least two profile programs')
+    for p in programs:require(p in working_set and working_set[p]>0,'working set unknown for profile program '+p)
+    reference=statistics.median([working_set[p] for p in programs])
+    x={p:math.log(working_set[p]/reference) for p in sorted(working_set)}
+    means=mean_prices(prices)
+    numerator=denominator=0.0;shared=0
+    for row in means.values():
+        if len(row)<2:continue
+        shared+=1
+        mx=statistics.mean(x[p] for p in row);my=statistics.mean(math.log(v) for v in row.values())
+        for p,v in row.items():
+            numerator+=(x[p]-mx)*(math.log(v)-my);denominator+=(x[p]-mx)**2
+    require(shared>=minimum_shared,'too few coordinates shared across profile programs: %d' % shared)
+    require(denominator>0,'the profile programs share one working set; no exponent is identifiable')
+    theta=numerator/denominator
+    require(math.isfinite(theta),'the working-set exponent is not finite')
+    levels,singletons=reference_levels(means,x,theta)
+    return dict(exponent=theta,reference_bytes=reference,factors={p:math.exp(theta*x[p]) for p in x},
+        levels=levels,shared=shared,singletons=singletons,programs=len(programs))
+
+
+def levels_at_reference(prices,exponent,working_set,reference_bytes):
+    """The same division for cells measured after the law was fitted."""
+    x={p:math.log(working_set[p]/reference_bytes) for p in sorted(working_set)}
+    means=mean_prices(prices)
+    return reference_levels(means,x,exponent)
+
+
 # The five generated Executor fragments this probe is compiled against, and the
 # hashes the published campaign ran. They ship in the repository because the two
 # properties that make them usable -- the binary initial-asset transport and the
@@ -118,7 +220,7 @@ def prepare(out,binary,*,pilot=False,workers=1,cache=None):
             if repeat%2:order.reverse()
             for key in order:
                 request=dict(schema='h2d-history-request-1',source_sha256=sha(source_paths[2]),
-                    sampling=e2a.request('full',trials=16),
+                    sampling=e2a.request('full',trials=TRIALS),
                     expected_process_mask=host.process_affinity_mask(),
                     mode='full',instrumentation='stamped' if split=='profile' else 'bare',
                     memory_mode='pageable',target_action_index=None)
@@ -130,7 +232,8 @@ def prepare(out,binary,*,pilot=False,workers=1,cache=None):
         programs=programs,jobs=jobs,sources=sources,binary=receipt(target),runtime=old['runtime'],
         runtime_dirs=old['runtime_dirs'],context=context,
         protocol=dict(profile_processes=sum(j['split']=='profile' for j in jobs),
-            heldout_processes=sum(j['split']=='heldout' for j in jobs),trials=16,replays=8,
+            heldout_processes=sum(j['split']=='heldout' for j in jobs),trials=TRIALS,replays=8,
+            estimator='trimmed mean of the ten block times after dropping the highest and the lowest',
             mean_ape_gate=.1,p90_ape_gate=.2,raw_CV_is_accuracy_gate=False,timeout_seconds=600,
             source_and_parameter_freeze_before_heldout=True,no_retries=True,
             numerical_atol=5e-5,numerical_rtol=5e-5,capacity_or_actual_eviction_qualified=False))
@@ -160,11 +263,11 @@ def verify_native(n,job,program,oracle,pid):
         a,b=np.asarray(got[tid]),np.asarray(expected)
         require(a.shape==b.shape and np.all(np.isfinite(a)) and np.allclose(a,b,atol=5e-5,rtol=5e-5),'numeric mismatch '+tid)
     require(n['initial_binary_buffers_verified']==len(program['initial_assets']['tensors']),'binary initialization inventory differs')
-    hz=n['clock']['frequency_hz'];require(len(n['trials'])==16,'trial count differs')
+    hz=n['clock']['frequency_hz'];require(len(n['trials'])==TRIALS,'trial count differs')
     for r in n['trials']:
         require(r['repeats']==8 and r['end_tick']>r['begin_tick'],'QPC interval differs')
         require(abs((r['end_tick']-r['begin_tick'])*1e9/hz-r['wall_ns'])<=1,'QPC duration differs')
-    return dict(passed=True,ports=len(got),blocks=16)
+    return dict(passed=True,ports=len(got),blocks=TRIALS)
 
 
 def collect(out,split):
@@ -250,11 +353,14 @@ def freeze(out):
     executions=read(out/'profile-executions.json')
     require(len(executions)==m['protocol']['profile_processes'] and all(e['status']=='completed' for e in executions),'missing profile evidence')
     scope=digest(m['context']);groups={};evidence=defaultdict(list);programs={};native_rows=[];static_coords={};seen_evidence=defaultdict(set);per_program=defaultdict(lambda:defaultdict(list))
-    def add(coord,value,source,key):
-        require(type(value) is int and value>=0,'nonnegative native action ns required')
-        group=groups.setdefault(key,dict(coordinate=coord,sum_ns=0,count=0));group['sum_ns']+=value;group['count']+=1
+    static_prices=defaultdict(lambda:defaultdict(list));conditioned_prices=defaultdict(lambda:defaultdict(list))
+    def add(coord,value,source,key,program):
+        require(isinstance(value,Fraction) or (type(value) is int and value>=0),'nonnegative native action ns required')
+        group=groups.setdefault(key,dict(coordinate=coord,sum_ns=Fraction(0),count=0));group['sum_ns']+=value;group['count']+=1
+        (conditioned_prices if coord['condition'] else static_prices)[key][program].append(value)
         if source['native']['sha256'] not in seen_evidence[key]:
             evidence[key].append(source);seen_evidence[key].add(source['native']['sha256'])
+    by_block=defaultdict(dict);source_of={}
     for e in executions:
         key=e['job']['program_key']
         if key not in programs:
@@ -262,14 +368,39 @@ def freeze(out):
             coordinates=[dict(scope_sha256=scope,semantic=semantic_action(programs[key],i),condition={}) for i in range(len(programs[key]['actions']))]
             static_coords[key]=[(c,digest(c)) for c in coordinates]
         n=read(e['native']['path']);native_rows.append((e,key))
-        for block in n['trials']:
+        source_of[key]=dict(native=e['native'],split='profile')
+        for number,block in enumerate(n['trials']):
             for r in block['action_intervals']:
+                by_block[(key,r['invocation'],r['action_index'])][number]=r['wall_ns']
                 coord,h=static_coords[key][r['action_index']]
-                add(coord,r['wall_ns'],dict(native=e['native'],split='profile'),h);per_program[h][key].append(r['wall_ns'])
+                per_program[h][key].append(r['wall_ns'])
+    for samples in by_block.values():require(len(samples)==TRIALS,'block count differs from the declared trials')
+    def rational(value):return str(Fraction(value).limit_denominator(10**9))
     def entries():
-        return [dict(key=k,coordinate=g['coordinate'],mean_ns=str(Fraction(g['sum_ns'],g['count'])),
+        # Every stored price is the coordinate's level at the reference
+        # working set, so one table no longer carries whichever program
+        # happened to be pooled into it.
+        return [dict(key=k,coordinate=g['coordinate'],
+                     mean_ns=rational(levels.get(k,Fraction(g['sum_ns'],g['count']))),
                      sample_count=g['count'],evidence=evidence[k]) for k,g in sorted(groups.items())]
-    static={digest(g['coordinate']['semantic']):Fraction(g['sum_ns'],g['count']) for g in groups.values()}
+    # One observation per action per block: the highest and the lowest block are
+    # dropped before the estimate, exactly as at the process level.  A static
+    # coordinate is shared by the eight replays, so their trimmed values are
+    # averaged; a history-conditioned coordinate belongs to one replay.
+    static_by_replay=defaultdict(dict)
+    for (key,invocation,index),samples in by_block.items():
+        static_by_replay[(key,index)][invocation]=trimmed(list(samples.values()))
+    for (key,index),per_replay in sorted(static_by_replay.items()):
+        coord,h=static_coords[key][index]
+        add(coord,Fraction(sum(per_replay.values()),len(per_replay)),source_of[key],h,key)
+    working_set={k:int(b['initial_assets']['bytes']) for k,b in m['programs'].items()}
+    law=working_set_law(static_prices,working_set,sorted(programs))
+    levels=dict(law['levels'])
+    # The logical history that constructs the conditioned cells is advanced
+    # with the same levels the predictor commits, so a cell is looked up
+    # under the conditions it was measured under.
+    static={digest(g['coordinate']['semantic']):Fraction(levels.get(k,Fraction(g['sum_ns'],g['count']))).limit_denominator(10**9)
+        for k,g in groups.items()}
     traces={}
     for key,p in programs.items():
         history=SerialExecutionHistory(p,HistoryScope(scope));durations=[static[digest(semantic_action(p,i))] for i in range(len(p['actions']))]
@@ -279,30 +410,39 @@ def freeze(out):
             for i,d in enumerate(durations):
                 c=response_coordinate(history.snapshot(i),FIELDS);trace[invocation,i]=(c,digest(c));history.commit(i,d)
         traces[key]=trace
-    for e,key in native_rows:
-        n=read(e['native']['path'])
-        for block in n['trials']:
-            for r in block['action_intervals']:
-                coord,h=traces[key][r['invocation'],r['action_index']]
-                if coord['condition']:add(coord,r['wall_ns'],dict(native=e['native'],split='profile'),h)
+    for (key,invocation,index),samples in by_block.items():
+        coord,h=traces[key][invocation,index]
+        if coord['condition']:add(coord,trimmed(list(samples.values())),source_of[key],h,key)
+    conditioned,singleton_cells=levels_at_reference(conditioned_prices,law['exponent'],working_set,law['reference_bytes'])
+    levels.update(conditioned)
+    unleveled=sum(1 for k in groups if k not in levels)
     profile=dict(schema=SCHEMA,scope_sha256=scope,scope=m['context'],condition_fields=FIELDS,bucketing=BUCKETING,
         initialization=INITIALIZATION,unmodeled_reset_accesses=True,entries=entries(),frozen_at_utc=e2a.utc(),
-        target_time_used_for_fit=False,future_target_state_used=False,calibration_label='inclusive per-action intervals only')
+        target_time_used_for_fit=False,future_target_state_used=False,calibration_label='inclusive per-action intervals only',
+        working_set_law=dict(rule='one shared log-log working-set exponent with a level per coordinate; every stored price is that level at reference_bytes',
+            exponent=law['exponent'],reference_bytes=law['reference_bytes'],
+            shared_coordinates=law['shared'],singleton_coordinates=law['singletons']+singleton_cells,
+            unleveled_coordinates=unleveled,profile_programs=law['programs'],target_time_used_for_fit=False))
     table=HistoryConditionedResponseTable.from_profile(profile);predictions=[]
     for key,b in m['programs'].items():
         if b['split']!='heldout':continue
         p=read(b['program']['path']);costs={}
+        factor=Fraction(law['factors'][key]).limit_denominator(10**9)
         for name,enabled in (('context_static',False),('history_conditional',True)):
             prediction=table.predict_blocks(p,blocks=1,repeats=8,use_history=enabled)
-            costs[name]=str(prediction['duration_ns'])
-        predictions.append(dict(program_key=key,layers=b['layers'],phase=b['phase'],strategy=b['strategy'],costs=costs))
+            # The table prices one reference working set; this program's own
+            # size enters as one factor for every action it runs.
+            costs[name]=str(Fraction(prediction['duration_ns'])*factor)
+        predictions.append(dict(program_key=key,layers=b['layers'],phase=b['phase'],strategy=b['strategy'],
+            working_set_bytes=int(b['initial_assets']['bytes']),working_set_factor=str(factor),costs=costs))
     consistency=fit_consistency(per_program)
     write(out/'model-frozen.json',profile);write(out/'predictions-frozen.json',predictions)
     write(out/'fit-consistency.json',consistency)
     write(out/'frozen-barrier.json',dict(frozen_at_utc=e2a.utc(),files={n:sha(out/n) for n in ('model-frozen.json','predictions-frozen.json','fit-consistency.json')},
         all_target_coordinates_known=True,target_outcomes_read=False))
     return dict(response_cells=len(profile['entries']),heldout_cases=len(predictions),
-        shared_coordinates=consistency['shared_coordinates'],max_coordinate_spread=consistency['max_spread'])
+        shared_coordinates=consistency['shared_coordinates'],max_coordinate_spread=consistency['max_spread'],
+        working_set_exponent=law['exponent'],working_set_reference_bytes=law['reference_bytes'])
 
 
 def evaluate(out):
@@ -318,8 +458,10 @@ def evaluate(out):
             row=dict(raw=e.get('native'),status=e['status'])
             if e['status']=='completed':
                 n=read(e['native']['path']);values=[r['wall_ns']/8 for r in n['trials']]
-                row.update(mean_ns=statistics.mean(values),trial_ns=values,cv=statistics.stdev(values)/statistics.mean(values),
-                    late_over_early=statistics.mean(values[8:])/statistics.mean(values[:8])-1)
+                half=len(values)//2
+                row.update(mean_ns=float(trimmed(values)),trial_ns=values,cv=statistics.stdev(values)/statistics.mean(values),
+                    late_over_early=statistics.mean(values[half:])/statistics.mean(values[:half])-1,
+                    estimator='trimmed mean of ten blocks, highest and lowest dropped')
             actual.append(row)
         providers={}
         for name,value in pred['costs'].items():
@@ -333,6 +475,7 @@ def evaluate(out):
     result=dict(schema='dense-depth-validation-result-1',evaluated_at_utc=e2a.utc(),declared_cases=len(results),cases=results,
         providers={n:dict(accuracy_passes=sum(r['providers'][n]['accuracy_passed'] for r in results),cases=len(results)) for n in ('context_static','history_conditional')},
         declared_processes=len(executions),completed_processes=sum(e['status']=='completed' for e in executions),
+        working_set_law=read(out/'model-frozen.json').get('working_set_law'),
         target_time_used_for_fit=False,autoregressive_generation=False,raw_cv_is_accuracy_gate=False)
     write(out/'summary.json',result);return {k:result[k] for k in ('declared_cases','providers','declared_processes','completed_processes')}
 
