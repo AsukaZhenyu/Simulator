@@ -78,3 +78,43 @@ preceding request. The whole GPU forward of a model without routed experts
 lands in one bridge window, so the state cannot be averaged away inside a
 single run; only repetitions average it out, and only the occupancy explains
 how far a single run can move.
+
+## 6. Revision 2: the device state is an input, and the driver holds it
+
+Repetitions measure the spread of an uncontrolled state; they do not control
+it. Revision 2 adds the control, and with it a new entry point. A cohort run by
+`tools/run_accuracy_campaign.py` on its own is one cohort of an ensemble, not a
+paper number.
+
+1. **Precondition.** One discarded campaign, run while the device is read on a
+   cadence (in-process NVML, one reading every 2 s; no extra process). The
+   machine is settled when, over the last 60 s, the temperature moved at most
+   1.5 °C and the SM clock at most the profile's fraction. A machine that does
+   not settle before the campaign ends is refused, and its trace is kept: the
+   workload is the campaign's own, so a burn that settles a different thermal
+   path would warm the wrong machine.
+2. **Band.** Every reading of a counted cohort must be inside the declared
+   band, and the state must not drift outside its declared stability limits
+   within a cohort. A cohort that entered and left the band is excluded exactly
+   as one that was never in it. The band and both tolerances are set from the
+   precondition trace, which contains no accuracy number; they are calibrated to
+   the machine, never to the result.
+3. **Lock, where the machine allows it.** `nvidia-smi` clock pinning is
+   attempted only when the profile asks for it, and is reported as held only
+   after a read back shows the requested clock. A refused lock is recorded with
+   the tool's own words and the cohort falls back to the band.
+4. **Exclusions.** N counted cohorts, at most N+3 attempts. Every attempt is
+   reported with its status and, for an excluded one, the reading that refused
+   it; the excluded root stays on disk.
+5. **The number.** The mean of the N cohort means with its between-run standard
+   deviation, the per-run pass counts, the pooled per-condition phase APEs, and
+   the state occupancy at the boundary frozen for that machine (section 3.4).
+6. **The driver.** `tools/run_device_ensemble.py --profile <profile>`; one
+   profile per device and model under `profiling/real_moe_validation/devices/`.
+   A new machine runs `--dry-run` first and then `--precondition-only`, which
+   measures one discarded campaign and reports the state trace it would gate on;
+   the profile's band is set from that trace and not from any campaign result.
+
+What revision 2 does not control, and therefore does not claim: contention from
+other processes on the same machine, CPU frequency scaling, and which core a
+thread lands on. Those are refused or recorded only where a profile says so.
