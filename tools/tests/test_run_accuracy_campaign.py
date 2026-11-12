@@ -320,7 +320,7 @@ class AHostThatCannotMeasure(unittest.TestCase):
         self.assertIn("no accelerator ggml can compute on was found", log)
         # And every column still says what it would have needed, so the operator
         # learns what the measurement requires rather than only that it cannot.
-        for name in ("model", "dense", "e2a"):
+        for name in ("model-ggml", "dense", "e2a"):
             self.assertIn(f"the {name} column is not ready", log)
         self.assertIn("preflight finished; nothing was measured", log)
 
@@ -348,7 +348,7 @@ class ADryRunThatNamesWhatToBuild(unittest.TestCase):
                                                  "--root", str(root)]):
                 self.assertEqual(0, subject.main())
             log = (root / "campaign.log").read_text(encoding="utf-8")
-        self.assertIn("missing artifacts for the model column:", log)
+        self.assertIn("missing artifacts for the model-ggml column:", log)
         self.assertIn(str(absent), log)
 
 

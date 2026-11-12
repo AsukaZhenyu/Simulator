@@ -158,6 +158,13 @@ class PortableDescriptorTests(unittest.TestCase):
 
 
 class PreparationReadsNothingMeasured(unittest.TestCase):
+    # This one test is the exception to the module's "no previous campaign"
+    # rule: it checks the adapter against the archived H2D manifest, which lives
+    # in `build/` and is not in the repository. On a checkout without the
+    # archive the adapter's only path cannot be exercised, and a skip says so
+    # instead of a green run that never reached the code.
+    @unittest.skipUnless(prepare_portable.LEGACY.is_file(),
+                         "the archived H2D campaign is not in this checkout")
     def test_the_adapter_answers_the_legacy_descriptor_and_nothing_else(self):
         # The one archived path the adapter replaces is the H2D descriptor; every
         # other read must still reach the disk, so a missing frozen profile or

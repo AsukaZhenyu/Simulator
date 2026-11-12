@@ -161,5 +161,24 @@ class LockTest(unittest.TestCase):
         self.assertEqual(missed["status"], "not_verified")
 
 
+class HostMatchTest(unittest.TestCase):
+    def test_the_wrong_platform_is_refused_before_any_path_is_resolved(self):
+        ok, why = state.host_matches({"platform": "linux", "device_name_contains": "RTX 5090"},
+                                     "windows", "NVIDIA GeForce RTX 5090")
+        self.assertFalse(ok)
+        self.assertIn("this host is windows", why)
+
+    def test_the_wrong_device_is_refused(self):
+        ok, why = state.host_matches({"device_name_contains": "RTX 5090"},
+                                     "windows", "NVIDIA GeForce RTX 4070 Laptop GPU")
+        self.assertFalse(ok)
+        self.assertIn("RTX 5090", why)
+
+    def test_a_matching_host_is_admitted(self):
+        ok, why = state.host_matches({"platform": "windows", "device_name_contains": "rtx 4070"},
+                                     "windows", "NVIDIA GeForce RTX 4070 Laptop GPU")
+        self.assertTrue(ok, why)
+
+
 if __name__ == "__main__":
     unittest.main()

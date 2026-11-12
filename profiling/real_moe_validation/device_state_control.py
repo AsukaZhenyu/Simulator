@@ -340,6 +340,27 @@ def verify_lock(provider: Provider, requested: dict[str, Any], tolerance_fractio
             "matched": matched, "tolerance_fraction": tolerance_fraction}
 
 
+def host_matches(declared: dict[str, Any], platform_name: str,
+                 device_name: str | None) -> tuple[bool, str]:
+    """Whether this machine is the one a profile was written for.
+
+    A profile carries paths for one machine, and a `~` expands to whatever home
+    directory is running it: the wrong machine would otherwise resolve every
+    path successfully and measure a device the profile does not describe.
+    """
+    wanted = declared.get("platform")
+    if wanted and wanted != platform_name:
+        return False, "the profile is for %s and this host is %s" % (wanted, platform_name)
+    wanted_name = declared.get("device_name_contains")
+    if wanted_name:
+        if not device_name:
+            return False, "the profile names device %r and this host has no device name" % wanted_name
+        if wanted_name.lower() not in device_name.lower():
+            return False, "the profile names device %r and this host has %r" % (
+                wanted_name, device_name)
+    return True, ""
+
+
 def write_jsonl(path: Any, rows: Iterable[dict[str, Any]]) -> None:
     from pathlib import Path
     target = Path(path)

@@ -117,6 +117,168 @@ class InstantiateTests(unittest.TestCase):
             self.build(["moe-compute-000-demand"], model="qwen3-0.6b")
 
 
+def write_gguf(path: Path, tensors: dict[str, tuple[list[int], int]]) -> None:
+    """The smallest file `read_gguf` and `instantiate.gguf_dtypes` accept.
+
+    Only the metadata a case generator reads is written: names, shapes, types.  The
+    tensor data blob is empty, which is enough because nothing in these tests loads
+    bytes -- `verify_weights` is tested against the real files, not a stub.
+    """
+    import struct
+
+    def text(value: str) -> bytes:
+        raw = value.encode("utf-8")
+        return struct.pack("<Q", len(raw)) + raw
+
+    body = b""
+    for name, (dims, kind) in sorted(tensors.items()):
+        body += text(name) + struct.pack("<I", len(dims))
+        body += b"".join(struct.pack("<Q", d) for d in dims)
+        body += struct.pack("<IQ", kind, 0)
+    header = b"GGUF" + struct.pack("<IQQ", 3, len(tensors), 1)
+    header += text("general.architecture") + struct.pack("<I", 8) + text("qwen3")
+    blob = header + body
+    path.write_bytes(blob + b"\0" * (-len(blob) % 32))
+
+
+class PerLayerWeightTests(unittest.TestCase):
+    """A case that names its layers, and the file that decides their dtypes."""
+
+    def instantiate(self, flags, spec="qwen3-0.6b"):
+        blob = corpus_es.load(PACK)
+        folder = tempfile.TemporaryDirectory(prefix="ir-layers-")
+        self.addCleanup(folder.cleanup)
+        cases = Path(folder.name) / "in"
+        for name in ("dense-compute-000-spare", "dense-compute-001-demand"):
+            target = cases / name
+            target.mkdir(parents=True)
+            (target / "nodes.json").write_text(
+                corpus_es._canonical(corpus_es.nodes_of(blob["cases"][name])),
+                encoding="utf-8", newline="\n")
+        out = Path(folder.name) / "out"
+        code = inst.main(["--model", spec, "--tokens", "64", "--cases", str(cases),
+                          "--out", str(out)] + flags)
+        self.assertEqual(code, 0)
+        return Path(folder.name), out / spec
+
+    def test_the_flag_names_every_compute_node_and_no_arrival(self):
+        _, written = self.instantiate(["--per-layer-weights"])
+        text = (written / "dense-compute-000-spare.txt").read_text(encoding="utf-8")
+        nodes = [line.split() for line in text.splitlines() if line.startswith("node ")]
+        arrivals = [w for w in nodes if w[2] == "arrival"]
+        compute = [w for w in nodes if w[2] != "arrival"]
+        self.assertTrue(arrivals and compute)
+        # params are a comma-joined list of k=v terms after the dependency column
+        def has_layer(words):
+            return any(term.startswith("layer=")
+                       for term in " ".join(words[5:]).replace(",", " ").split())
+
+        self.assertFalse(any(has_layer(w) for w in arrivals))
+        self.assertTrue(all(has_layer(w) for w in compute))
+
+    def test_without_the_flag_the_case_is_the_one_the_tables_were_measured_on(self):
+        _, written = self.instantiate([])
+        text = (written / "dense-compute-000-spare.txt").read_text(encoding="utf-8")
+        self.assertNotIn("layer=", text)
+        self.assertNotIn("_l0 ", text)
+
+    def test_the_files_dtypes_win_over_the_table_declaration(self):
+        folder, _ = self.instantiate([])
+        spec = inst.load_model("qwen3-0.6b")
+        tensors = {}
+        for layer in range(spec["layers"]):
+            for role, stem in inst.ROLE_FILES.items():
+                if role.endswith("_shexp"):
+                    continue
+                tensors[f"blk.{layer}.{stem}.weight"] = ([256, 8], 12)
+        # one layer stores a different width, which is what a real Q4_K_M file does
+        tensors["blk.3.attn_v.weight"] = ([256, 8], 14)
+        path = folder / "tiny.gguf"
+        write_gguf(path, tensors)
+        header, extra = inst.gguf_dtypes(path, spec)
+        self.assertEqual(header["v"], "q4_k")
+        self.assertIn("dtype_v_l3 q6_k", extra)
+        self.assertNotIn("dtype_v_l4 q6_k", extra)
+        self.assertEqual(len(extra), 1)
+
+    def test_a_file_missing_a_layer_is_named_rather_than_silently_short(self):
+        folder, _ = self.instantiate([])
+        spec = inst.load_model("qwen3-0.6b")
+        tensors = {f"blk.{layer}.{stem}.weight": ([256, 8], 12)
+                   for layer in range(spec["layers"] - 1)
+                   for role, stem in inst.ROLE_FILES.items() if not role.endswith("_shexp")}
+        path = folder / "short.gguf"
+        write_gguf(path, tensors)
+        with self.assertRaises(SystemExit) as caught:
+            inst.gguf_dtypes(path, spec)
+        self.assertIn("has no blk.27.attn_q.weight", str(caught.exception))
+
+
+class ModelColumnTests(unittest.TestCase):
+    """The whole-model column's own arithmetic: placements, cases, and the claim.
+
+    Nothing here runs the executor.  What can be wrong before a GPU is ever touched is the
+    case set (does every placement exist, does a decode round exist) and the claim (is a
+    miss a miss); both are answered from the corpus generator.
+    """
+
+    def test_every_placement_from_nothing_on_the_accelerator_to_everything(self):
+        from profiling.ir_ggml import model_column as mc
+        self.assertEqual(mc.placements(28), [0, 7, 14, 21, 28])
+        self.assertEqual(mc.placements(16), [0, 4, 8, 12, 16])
+        # a shallow model must not emit the same placement five times
+        self.assertEqual(mc.placements(2), [0, 1, 2])
+        self.assertEqual(mc.placements(1), [0, 1])
+
+    def test_a_case_carries_the_whole_stack_and_the_declared_decode_rounds(self):
+        from profiling.ir_ggml import model_column as mc
+        spec = inst.load_model("qwen3-0.6b")
+        with tempfile.TemporaryDirectory(prefix="model-column-") as folder:
+            written = mc.build_cases(spec, rounds=2, out=Path(folder))
+            self.assertEqual(set(written), {mc.case_name(28, g) for g in (0, 7, 14, 21, 28)})
+            text = (Path(folder) / mc.case_name(28, 14) / "nodes.json").read_text(encoding="utf-8")
+        self.assertIn("layer27", text)
+        self.assertIn("decode0", text)
+        self.assertIn("decode1", text)
+        self.assertNotIn("decode2", text)
+
+    def test_the_claim_turns_a_miss_into_a_miss(self):
+        from profiling.ir_ggml import model_column as mc
+        summary = {"units_by_phase": {"attention:prefill": {"n": 10, "median": 0.95},
+                                      "attention:decode": {"n": 10, "median": 1.15}},
+                   "makespan_resolved": {"n": 1, "median": 0.97},
+                   "state": {"verdict": "in_band"}}
+        verdict = mc.claim(summary)
+        self.assertTrue(verdict["cells"]["attention:prefill"]["within_band"])
+        self.assertFalse(verdict["cells"]["attention:decode"]["within_band"])
+        self.assertEqual(verdict["verdict"], "off_band")
+        summary["units_by_phase"]["attention:decode"]["median"] = 1.05
+        self.assertEqual(mc.claim(summary)["verdict"], "in_band")
+
+    def test_an_off_band_tranche_is_not_a_reading(self):
+        from profiling.ir_ggml import model_column as mc
+        summary = {"units_by_phase": {"attention:prefill": {"n": 10, "median": 1.00}},
+                   "state": {"verdict": "off_band:tranche_void"}}
+        self.assertEqual(mc.claim(summary)["verdict"], "off_band")
+
+    def test_units_are_split_by_how_many_nodes_they_cost(self):
+        from profiling.ir_ggml import model_column as mc
+        rows = [{"units": {
+            "a": {"unit": "attention", "phase": "decode", "nodes": [1, 2, 3, 4], "ratio": 1.2},
+            "b": {"unit": "attention", "phase": "decode", "nodes": [1, 2, 3, 4], "ratio": 1.0},
+            "c": {"unit": "projection", "phase": "decode", "nodes": [1], "ratio": 0.9}}}]
+        table = mc.by_unit_nodes(rows)
+        self.assertEqual(table["attention:decode:4n"]["median"], 1.1)
+        self.assertEqual(table["projection:decode:1n"]["median"], 0.9)
+
+    def test_a_history_the_table_does_not_price_is_refused(self):
+        from profiling.ir_ggml import model_column as mc
+        with tempfile.TemporaryDirectory(prefix="model-column-") as folder:
+            with self.assertRaises(SystemExit):
+                mc.main(["--model", "qwen3-0.6b", "--out", folder,
+                         "--decode-history", "65", "--analyse-only"])
+
+
 class PriceProvenanceTests(unittest.TestCase):
     def test_every_model_has_a_frozen_table(self):
         for model in prices_provenance.ORIGIN:

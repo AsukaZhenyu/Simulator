@@ -143,14 +143,17 @@ device's number baked into every build.
 
 ### The three machines this paper measures on
 
-Windows laptop, 5090 Ubuntu desktop, DGX Spark. A Mac is a supported *build*
-target — both portable probes configure and compile for Metal, and the dense
-column runs there — but it is not one of this paper's measuring machines, and the
-two columns it cannot run are out of scope rather than pending. Nothing in the
-paper is claimed of an Apple platform: the manuscript's shared-pool branch says in
-its own words that it is "an idealized architectural counterfactual, not a
-measured Apple or phone platform". So the Metal paragraphs below are the record of
-a refusal (why the two columns have no Metal route), not a to-do list.
+Windows laptop, 5090 Ubuntu desktop, Mac mini M4. The Mac is a supported *build*
+target and, since 2026-11-13, one of this paper's declared machines; it replaces
+the DGX Spark in that role. Only one column can carry a number on it: both
+portable probes configure and compile for Metal and the dense column runs end to
+end, while the model column has no Metal observer and the e2a column still needs
+a strict-F32 Metal route. Those two are out of scope on Apple silicon rather than
+pending, so the paper's row carries dashes for them. Nothing is claimed of an
+Apple platform beyond what a dense-column cohort would measure; the manuscript's
+shared-pool branch says in its own words that it is "an idealized architectural
+counterfactual, not a measured Apple or phone platform". The Metal paragraphs
+below are the record of that refusal, not a to-do list.
 
 That leaves one question per machine, and it is the same one on all three: does
 the procedure that produced the published numbers reproduce on this box? Each
@@ -180,8 +183,8 @@ looked plausible.
 | Windows desktop | CUDA | separate | all three columns; a second GPU, a separate table |
 | Linux laptop | CUDA | separate | all three columns; the same recipe as Windows |
 | 5090 server | CUDA (`sm_120`) | separate | all three columns; Blackwell arch and bandwidth |
-| Mac (Apple silicon) | Metal | **shared** | not a measuring machine for this paper: the dense column runs, the other two are out of scope |
-| DGX Spark (GB10) | CUDA (`sm_121`) | **shared**, declared | all three columns, on a unified pool |
+| Mac mini M4 (Apple silicon) | Metal | **shared** | one of the paper's three machines: the dense column only; the model and e2a columns have no Metal route |
+| DGX Spark (GB10) | CUDA (`sm_121`) | **shared**, declared | a supported target; not a paper machine since 2026-11-13 |
 
 The last two rows are the ones the code had to change for, and they are not the
 same problem.

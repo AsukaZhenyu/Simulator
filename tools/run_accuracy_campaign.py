@@ -7,19 +7,27 @@ launched from a plain terminal with nothing else running -- no editor, no
 browser, no assistant -- because every column here is a timing measurement and
 every number in it belongs to the machine state that produced it.
 
-    python tools/run_accuracy_campaign.py --columns model,dense,e2a
+    python tools/run_accuracy_campaign.py --columns model-ggml,dense,e2a
 
 Columns
 -------
-  model   Real MoE end to end: OLMoE-1B-7B Q4_K_M against the composed model.
-          Needs the 4.2 GB GGUF and about 6 GiB of free memory. This is the
-          Table II "Model" cell.
+  model-ggml
+          Whole model, ours end to end: the plan is our IR, lowered by
+          `profiling/native/ir_runner.cpp` and executed on ggml alone against
+          the model file's own per-layer weight bytes. No external runtime is
+          in the loop. Its cells and band are fixed in
+          `profiling/ir_ggml/PREREG-model-column.md`. This is the "Model" cell.
   dense   Dense executor: per-action time of the composed F32 executor against
           the history-conditioned price, held out by process. This is the
           Table II "Dense" cell.
   e2a     Matched Dense strategies: four placements x six workloads, eight
           fresh processes per configuration. This is Table V and the selection
           claim beside it, plus the decision-margin study.
+
+  model   Retired. The engine-timed column: it times another runtime's request
+          and asks the simulator to predict that runtime. It is kept only as
+          the record of the published tables and still needs that runtime's
+          headers and shared libraries to build.
 
 Nothing here is retried and nothing is averaged over a failure: a phase that
 fails stops the run and leaves its output on disk for inspection. Cohorts are
@@ -477,6 +485,35 @@ def column_model(campaign: Campaign, args) -> Path:
     return out
 
 
+def column_model_ggml(campaign: Campaign, args) -> Path:
+    """The model column with no engine between the plan and ggml.
+
+    The plan is our IR, lowered by `profiling/native/ir_runner.cpp`, executed against the
+    model file's own per-layer weight bytes on this machine.  What is compared is the
+    frozen table's price of each action against what that action costs when our graph runs
+    it -- not one runtime's scheduler against another's.  `profiling/ir_ggml/
+    PREREG-model-column.md` fixes the cells and the band before the run.
+    """
+    if args.model_gguf is None:
+        raise SystemExit("the model-ggml column needs --model-gguf: it executes the model's "
+                         "own file, not a runtime's copy of it")
+    gguf = Path(args.model_gguf)
+    # The executor is the column's instrument; naming it here means a host without one
+    # is refused before the campaign starts rather than after the cases are built.
+    from profiling.ir_ggml import run as ir_run
+    preflight(campaign, "model-ggml", args.model_ggml_memory_gib, [gguf, ir_run.RUNNER],
+              backend="cuda")
+    out = fresh_cohort(campaign.root / "model-ggml" / "formal", campaign)
+    python = require_python(campaign, VENV_PYTHON)
+    campaign.step("model-ggml:column", [python, "-m", "profiling.ir_ggml.model_column",
+                                        "--model", args.model_id,
+                                        "--gguf", gguf,
+                                        "--rounds", str(args.model_ggml_rounds),
+                                        "--replicas", str(args.model_ggml_replicas),
+                                        "--out", out])
+    return out
+
+
 def column_dense(campaign: Campaign, args) -> Path:
     binary = Path(args.depth_binary)
     toolkit = probe_toolkit_dirs(args)
@@ -541,7 +578,8 @@ def column_e2a(campaign: Campaign, args) -> Path:
     return out
 
 
-COLUMNS = dict(model=column_model, dense=column_dense, e2a=column_e2a)
+COLUMNS = {"model": column_model, "model-ggml": column_model_ggml,
+           "dense": column_dense, "e2a": column_e2a}
 
 
 def runtime_dirs(column: str, args) -> tuple[Path, ...]:
@@ -571,6 +609,13 @@ def requirements(column: str, args) -> tuple[float, list[Path]]:
     toolkit = probe_toolkit_dirs(args)
     if column == "model":
         return 6.0, [Path(args.model), Path(args.runtime_build) / "BUILD_COMPLETE.json", *toolkit]
+    if column == "model-ggml":
+        # A missing `--model-gguf` is an artifact that is missing, not a crash: a dry run
+        # exists to name what a host still needs, and this is one of the things it needs.
+        gguf = (Path(args.model_gguf) if args.model_gguf is not None
+                else Path("<--model-gguf>: the model-ggml column executes the model's own "
+                          "file, not a runtime's copy of it"))
+        return args.model_ggml_memory_gib, [gguf]
     if column == "dense":
         return 2.0, [Path(args.depth_binary), *toolkit]
     return 2.0, [Path(args.e2a_binary), e2a_runtime(args), *toolkit]
@@ -594,6 +639,19 @@ def headline(root: Path, produced: dict) -> list[str]:
         if result.get("complete_endpoint_conditions") != result.get("declared_conditions"):
             lines.append("  - the conditions that did not complete are listed with a reason and "
                          "are excluded, not averaged in")
+    ggml_column = Path(produced["model-ggml"]) / "column.json" if "model-ggml" in produced else None
+    if ggml_column is not None and ggml_column.is_file():
+        result = json.loads(ggml_column.read_text(encoding="utf-8"))
+        claim_block = result.get("claim", {})
+        cells = claim_block.get("cells", {})
+        lines.append("- Model cell (our lowering on ggml, `{}`): verdict {}, weights {}, "
+                     "state gate {}".format(ggml_column, claim_block.get("verdict"),
+                                            result.get("weights"),
+                                            (claim_block.get("state") or {}).get("verdict")))
+        for unit, cell in sorted(cells.items()):
+            lines.append("  - {}: measured/predicted {:.3f}, error {:.1%}{}".format(
+                unit, cell["median"], cell["error"],
+                "" if cell["within_band"] else "  (outside the declared band)"))
     dense = Path(produced["dense"]) / "summary.json" if "dense" in produced else None
     if dense is not None and dense.is_file():
         result = json.loads(dense.read_text(encoding="utf-8"))
@@ -687,9 +745,12 @@ def summarize(campaign: Campaign, produced: dict) -> Path:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--columns", default="model,dense,e2a",
-                        help="comma-separated subset of model,dense,e2a (order is ignored; "
-                             "columns always run in the order model, dense, e2a)")
+    parser.add_argument("--columns", default="model-ggml,dense,e2a",
+                        help="comma-separated subset of model-ggml,dense,e2a (order is "
+                             "ignored; columns always run in the order model-ggml, dense, "
+                             "e2a).  `model` is the retired engine-timed column: it needs "
+                             "sources that include that engine's headers and is kept only "
+                             "as the record of the published tables")
     parser.add_argument("--root", type=Path, help="output root; default build/accuracy-<date>")
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     parser.add_argument("--runtime-build", type=Path, default=DEFAULT_RUNTIME_BUILD)
@@ -715,6 +776,18 @@ def main(argv=None) -> int:
                              "default is the published OLMoE suite, which only OLMoE may use")
     parser.add_argument("--model-id", default="olmoe-1b-7b",
                         help="entry of profiling/multimodel/models.json that --model is pinned to")
+    parser.add_argument("--model-gguf", type=Path,
+                        help="the model file the model-ggml column executes.  The column "
+                             "lowers the plan itself and loads this file's per-layer weight "
+                             "bytes, so nothing of an external runtime is involved")
+    parser.add_argument("--model-ggml-rounds", type=int, default=2,
+                        help="decode rounds per case in the model-ggml column")
+    parser.add_argument("--model-ggml-replicas", type=int, default=4,
+                        help="the published protocol; replica 0 pays the CUDA module load "
+                             "and is never a reading")
+    parser.add_argument("--model-ggml-memory-gib", type=float, default=2.0,
+                        help="free memory the model-ggml column needs (the gguf plus the "
+                             "executor's own buffers)")
     parser.add_argument("--authorization", default=(
         "standalone campaign: operator closed every other program on this machine and ran "
         "tools/run_accuracy_campaign.py, one native process at a time"))

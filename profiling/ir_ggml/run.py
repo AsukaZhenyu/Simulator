@@ -382,7 +382,7 @@ def analyse(case: dict, run: dict, prices: dict, tokens: int, manifest: dict,
     }
 
 
-def summarise(rows: list[dict]) -> dict:
+def summarise(rows: list[dict], control_prefix: str = "dense-compute-") -> dict:
     out = {"cases": len(rows), "units": {}, "makespan": {}, "unpriceable": {}}
     reasons: dict[str, int] = {}
     for row in rows:
@@ -453,11 +453,11 @@ def summarise(rows: list[dict]) -> dict:
     # every replica agreed to <1%).  `dense-compute` is the control: pure CPU, no copies,
     # no GPU, three priced actions per case.  Its median A1 is the tranche's state reading;
     # outside the declared band the tranche is void, not explained.
-    control = [u["ratio"] for r in steady if r["case"].startswith("dense-compute-")
+    control = [u["ratio"] for r in steady if r["case"].startswith(control_prefix)
                for u in r["units"].values() if u["phase"] == "prefill"]
     out["state"] = {
         "band": list(STATE_BAND),
-        "control_family": "dense-compute",
+        "control_family": control_prefix,
         "n": len(control),
         "median": statistics.median(control) if control else None,
         "verdict": ("no_control_case" if not control else
@@ -484,12 +484,11 @@ def main(argv=None) -> int:
                              "cases/<model> (the t=64 tranche) so other shapes can coexist")
     parser.add_argument("--out", default=None)
     parser.add_argument("--gguf", type=Path, default=None,
-                        help="the model's own gguf file.  The executor then runs layer 0's real "
-                             "weights instead of a deterministic pattern of the same shape and "
-                             "dtype, and aborts if the file and the case disagree.  Every "
-                             "published A1/A2 was measured on the pattern; the flag exists "
-                             "because 'a graph shaped like the model' and 'the model' are "
-                             "different claims, and the second one is checkable")
+                        help="the model's own gguf file.  The executor then runs the file's "
+                             "real weights -- every layer's own bytes when the case names its "
+                             "layers (`instantiate.py --per-layer-weights`), layer 0's "
+                             "otherwise -- instead of a deterministic pattern of the same "
+                             "shape and dtype, and aborts if the file and the case disagree")
     parser.add_argument("--ssd-dir", default=None,
                         help="the third tier's file, for cases that declare ssd_bytes; one "
                              "file is reused and resized to each case's own budget")
@@ -506,6 +505,11 @@ def main(argv=None) -> int:
                         help="per plan node device-dispatch cost added to every non-CPU unit "
                              "(PREREG-gpu-prices.md 4g).  Measured on a node whose compute is "
                              "negligible, not fitted to A1; 0 reproduces the published runs")
+    parser.add_argument("--control-prefix", default="dense-compute-",
+                        help="the case name prefix whose pure-CPU prefill units are the "
+                             "tranche's state reading.  The 800-policy corpus carries one "
+                             "control family; a whole-model tranche carries its all-CPU arm, "
+                             "which is the same control on a different graph")
     args = parser.parse_args(argv)
 
     case_dir = args.cases_dir if args.cases_dir else (HERE / "cases" / args.model)
@@ -680,7 +684,8 @@ def main(argv=None) -> int:
                 print(f"  {i + 1}/{len(names)}  {time.time() - began:.0f}s", flush=True)
         flush()
         document = {"model": args.model, "tokens": args.tokens, "replicas": args.replicas,
-                    "runner": str(RUNNER), "rows": rows}
+                    "runner": str(RUNNER), "gguf": str(args.gguf) if args.gguf else None,
+                    "weights": "real" if args.gguf else "pattern", "rows": rows}
 
     # A row is a reading only if it got far enough to analyse: every gate rejection carries
     # its own reason key instead, and pooling one into A1/A2 would count a rejected case as
@@ -695,7 +700,7 @@ def main(argv=None) -> int:
         for r in failed[:5]:
             reason = {k: v for k, v in r.items() if k != "case"}
             print(f"  REJECTED {r['case']}: {reason}")
-    summary = summarise(good)
+    summary = summarise(good, args.control_prefix)
     print(f"  gate 3: {summary['unstable_cases']} of {len(good)} cases unstable "
           f"(replica CV > 5%), excluded from A1 and A2")
     state = summary["state"]

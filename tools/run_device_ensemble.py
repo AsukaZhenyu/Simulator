@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -107,9 +108,17 @@ def load_profile(path: Path) -> dict:
 
 
 def campaign_command(profile: dict, root: Path) -> list[str]:
+    """The frozen campaign, with this machine's profile substituted in.
+
+    The arguments are expanded here rather than by a shell, because the list is
+    handed to `subprocess` whole: a `~` that reached the campaign would be a
+    directory named "~", and a relative path would resolve against whichever
+    directory the driver happened to be started from.
+    """
     campaign = profile["campaign"]
     return [str(resolve(campaign["python"])), str(resolve(campaign["runner"])),
-            "--root", str(root), *[str(item) for item in campaign["arguments"]]]
+            "--root", str(root),
+            *[os.path.expanduser(str(item)) for item in campaign["arguments"]]]
 
 
 # ------------------------------------------------------------------ phases
@@ -189,13 +198,22 @@ def one_repetition(profile: dict, provider: state.Provider | None, root: Path,
     if not in_band:
         entry.update(status="excluded", reason="device state left the band: " + why)
         return entry
-    evaluation = ensemble.evaluation(root)
+    try:
+        evaluation = ensemble.evaluation(root)
+    except ensemble.Unreadable as error:
+        entry.update(status="excluded", reason=str(error))
+        return entry
+    if evaluation["complete_endpoint_conditions"] < 12:
+        entry.update(status="excluded",
+                     reason="only %d of 12 conditions completed; the protocol excludes it"
+                            % evaluation["complete_endpoint_conditions"])
+        return entry
     entry.update(status="counted", mean_APE=evaluation["mean_APE"],
                  worst_APE=evaluation["worst_APE"],
                  passed=evaluation["passed_conditions"],
                  conditions=evaluation["complete_endpoint_conditions"],
-                 phase_APEs=[{"placement": condition["placement"],
-                              "request_id": condition["request_id"],
+                 phase_APEs=[{"placement": condition.get("placement"),
+                              "request_id": condition.get("request_id"),
                               "APE": {name: value for name, value in condition["APE"].items()
                                       if name in ("total", "prefill", "decode_with_sampling")},
                               "passed": condition.get("passed")}
@@ -288,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
     log(f"{repetitions} repetitions, at most {attempts_allowed} cohorts, "
         f"band {'declared' if band else 'not declared'}")
 
+    platform_name = "windows" if sys.platform.startswith("win") else (
+        "linux" if sys.platform.startswith("linux") else sys.platform)
     provider = None
     if state_block.get("required", True):
         try:
@@ -297,6 +317,11 @@ def main(argv: list[str] | None = None) -> int:
         metadata = provider.metadata
         log("device state: " + json.dumps({k: metadata.get(k) for k in
                                            ("device_name", "device_uuid") if k in metadata}))
+
+    matched, why = state.host_matches(profile.get("host", {}), platform_name,
+                                      (provider.metadata.get("device_name") if provider else None))
+    if not matched:
+        raise Refused("this is not the machine the profile describes: " + why)
 
     if arguments.dry_run:
         command = campaign_command(profile, root / "rep01")

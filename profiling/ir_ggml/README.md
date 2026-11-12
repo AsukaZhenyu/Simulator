@@ -141,6 +141,34 @@ python profiling/ir_ggml/corpus_v4.py                  # -> cases-v4/, cases-v4-
 python profiling/ir_ggml/instantiate.py --cases cases-v4 --out cases-v4-out
 ```
 
+## 7. The model column: no engine in the loop
+
+`model_column.py` is the paper's "Model" cell. It builds the whole stack of a real model
+from the placement axis (`corpus_v4.topology`, `L` blocks, prefill + decode rounds),
+instantiates it with `--per-layer-weights --gguf`, and runs it. The executed object is
+our lowering of a declared plan against the model file's own per-layer weight bytes — the
+same binary, the same op set and the same ggml as every other number in this directory.
+
+```bash
+python -m profiling.ir_ggml.model_column --model qwen3-0.6b \
+    --gguf models/Qwen3-0.6B-Q4_K_M.gguf --rounds 2 --replicas 4 --out COLUMN_DIR
+python -m profiling.ir_ggml.model_column --model qwen3-0.6b --out COLUMN_DIR --analyse-only
+```
+
+The cells and the acceptance band are fixed before the run in `PREREG-model-column.md`.
+`column.json` carries the verdict, the per-cell ratios, A1 split by the node count each
+unit is lowered into, and the gguf's sha256; `REPORT.md` is the same table for reading.
+
+Two properties are worth knowing before reading a number:
+
+* **A decode unit is five times smaller than a prefill unit**, so a fixed cost in the
+  lowering shows up there first. The report splits A1 by node count for exactly that
+  reason — and the readings so far show the split is *not* what moves the decode cell.
+* **The frozen table prices prefill and decode from separate campaigns.** Each table
+  therefore carries its own band, and this column is the instrument that makes the gap
+  visible: on 2026-11-12 the same binary read decode at +11% for Qwen3-0.6B and 1.00 for
+  Granite, which is a property of the two tables, not of the lowering.
+
 ## What is not reproducible from this repository
 
 - **The price tables.** `prices/<model>/costs.json` are frozen exports from the
@@ -155,7 +183,8 @@ python profiling/ir_ggml/instantiate.py --cases cases-v4 --out cases-v4-out
   `exact_fairness.stage1.py`, which prices policies with a MILP and depends on the
   `experiments/ir_value` tree. That tree is kept with the paper. `corpus_es.py --pack`
   rebuilds the pack from such an output; the pack itself is self-contained.
-- **The llama.cpp C arm.** Comparing the same policy against real inference on GGUF
-  weights needs a full llama.cpp build with `llama-bench`, plus 0.4--2.5 GiB per model.
-  Weights are fetched by `python profiling/multimodel/fetch_models.py` (SHA-256 in
-  `models.json`); the C arm itself is campaign code, not part of this package.
+- **The engine-timed model column.** The retired column timed another runtime's request
+  and asked the simulator to predict that runtime; its sources live in
+  `profiling/real_moe_validation/` and include that runtime's headers. The model column
+  in §7 replaces it and needs none of it. Weights are fetched by
+  `python profiling/multimodel/fetch_models.py` (SHA-256 in `models.json`).

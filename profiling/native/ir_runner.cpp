@@ -320,9 +320,13 @@ struct Session {
     ggml_context * weights_ctx = nullptr;
     ggml_backend_buffer_t weights_cpu_buf = nullptr, weights_gpu_buf = nullptr;
     std::map<std::string, ggml_tensor *> w_cpu, w_gpu;
+    // The layer whose weights the node being built reads.  A case that declares `layer=`
+    // gets one weight buffer per layer and this cursor picks it; a case that declares none
+    // leaves it at 0 and keeps the shared buffer.
+    int64_t cur_layer = 0;
     // Provenance of the bytes behind `w_cpu`.  Empty when they are the deterministic
     // pattern (the default, and what every published price was measured on); the file path
-    // when they are the model's own layer-0 tensors (`--gguf`).
+    // when they are the model's own tensors (`--gguf`).
     std::string gguf_path;                  // --gguf; empty = every weight is the pattern
     int64_t x_token = -1;                   // --x-token; -1 = the input row is the pattern
     std::string weights_source, weights_pattern;
@@ -631,8 +635,14 @@ static Admission acquire(Session & s, int dev, const std::string & key, int64_t 
 }
 
 
+// `layer` < 0 asks for the case-wide declaration; a layer asks for that layer's own first,
+// because a quantised file does not promise one dtype for a role across the stack.
 static const std::string & dtype_of_role(const Case & c, const std::string & role,
-                                         const char * fallback) {
+                                         const char * fallback, int64_t layer = -1) {
+    if (layer >= 0) {
+        auto own = c.dtype.find(role + "_l" + std::to_string(layer));
+        if (own != c.dtype.end() && !own->second.empty()) return own->second;
+    }
     auto it = c.dtype.find(role);
     if (it != c.dtype.end() && !it->second.empty()) return it->second;
     static const std::string fb[8] = {};
@@ -670,8 +680,27 @@ static int seek64(std::FILE * f, int64_t off) {
 #endif
 }
 
-static std::string weight_tensor_name(const std::string & role) {
-    const std::string b = "blk.0.";
+// A weight is addressed by `L<layer>:<role>` once a case declares `layer=` on its nodes.
+// A case that declares none keeps the bare role and one shared buffer for the whole stack:
+// that is how every published A1/A2 was measured, and it has to stay reproducible, so the
+// layered form is an addition and not a replacement.
+static std::string weight_key(int64_t layer, const std::string & role) {
+    return "L" + std::to_string(layer) + ":" + role;
+}
+static std::string layer_role(const std::string & key) {
+    const auto at = key.find(':');
+    return at == std::string::npos ? key : key.substr(at + 1);
+}
+static int64_t layer_of(const std::string & key) {
+    if (key.size() < 2 || key[0] != 'L') return 0;
+    const auto at = key.find(':');
+    if (at == std::string::npos || at < 2) return 0;
+    return std::stoll(key.substr(1, at - 1));
+}
+
+static std::string weight_tensor_name(const std::string & key) {
+    const std::string role = layer_role(key);
+    const std::string b = "blk." + std::to_string(layer_of(key)) + ".";
     if (role == "input_norm")          return b + "attn_norm.weight";
     if (role == "post_attention_norm") return b + "ffn_norm.weight";
     if (role == "final_norm")          return "output_norm.weight";
@@ -739,7 +768,8 @@ static void load_real_weights(Session & s, const std::string & path, std::vector
             // A role the model does not have is legal only where the graph never reads it.
             // `q_norm`/`k_norm` are allocated unconditionally but only multiplied in under
             // a `rms`/`rms_hidden` geometry; granite has neither tensor and does not use them.
-            if ((kv.first == "q_norm" || kv.first == "k_norm") && !s.g.has_qk_norm()) {
+            const std::string role = layer_role(kv.first);
+            if ((role == "q_norm" || role == "k_norm") && !s.g.has_qk_norm()) {
                 synthetic.push_back(kv.first + " (model has none, graph never reads it)");
                 continue;
             }
@@ -1101,60 +1131,80 @@ static void init_session(Session & s) {
     }
 
     // weights
-    s.weights_ctx = ggml_init({ggml_tensor_overhead() * 64, nullptr, true});
-    auto add2 = [&](const std::string & role, ggml_type type, int64_t cols, int64_t rows) {
+    //
+    // A case that names its layers gets one buffer per layer.  Without it the whole stack
+    // reads one buffer, which measures the same bytes in the same order and is what the
+    // published tables were measured with; with it, "which layers are resident" becomes a
+    // question the ledger can answer, and a real file's bytes are laid down per layer.
+    std::set<int64_t> layers;
+    bool layered = false;
+    for (const auto & n : c.nodes) {
+        auto declared = n.p.find("layer");
+        if (declared != n.p.end()) { layered = true; layers.insert(std::stoll(declared->second)); }
+    }
+    if (!layered) layers.insert(0);
+    const int64_t weight_slots = static_cast<int64_t>(layers.size()) * 24;
+    s.weights_ctx = ggml_init({ggml_tensor_overhead() * (64 + weight_slots), nullptr, true});
+    auto key_of = [&](int64_t layer, const char * role) {
+        return layered ? weight_key(layer, role) : std::string(role);
+    };
+    auto add2 = [&](const std::string & name, ggml_type type, int64_t cols, int64_t rows) {
         auto * t = ggml_new_tensor_2d(s.weights_ctx, type, cols, rows);
-        ggml_set_name(t, role.c_str());
-        s.w_cpu[role] = t;
+        ggml_set_name(t, name.c_str());
+        s.w_cpu[name] = t;
     };
-    auto add1 = [&](const std::string & role, int64_t n) {
+    auto add1 = [&](const std::string & name, int64_t n) {
         auto * t = ggml_new_tensor_1d(s.weights_ctx, GGML_TYPE_F32, n);
-        ggml_set_name(t, role.c_str());
-        s.w_cpu[role] = t;
+        ggml_set_name(t, name.c_str());
+        s.w_cpu[name] = t;
     };
-    auto add3 = [&](const std::string & role, ggml_type type, int64_t cols, int64_t rows,
+    auto add3 = [&](const std::string & name, ggml_type type, int64_t cols, int64_t rows,
                     int64_t planes) {
         auto * t = ggml_new_tensor_3d(s.weights_ctx, type, cols, rows, planes);
-        ggml_set_name(t, role.c_str());
-        s.w_cpu[role] = t;
+        ggml_set_name(t, name.c_str());
+        s.w_cpu[name] = t;
     };
-    add1("input_norm", g.hidden);
-    add1("post_attention_norm", g.hidden);
+    // `final_norm` is not a block: the file has one `output_norm.weight` for the stack, and
+    // the graph reads it after the last block.  It is allocated once, under the bare role,
+    // so a layered case does not claim L copies of a tensor the file has one of.
     add1("final_norm", g.hidden);
-    add1("q_norm", g.qk_norm_width());
-    add1("k_norm", g.qk_norm_width());
-    add2("q", Geometry::dtype_of(dtype_of_role(c, "q", "q4_k")), g.hidden, g.q_dim());
-    add2("k", Geometry::dtype_of(dtype_of_role(c, "k", "q4_k")), g.hidden, g.kv_dim());
-    add2("v", Geometry::dtype_of(dtype_of_role(c, "v", "q6_k")), g.hidden, g.kv_dim());
-    add2("output", Geometry::dtype_of(dtype_of_role(c, "o", "q4_k")), g.q_dim(), g.hidden);
+    for (int64_t layer : layers) {
+    add1(key_of(layer, "input_norm"), g.hidden);
+    add1(key_of(layer, "post_attention_norm"), g.hidden);
+    add1(key_of(layer, "q_norm"), g.qk_norm_width());
+    // `final_norm` is allocated once above, under the bare role, and read by the last
+    // block's owners through the same fallback W() uses.
+    add1(key_of(layer, "k_norm"), g.qk_norm_width());
+    auto dt = [&](const char * role, const char * fallback) {
+        return Geometry::dtype_of(dtype_of_role(c, role, fallback, layered ? layer : -1));
+    };
+    add2(key_of(layer, "q"), dt("q", "q4_k"), g.hidden, g.q_dim());
+    add2(key_of(layer, "k"), dt("k", "q4_k"), g.hidden, g.kv_dim());
+    add2(key_of(layer, "v"), dt("v", "q6_k"), g.hidden, g.kv_dim());
+    add2(key_of(layer, "output"), dt("o", "q4_k"), g.q_dim(), g.hidden);
     if (c.experts > 0) {
         // One matrix per expert, stacked along the third dimension: the shape
         // `ggml_mul_mat_id` wants, and the one the frozen `moe_ffn` price was measured on
         // (see routed_experts).  Same bytes as top_k 2D matrices.
         const int64_t slots = s.moe_stack_peak();
-        add2("router", GGML_TYPE_F32, g.hidden, c.experts);
-        add3("gate_exps", Geometry::dtype_of(dtype_of_role(c, "gate", "q4_k")), g.hidden,
-             g.intermediate, slots);
-        add3("up_exps", Geometry::dtype_of(dtype_of_role(c, "up", "q4_k")), g.hidden,
-             g.intermediate, slots);
-        add3("down_exps", Geometry::dtype_of(dtype_of_role(c, "down", "q6_k")), g.intermediate,
-             g.hidden, slots);
+        add2(key_of(layer, "router"), GGML_TYPE_F32, g.hidden, c.experts);
+        add3(key_of(layer, "gate_exps"), dt("gate", "q4_k"), g.hidden, g.intermediate, slots);
+        add3(key_of(layer, "up_exps"), dt("up", "q4_k"), g.hidden, g.intermediate, slots);
+        add3(key_of(layer, "down_exps"), dt("down", "q6_k"), g.intermediate, g.hidden, slots);
         // A shared expert is part of the block the `moe_ffn` price was measured on (the
         // probe builds it inside the same timed graph), so the executor allocates and
         // runs it too; without it the block executes roughly half the priced work.
         if (c.shared > 0) {
-            add2("gate_inp_shexp", GGML_TYPE_F32, g.hidden, 1);
-            add2("gate_shexp", Geometry::dtype_of(dtype_of_role(c, "gate_shexp", "q4_k")),
-                 g.hidden, c.shared);
-            add2("up_shexp", Geometry::dtype_of(dtype_of_role(c, "up_shexp", "q4_k")),
-                 g.hidden, c.shared);
-            add2("down_shexp", Geometry::dtype_of(dtype_of_role(c, "down_shexp", "q6_k")),
-                 c.shared, g.hidden);
+            add2(key_of(layer, "gate_inp_shexp"), GGML_TYPE_F32, g.hidden, 1);
+            add2(key_of(layer, "gate_shexp"), dt("gate_shexp", "q4_k"), g.hidden, c.shared);
+            add2(key_of(layer, "up_shexp"), dt("up_shexp", "q4_k"), g.hidden, c.shared);
+            add2(key_of(layer, "down_shexp"), dt("down_shexp", "q6_k"), c.shared, g.hidden);
         }
     } else {
-        add2("gate", Geometry::dtype_of(dtype_of_role(c, "gate", "q4_k")), g.hidden, g.intermediate);
-        add2("up", Geometry::dtype_of(dtype_of_role(c, "up", "q4_k")), g.hidden, g.intermediate);
-        add2("down", Geometry::dtype_of(dtype_of_role(c, "down", "q6_k")), g.intermediate, g.hidden);
+        add2(key_of(layer, "gate"), dt("gate", "q4_k"), g.hidden, g.intermediate);
+        add2(key_of(layer, "up"), dt("up", "q4_k"), g.hidden, g.intermediate);
+        add2(key_of(layer, "down"), dt("down", "q6_k"), g.intermediate, g.hidden);
+    }
     }
     s.weights_cpu_buf = ggml_backend_alloc_ctx_tensors(s.weights_ctx, s.cpu);
     if (!s.weights_cpu_buf) throw std::runtime_error("weight cpu buffer allocation failed");
@@ -1169,7 +1219,11 @@ static void init_session(Session & s) {
     // loader decided the model has no such tensor, and that list is reported, not hidden.
     if (!s.gguf_path.empty()) load_real_weights(s, s.gguf_path, tmp);
     if (s.gpu) {
-        ggml_context * wg = ggml_init({ggml_tensor_overhead() * 64, nullptr, true});
+        // One mirror per weight, so the pool is sized by the weights there are: a layered
+        // case holds one set per block, and the fixed 64 this used to reserve was enough
+        // only because every case shared a single set.
+        ggml_context * wg = ggml_init({ggml_tensor_overhead()
+                                       * static_cast<size_t>(s.w_cpu.size() + 8), nullptr, true});
         for (auto & kv : s.w_cpu) {
             auto * t = ggml_new_tensor_4d(wg, kv.second->type, kv.second->ne[0], kv.second->ne[1],
                                           kv.second->ne[2], kv.second->ne[3]);
@@ -1263,7 +1317,8 @@ static ggml_tensor * P(Session & s, const std::string & name, bool cuda) {
 
 static ggml_tensor * W(Session & s, const std::string & role, bool cuda) {
     auto & m = cuda ? s.w_gpu : s.w_cpu;
-    auto it = m.find(role);
+    auto it = m.find(weight_key(s.cur_layer, role));
+    if (it == m.end()) it = m.find(role);      // cases that do not name their layers
     if (it == m.end()) throw std::runtime_error("weight role not allocated: " + role);
     return it->second;
 }
@@ -1519,6 +1574,10 @@ static void build_node_graph(Session & s, const Node & n, bool cuda, ggml_backen
     const auto it = std::find(s.shapes.begin(), s.shapes.end(), key);
     if (it == s.shapes.end()) throw std::runtime_error("node shape was never allocated");
     s.cur_shape = static_cast<size_t>(it - s.shapes.begin());
+    // Which layer's weights this node reads.  Declared per node, so a schedule that puts
+    // one layer on the CPU and the next on the GPU carries its own answer; absent means 0,
+    // which is the shared buffer every published case used.
+    s.cur_layer = n.num("layer", 0);
     b.shape_index = s.cur_shape;
     b.ctx = ggml_init({ggml_tensor_overhead() * 256 + ggml_graph_overhead_custom(256, false),
                        nullptr, true});

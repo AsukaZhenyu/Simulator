@@ -432,7 +432,15 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
                 cpu_mask: str = "2,4", history: int = 0,
                 decode_history: int | None = None,
                 request_tokens: tuple[int, ...] | None = None,
-                overrides: dict | None = None) -> tuple[str, list[dict]]:
+                overrides: dict | None = None,
+                per_layer: bool = False, dtype_text: dict[str, str] | None = None,
+                extra_header: list[str] | None = None) -> tuple[str, list[dict]]:
+    """One case file.
+
+    ``per_layer`` gives every compute node its layer, so the executor allocates one weight
+    buffer per (layer, role) instead of one shared buffer for the whole stack.  Off by
+    default: every published case was measured without it and must stay byte-identical.
+    """
     topo = read_topology(case_dir)
     order = list(topo)                       # insertion order == the case's own order
     index_of = {name: i for i, name in enumerate(order)}
@@ -464,6 +472,14 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
             if op == "ffn" and spec["experts"] > 0:
                 op = "moe_ffn"
             params = {}
+            if per_layer and op != "arrival":
+                # An arrival is a trace marker with no work and no weights; everything else
+                # must say which block it belongs to, or the executor would have to guess
+                # and "the model" would quietly mean "layer 0, L times".
+                found = LAYER_RE.search(name)
+                if found is None:
+                    raise KeyError(f"compute node {name!r} names no layer")
+                params["layer"] = int(found.group(1))
         # a node whose shape is the case header's shape says nothing; only the pd family's
         # decode round carries its own `t=`/`h=`, so every single-shape case file stays
         # byte-identical to the ones the prefill tranche was measured from
@@ -477,6 +493,16 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
         manifest.append({"index": i, "id": name, "op": op, "machine": node["machine"],
                          "priced_unit": PRICED_UNIT.get(op), "bytes": params.get("bytes", 0),
                          "tokens": node_tokens, "history": node_history})
+    if dtype_text is None:
+        declared = spec["dtypes"]
+        dtype_text = {"q": declared["q"], "k": declared["k"], "v": declared["v"],
+                      "o": declared["output"],
+                      "gate": declared.get("gate", "q4_k"),
+                      "up": declared.get("up", "q4_k"),
+                      "down": declared.get("down", "q6_k")}
+        for role in ("gate", "up", "down"):
+            if role + "_shexp" in declared:
+                dtype_text[role + "_shexp"] = declared[role + "_shexp"]
     header = [
         f"case {case_dir.name}",
         f"model {spec['model']}",
@@ -539,13 +565,8 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
         f"geometry_norm_eps {spec['norm_eps']}",
         f"geometry_qk_norm {spec['qk_norm']}",
         f"geometry_attention_gate {spec['attention_gate']}",
-        f"dtype_q {spec['dtypes']['q']}",
-        f"dtype_k {spec['dtypes']['k']}",
-        f"dtype_v {spec['dtypes']['v']}",
-        f"dtype_o {spec['dtypes']['output']}",
-        f"dtype_gate {spec['dtypes'].get('gate', 'q4_k')}",
-        f"dtype_up {spec['dtypes'].get('up', 'q4_k')}",
-        f"dtype_down {spec['dtypes'].get('down', 'q6_k')}",
+        *(f"dtype_{role} {dtype_text[role]}" for role in
+          ("q", "k", "v", "o", "gate", "up", "down")),
         f"dtype_kv {spec['kv_dtype']}",
     ]
     if spec.get("shared"):
@@ -553,11 +574,53 @@ def instantiate(case_dir: Path, spec: dict, tokens: int,
         # byte-identical to the ones the earlier tranches were measured from.
         header += [
             f"shared {spec['shared']}",
-            f"dtype_gate_shexp {spec['dtypes'].get('gate_shexp', spec['dtypes'].get('gate', 'q4_k'))}",
-            f"dtype_up_shexp {spec['dtypes'].get('up_shexp', spec['dtypes'].get('up', 'q4_k'))}",
-            f"dtype_down_shexp {spec['dtypes'].get('down_shexp', spec['dtypes'].get('down', 'q6_k'))}",
-        ]
+        ] + [f"dtype_{role}_shexp {dtype_text.get(role + '_shexp', dtype_text[role])}"
+             for role in ("gate", "up", "down")]
+    if extra_header:
+        header += extra_header
     return "\n".join(header + lines) + "\n", manifest
+
+
+ROLE_FILES = {"q": "attn_q", "k": "attn_k", "v": "attn_v", "o": "attn_output",
+              "gate": "ffn_gate", "up": "ffn_up", "down": "ffn_down",
+              "gate_shexp": "ffn_gate_shexp", "up_shexp": "ffn_up_shexp",
+              "down_shexp": "ffn_down_shexp"}
+
+
+def gguf_dtypes(path: Path, spec: dict) -> tuple[dict[str, str], list[str]]:
+    """The dtypes the file actually holds, and a line per (layer, role) that differs.
+
+    A case that declares `q4_k` for a tensor the file stores as `q6_k` is refused by the
+    executor, and rightly: the run would either abort or silently time different bytes.
+    Reading the answer out of the file is cheaper than being told.
+    """
+    sys.path.insert(0, str(SIMULATOR))
+    from profiling.ir_ggml.verify_weights import TYPE_NAME, read_gguf    # noqa: E402
+    _, tensors, _ = read_gguf(path)
+    role_file = dict(ROLE_FILES)
+    if spec["experts"] > 0:
+        role_file.update({"gate": "ffn_gate_exps", "up": "ffn_up_exps",
+                          "down": "ffn_down_exps"})
+    if not spec.get("shared"):
+        for role in ("gate_shexp", "up_shexp", "down_shexp"):
+            role_file.pop(role, None)
+    seen: dict[int, dict[str, str]] = {}
+    for layer in range(spec["layers"]):
+        row = {}
+        for role, stem in role_file.items():
+            found = tensors.get(f"blk.{layer}.{stem}.weight")
+            if found is None:
+                raise SystemExit(f"{path.name}: has no blk.{layer}.{stem}.weight")
+            if found[1] not in TYPE_NAME:
+                raise SystemExit(f"{path.name}: blk.{layer}.{stem}.weight has type "
+                                 f"{found[1]}, which is not in the table")
+            row[role] = TYPE_NAME[found[1]]
+        seen[layer] = row
+    header = dict(seen[0])
+    extra = [f"dtype_{role}_l{layer} {dtype}"
+             for layer, row in seen.items() for role, dtype in row.items()
+             if dtype != header[role]]
+    return header, extra
 
 
 def main(argv=None) -> int:
@@ -583,6 +646,15 @@ def main(argv=None) -> int:
                              "request's own prefill length, the physical chain), a declared "
                              "history from the frozen decode grid, or one per round as "
                              "`h0,h1,...` (see decode_histories)")
+    parser.add_argument("--per-layer-weights", action="store_true",
+                        help="every compute node names its layer, so the executor allocates "
+                             "one weight buffer per (layer, role) instead of one shared "
+                             "buffer for the whole stack.  Required for a run that loads a "
+                             "real file: without it every layer reads layer 0's bytes")
+    parser.add_argument("--gguf", type=Path, default=None,
+                        help="the model's own file; its per-layer dtypes are written into "
+                             "the case so the executor refuses nothing and times the bytes "
+                             "the file actually stores")
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args(argv)
 
@@ -660,6 +732,8 @@ def main(argv=None) -> int:
                                        else list(pinned) if len(pinned) > 1 else pinned[0]),
                     "skipped_deeper_than_model": skipped,
                     "cases": {}}
+        dtypes_from_file, dtype_lines = ((None, None) if args.gguf is None
+                                         else gguf_dtypes(args.gguf, spec))
         for d in kept:
             overrides = case_overrides(d)
             case_spec = apply_overrides(spec, overrides)
@@ -669,7 +743,12 @@ def main(argv=None) -> int:
                                       decode_history=(None if args.decode_history == "chain"
                                                       else args.decode_history),
                                       request_tokens=tuple(shapes) if shapes else None,
-                                      overrides=overrides)
+                                      overrides=overrides,
+                                      per_layer=args.per_layer_weights,
+                                      dtype_text=(None if args.gguf is None or "dtypes" in overrides
+                                                  else dtypes_from_file),
+                                      extra_header=(None if args.gguf is None or "dtypes" in overrides
+                                                    else dtype_lines))
             (out / f"{d.name}.txt").write_text(text, encoding="utf-8")
             manifest["cases"][d.name] = {"nodes": nodes, "request_tokens": shapes,
                                          "price_signature_override":

@@ -69,6 +69,27 @@ SCALAR = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?"
           10: "<Q", 11: "<q", 12: "<d"}
 
 
+TYPE_NAME = {0: "f32", 1: "f16", 2: "q4_0", 3: "q4_1", 6: "q5_0", 7: "q5_1", 8: "q8_0",
+             10: "q2_k", 11: "q3_k", 12: "q4_k", 13: "q5_k", 14: "q6_k"}
+
+
+def tensor_name(key: str) -> str:
+    """`L3:q` -> `blk.3.attn_q.weight`; a bare role stays the layer-0 name it always was.
+
+    The executor's weight map is keyed exactly like this, so iterating the same keys in the
+    same order (a string sort) reproduces its checksum; `L10:` really does sort before `L2:`,
+    in both languages.
+    """
+    role = key.split(":", 1)[1] if ":" in key else key
+    layer = int(key[1:key.index(":")]) if key.startswith("L") and ":" in key else 0
+    name = ROLE_TO_TENSOR.get(role)
+    if name is None:
+        raise SystemExit(f"{key}: no gguf tensor for this role")
+    if name.startswith("blk.0."):
+        name = f"blk.{layer}." + name[len("blk.0."):]
+    return name
+
+
 def read_str(f) -> str:
     (n,) = struct.unpack("<Q", f.read(8))
     return f.read(n).decode("utf-8", "replace")
@@ -125,6 +146,11 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gguf", type=Path, required=True)
     ap.add_argument("--result", type=Path, required=True, help="the executor's JSON")
+    ap.add_argument("--case", type=Path, default=None,
+                    help="the case that was run; a case that declares layers has one weight "
+                         "per (layer, role) and the same file covers every block.  Without "
+                         "it the layer-0 key set is assumed, which is what a case that "
+                         "declares none allocates")
     args = ap.parse_args(argv)
 
     res = json.loads(args.result.read_text(encoding="utf-8"))
@@ -140,9 +166,11 @@ def main(argv=None) -> int:
 
     fnv = FNV_OFFSET
     total = 0
+    keys = weight_keys(args.case) if args.case else sorted(ROLE_TO_TENSOR)
     with open(args.gguf, "rb") as f:
-        for role in sorted(ROLE_TO_TENSOR):
-            name = ROLE_TO_TENSOR[role]
+        for key in keys:
+            role = key.split(":", 1)[1] if ":" in key else key
+            name = tensor_name(key)
             if name not in tensors:
                 continue                      # the executor skips it too (norms it never reads)
             ne, tt, off = tensors[name]
@@ -159,7 +187,7 @@ def main(argv=None) -> int:
                 fnv ^= b
                 fnv = (fnv * FNV_PRIME) & 0xFFFFFFFFFFFFFFFF
             total += n
-            print(f"   {role:20s}{name:36s}{n:>12d} B")
+            print(f"   {key:20s}{name:36s}{n:>12d} B")
     print(f"   bytes {total}   (executor said {w.get('bytes_real')})")
     got = f"{fnv:016x}"
     print(f"   fnv64 recomputed {got}   executor {expect}")
@@ -171,6 +199,37 @@ def main(argv=None) -> int:
 
 def expert_roles(role: str) -> bool:
     return role.endswith("_exps") or role.endswith("_shexp")
+
+
+def weight_keys(case: Path) -> list[str]:
+    """The exact key set the executor allocated for this case, in its own sort order.
+
+    A case that names no layers allocated one buffer per role; one that does allocated one
+    per (layer, role) plus a single `final_norm`.  Reading the keys from the case rather
+    than assuming them is what makes the checksum a test of the loader instead of a test of
+    this script's idea of the loader.
+    """
+    layers, experts, shared = set(), 0, 0
+    for line in case.read_text(encoding="utf-8").splitlines():
+        words = line.split()
+        if not words:
+            continue
+        if words[0] == "experts":
+            experts = int(words[1])
+        elif words[0] == "shared":
+            shared = int(words[1])
+        elif words[0] == "node":
+            for item in ",".join(words[5:]).split(","):
+                if item.startswith("layer="):
+                    layers.add(int(item.split("=", 1)[1]))
+    if not layers:
+        return sorted(ROLE_TO_TENSOR)
+    roles = ["input_norm", "post_attention_norm", "q_norm", "k_norm", "q", "k", "v", "output"]
+    roles += (["router", "gate_exps", "up_exps", "down_exps"] if experts
+              else ["gate", "up", "down"])
+    if experts and shared:
+        roles += ["gate_inp_shexp", "gate_shexp", "up_shexp", "down_shexp"]
+    return sorted([f"L{layer}:{role}" for layer in layers for role in roles] + ["final_norm"])
 
 
 if __name__ == "__main__":
