@@ -64,11 +64,18 @@ class BoundaryTest(unittest.TestCase):
 
 class AggregateTest(unittest.TestCase):
     def entry(self, root, mean, status="counted", passes=8):
-        return {"root": str(root), "status": status, "mean_APE": mean, "worst_APE": mean * 2,
+        # `mean` is a number in the old shape and one APE per phase in the shape
+        # the campaign writes; both are entry points the aggregate must read.
+        if isinstance(mean, dict):
+            worst = {name: value * 2 for name, value in mean.items()}
+            total = mean.get("total", next(iter(mean.values()), 0.0))
+        else:
+            worst, total = mean * 2, mean
+        return {"root": str(root), "status": status, "mean_APE": mean, "worst_APE": worst,
                 "passed": passes, "conditions": 12,
                 "phase_APEs": [{"placement": "cpu", "request_id": "a",
-                                "APE": {"total": mean, "prefill": mean * 2,
-                                        "decode_with_sampling": mean / 2}}],
+                                "APE": {"total": total, "prefill": total * 2,
+                                        "decode_with_sampling": total / 2}}],
                 "first_forward_ms": [{"ms": 21.0}, {"ms": 41.0}]}
 
     def test_the_ensemble_is_the_mean_of_the_cohort_means_with_its_spread(self):
@@ -93,6 +100,20 @@ class AggregateTest(unittest.TestCase):
         self.assertEqual(with_declared["state"]["boundary_ms"], 31.0)
         self.assertEqual(with_declared["state"]["slow"], 1)
         self.assertIn("declared in the profile", with_declared["state"]["source"])
+
+    def test_a_cohort_that_states_its_ape_per_phase_is_read_by_its_total(self):
+        # What CONDITION_MEAN_EVALUATION.json actually writes: one APE per
+        # phase.  Reading the dict as a number is what crashed the first
+        # ensemble after its first counted cohort.
+        entries = [self.entry("a", {"total": 0.02, "prefill": 0.03, "decode_with_sampling": 0.01}),
+                   self.entry("b", {"total": 0.06, "prefill": 0.09, "decode_with_sampling": 0.03})]
+        result = ensemble.aggregate(entries, attempts=2)
+        self.assertAlmostEqual(result["mean_of_means"], 0.04)
+        self.assertAlmostEqual(result["mean_worst_APE"], 0.08)
+
+    def test_a_cohort_that_states_no_total_is_an_error(self):
+        with self.assertRaises(ensemble.Unreadable):
+            ensemble.aggregate([self.entry("a", {"prefill": 0.03})], attempts=1)
 
     def test_no_counted_cohort_is_an_error_not_an_empty_ensemble(self):
         with self.assertRaises(ensemble.Unreadable):

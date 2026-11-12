@@ -236,38 +236,41 @@ def markdown(profile: dict, result: dict) -> str:
                  "| cohort | status | mean total APE | worst | conditions passed |",
                  "|---|---|---|---|---|"]
         for entry in result["cohorts"]:
-            mean = f"{entry['mean_APE'] * 100:.2f}%" if "mean_APE" in entry else "-"
+            mean = (f"{ensemble.total_ape(entry['mean_APE']) * 100:.2f}%"
+                    if "mean_APE" in entry else "-")
             lines.append(f"| {Path(entry['root']).name} | {entry['status']} | {mean} | - | - |")
         return "\n".join(lines) + "\n"
-    ensemble = result["ensemble"]
+    combined = result["ensemble"]
     lines = [
         f"# Device ensemble: {profile['device']}",
         "",
-        f"Created {result['created_at_utc']}. Cohorts counted: {ensemble['cohorts']} "
-        f"of {ensemble['attempts']} attempted.",
+        f"Created {result['created_at_utc']}. Cohorts counted: {combined['cohorts']} "
+        f"of {combined['attempts']} attempted.",
         "",
         "| cohort | status | mean total APE | worst | conditions passed |",
         "|---|---|---|---|---|",
     ]
     for entry in result["cohorts"]:
         name = Path(entry["root"]).name
-        mean = f"{entry['mean_APE'] * 100:.2f}%" if "mean_APE" in entry else "-"
-        worst = f"{entry['worst_APE'] * 100:.2f}%" if "worst_APE" in entry else "-"
+        mean = (f"{ensemble.total_ape(entry['mean_APE']) * 100:.2f}%"
+                if "mean_APE" in entry else "-")
+        worst = (f"{ensemble.total_ape(entry['worst_APE']) * 100:.2f}%"
+                 if "worst_APE" in entry else "-")
         passed = f"{entry['passed']}/{entry['conditions']}" if "passed" in entry else "-"
         lines.append(f"| {name} | {entry['status']} | {mean} | {worst} | {passed} |")
     lines += [
         "",
-        f"**Ensemble mean {ensemble['mean_of_means'] * 100:.2f}% "
-        f"+- {ensemble['sd_of_means'] * 100:.2f}% (between-run sd), "
-        f"range {ensemble['min_of_means'] * 100:.2f}-{ensemble['max_of_means'] * 100:.2f}%.**",
+        f"**Ensemble mean {combined['mean_of_means'] * 100:.2f}% "
+        f"+- {combined['sd_of_means'] * 100:.2f}% (between-run sd), "
+        f"range {combined['min_of_means'] * 100:.2f}-{combined['max_of_means'] * 100:.2f}%.**",
     ]
-    if "phase_APE" in ensemble:
-        phase = ensemble["phase_APE"]
+    if "phase_APE" in combined:
+        phase = combined["phase_APE"]
         lines.append(f"Per-condition phase APEs pooled over the cohorts: n={phase['n']}, "
                      f"mean {phase['mean'] * 100:.2f}%, median {phase['median'] * 100:.2f}%, "
                      f"p90 {phase['p90'] * 100:.2f}%, max {phase['max'] * 100:.2f}%.")
-    if "state" in ensemble:
-        where = ensemble["state"]
+    if "state" in combined:
+        where = combined["state"]
         lines.append(f"First-forward state: {where['slow']}/{where['requests']} bare requests "
                      f"above {where['boundary_ms']:.1f} ms "
                      f"({(where['fraction'] or 0) * 100:.0f}%); boundary from {where['source']}.")
@@ -381,7 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         if entry["status"] == "counted":
             counted += 1
             log(f"    counted ({counted}/{repetitions}): mean total APE "
-                f"{entry['mean_APE'] * 100:.2f}%, worst {entry['worst_APE'] * 100:.2f}%, "
+                f"{ensemble.total_ape(entry['mean_APE']) * 100:.2f}%, "
+                f"worst {ensemble.total_ape(entry['worst_APE']) * 100:.2f}%, "
                 f"{entry['passed']}/{entry['conditions']} conditions pass")
         else:
             log(f"    {entry['status']}: {entry.get('reason', '')}")
@@ -395,9 +399,9 @@ def main(argv: list[str] | None = None) -> int:
         result["cohorts"], attempts,
         profile.get("ensemble", {}).get("state_boundary_ms"))
     write_result(root, profile, result)
-    ensemble = result["ensemble"]
-    log(f"ensemble: {ensemble['mean_of_means'] * 100:.2f}% +- "
-        f"{ensemble['sd_of_means'] * 100:.2f}% over {ensemble['cohorts']} cohorts")
+    combined = result["ensemble"]
+    log(f"ensemble: {combined['mean_of_means'] * 100:.2f}% +- "
+        f"{combined['sd_of_means'] * 100:.2f}% over {combined['cohorts']} cohorts")
     return 0
 
 

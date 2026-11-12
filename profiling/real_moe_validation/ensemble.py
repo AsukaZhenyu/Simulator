@@ -27,6 +27,21 @@ def cohort_root(path: Path) -> Path:
     return Path(path)
 
 
+def total_ape(value: Any) -> float:
+    """The total APE a cohort states, whether as one number or one per phase.
+
+    A cohort's evaluation states its mean APE per phase (total, prefill,
+    decode_with_sampling); an older cohort states a single number.  The
+    ensemble's headline number is the total, so both shapes are read here
+    rather than at each call site.
+    """
+    if isinstance(value, dict):
+        value = value.get("total")
+    if value is None:
+        raise Unreadable("a cohort states no total APE")
+    return float(value)
+
+
 def evaluation(path: Path) -> dict[str, Any]:
     target = Path(path) / "model" / "formal" / "CONDITION_MEAN_EVALUATION.json"
     if not target.is_file():
@@ -104,7 +119,7 @@ def aggregate(entries: list[dict[str, Any]], attempts: int,
     counted = [entry for entry in entries if entry.get("status") == "counted"]
     if not counted:
         raise Unreadable("no cohort was counted; there is nothing to combine")
-    means = [entry["mean_APE"] for entry in counted]
+    means = [total_ape(entry["mean_APE"]) for entry in counted]
     ensemble: dict[str, Any] = {
         "cohorts": len(counted), "attempts": attempts,
         "excluded": len(entries) - len(counted),
@@ -112,7 +127,7 @@ def aggregate(entries: list[dict[str, Any]], attempts: int,
         "sd_of_means": statistics.stdev(means) if len(means) > 1 else 0.0,
         "min_of_means": min(means), "max_of_means": max(means),
         "pass_counts": [entry["passed"] for entry in counted],
-        "mean_worst_APE": statistics.fmean(entry["worst_APE"] for entry in counted),
+        "mean_worst_APE": statistics.fmean(total_ape(entry["worst_APE"]) for entry in counted),
     }
     phase_values = [value for entry in counted for condition in entry.get("phase_APEs", [])
                     for value in condition["APE"].values() if value is not None]
