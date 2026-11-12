@@ -44,9 +44,10 @@
    "enabled": true,
    "sample_interval_s": 2.0,
    "plateau": {
-    "window_s": 60.0,
+    "window_s": null,
     "temperature_c": 1.5,
-    "clock_fraction": 0.03
+    "clock_fraction": null,
+    "blocks": 3
    }
   },
   "sample_interval_s": 5.0

@@ -32,8 +32,12 @@ python tools/run_device_ensemble.py --profile <profile>.json
 - `state.band` — a closed interval per field. The laptop gates temperature
   only: its clocks legitimately swing by an order of magnitude between idle and
   loaded, so a clock interval would describe the workload rather than the state.
-- `state.stability` — how far a field may move *within* a cohort; `*_fraction`
-  names a field judged against its own median.
+- `state.stability` — how far a field's *block means* may move within a cohort
+  (revision 3); `*_fraction` names a field judged against its own median.
+- `state.precondition.plateau` — `window_s: null` judges the whole discarded
+  campaign, `blocks` is how many equal spans its means are compared over, and
+  `clock_fraction: null` records the SM clock without gating it, which is what an
+  unlocked machine declares: its clock follows the kernel mix, not its state.
 - `state.lock` — clock pinning, off unless the machine allows it. A lock is
   reported only after a read back shows the requested clock.
 - `ensemble.state_boundary_ms` — the machine's first-forward band boundary,

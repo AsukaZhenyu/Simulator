@@ -134,13 +134,17 @@ def precondition(profile: dict, provider: state.Provider | None, root: Path) -> 
     if not declared.get("enabled", True):
         return {"status": "skipped", "reason": "the profile disabled preconditioning"}
     plateau = state.Plateau(**{key: declared["plateau"][key] for key in
-                               ("window_s", "temperature_c", "clock_fraction")
+                               ("window_s", "temperature_c", "clock_fraction", "blocks")
                                if key in declared.get("plateau", {})})
     interval = float(declared.get("sample_interval_s", 2.0))
     target = root / "precondition"
     command = campaign_command(profile, target)
+    clock = ("gated at %.0f%%" % (100 * plateau.clock_fraction)
+             if plateau.clock_fraction is not None else "recorded, not gated")
+    window = ("the whole campaign" if plateau.window_s is None
+              else "the last %g s" % plateau.window_s)
     log(f"precondition: {target.name}, sampling every {interval:g} s, "
-        f"plateau window {plateau.window_s:g} s")
+        f"plateau over {window} in {plateau.blocks} blocks, SM clock {clock}")
     record = state.Record()
     started = time.monotonic()
     if provider is not None:
@@ -193,7 +197,9 @@ def one_repetition(profile: dict, provider: state.Provider | None, root: Path,
     if done.returncode != 0:
         entry.update(status="refused", reason=f"the campaign exited {done.returncode}")
         return entry
-    in_band, why = record.review(band, stability)
+    blocks = int(profile.get("state", {}).get("precondition", {})
+                 .get("plateau", {}).get("blocks", 3))
+    in_band, why = record.review(band, stability, blocks)
     entry["state"].update(in_band=in_band, reason=why)
     if not in_band:
         entry.update(status="excluded", reason="device state left the band: " + why)

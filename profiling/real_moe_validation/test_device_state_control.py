@@ -60,7 +60,48 @@ class PlateauTest(unittest.TestCase):
         settled, why = state.Plateau(window_s=5, temperature_c=1.5).verdict(
             series([60, 61, 62, 63, 64, 65]))
         self.assertFalse(settled)
-        self.assertIn("temperature moved", why)
+        self.assertIn("mean temperature drifted", why)
+
+    def test_a_bursty_machine_whose_mean_never_moves_settles(self):
+        # The campaign works for a few seconds and idles for longer, so the
+        # accelerator heats and cools inside the window while its mean state
+        # never moves.  Revision 3 judges the block means, not the extremes.
+        warm = [68, 72, 78, 74] * 3      # extremes span 10 C, means do not move
+        settled, why = state.Plateau(window_s=11, temperature_c=1.5).verdict(series(warm))
+        self.assertTrue(settled, why)
+        self.assertIn("across 3 blocks", why)
+
+    def test_a_whole_campaign_is_judged_when_no_window_is_declared(self):
+        settled, why = state.Plateau(window_s=None, temperature_c=1.5).verdict(
+            series([68, 72, 78, 74] * 3))
+        self.assertTrue(settled, why)
+        self.assertIn("whole campaign", why)
+        settled, why = state.Plateau(window_s=None, temperature_c=1.5).verdict(
+            series([60, 62, 64, 66, 68, 70]))
+        self.assertFalse(settled)
+        self.assertIn("whole campaign", why)
+
+    def test_a_mean_that_moves_does_not_settle(self):
+        settled, why = state.Plateau(window_s=5, temperature_c=1.5).verdict(
+            series([60, 62, 64, 66, 68, 70]))
+        self.assertFalse(settled)
+        self.assertIn("drifted", why)
+
+    def test_an_unlocked_clock_is_recorded_and_not_gated(self):
+        rows = series([70] * 6)
+        for index, row in enumerate(rows):
+            row["sm_clock_mhz"] = 1500 + 200 * index
+        settled, why = state.Plateau(window_s=5, clock_fraction=None).verdict(rows)
+        self.assertTrue(settled, why)
+        self.assertIn("not gated", why)
+
+    def test_a_locked_clock_is_still_gated(self):
+        rows = series([70] * 6)
+        for index, row in enumerate(rows):
+            row["sm_clock_mhz"] = 1500 + 200 * index
+        settled, why = state.Plateau(window_s=5, clock_fraction=0.02).verdict(rows)
+        self.assertFalse(settled)
+        self.assertIn("SM clock moved", why)
 
     def test_a_fixed_temperature_with_ramping_clocks_does_not_settle(self):
         rows = series([70] * 6)
@@ -92,7 +133,15 @@ class RecordTest(unittest.TestCase):
         ok, why = record.review(state.Band.parse({"temperature_c": [40, 90]}),
                                 {"temperature_c": 6.0})
         self.assertFalse(ok)
-        self.assertIn("temperature_c moved 15", why)
+        self.assertIn("temperature_c drifted 12.5", why)
+
+    def test_a_bursty_cohort_is_admitted_when_its_mean_holds(self):
+        # extremes span 10 C, so the span rule would exclude it; the means of
+        # its three blocks span 5 C, which is inside the declared limit.
+        record = state.Record(samples=series([70, 76, 79, 71, 69, 75, 78, 71]))
+        ok, why = record.review(state.Band.parse({"temperature_c": [40, 90]}),
+                                {"temperature_c": 6.0})
+        self.assertTrue(ok, why)
 
     def test_clock_drift_is_judged_as_a_fraction_of_the_median(self):
         rows = series([70] * 4)

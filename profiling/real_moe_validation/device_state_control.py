@@ -118,44 +118,99 @@ def _fmt(value: Any) -> str:
     return ("%.3g" % value) if isinstance(value, float) else str(value)
 
 
+def block_means(rows: list[dict[str, Any]], field: str, blocks: int = 3) -> list[float]:
+    """The mean of one field over equal spans of time across the rows.
+
+    A mean is the quantity a price is sensitive to; the extremes of a bursty
+    workload are not.  The spans are equal in time rather than equal in count,
+    so a gap in the trace cannot give one block more weight than another.
+    """
+    if blocks < 1:
+        raise ValueError("blocks must be at least one")
+    values = [(row["taken_monotonic_ns"], row[field]) for row in rows if field in row]
+    if not values:
+        return []
+    low, high = values[0][0], values[-1][0]
+    if high <= low:
+        return [sum(value for _, value in values) / len(values)]
+    width = (high - low) / blocks
+    out = []
+    for index in range(blocks):
+        start = low + index * width
+        end = low + (index + 1) * width
+        inside = [value for stamp, value in values
+                  if start <= stamp < end or (index == blocks - 1 and stamp == high)]
+        if inside:
+            out.append(sum(inside) / len(inside))
+    return out
+
+
 @dataclass(frozen=True)
 class Plateau:
     """What "the machine has settled" means, in numbers fixed before the run.
 
-    Temperature is the slow variable and the one that moves the clocks, so the
-    predicate is a bound on the temperature range over the last window *and* a
-    bound on the clock range over the same window; a machine can hold a
-    temperature while its clocks still ramp, which is the case the second bound
-    exists for.
+    Revision 3 gates drift, not jitter.  The campaign a machine is measured on
+    is bursty by construction: the accelerator works for a few seconds and
+    idles for longer while the host does its own part, so it heats and cools
+    by several degrees between bursts.  On the desktop, over the last minute
+    of a settled campaign the temperature still spans 4 C, and over the whole
+    campaign the means of three equal blocks span 1.1 C: the extremes describe
+    the workload, the means describe the machine.  A price is a mean, so the
+    predicate is a bound on the spread of the block means over the window.
+
+    The clock bound is separate and optional.  With clocks unlocked the SM
+    clock follows the kernel mix the campaign happens to schedule (180 to
+    2685 MHz on the same machine within one campaign), so a bound on it
+    measures the workload rather than the machine's state.  A profile that
+    does not lock clocks declares `clock_fraction: null`: the clock is then
+    recorded and reported, not gated.  Where the profile does lock, the lock's
+    read back fixes the clock and the bound still applies.
     """
 
-    window_s: float = 60.0
+    window_s: float | None = 60.0
     temperature_c: float = 1.5
-    clock_fraction: float = 0.02
+    clock_fraction: float | None = 0.02
+    blocks: int = 3
 
     def verdict(self, readings: Iterable[dict[str, Any]]) -> tuple[bool, str]:
         rows = list(readings)
         if not rows:
             return False, "no readings"
         span_s = (rows[-1]["taken_monotonic_ns"] - rows[0]["taken_monotonic_ns"]) / 1e9
-        if span_s < self.window_s:
-            return False, "only %.1f s of readings, window is %.1f s" % (span_s, self.window_s)
-        cutoff = rows[-1]["taken_monotonic_ns"] - int(self.window_s * 1e9)
-        window = [row for row in rows if row["taken_monotonic_ns"] >= cutoff]
-        temperatures = [row["temperature_c"] for row in window if "temperature_c" in row]
+        if self.window_s is None:
+            # The whole discarded campaign is the analysed span: the workload is
+            # the campaign's own, and its length differs by column, so a fixed
+            # trailing window would judge different fractions of it per machine.
+            window, where = rows, "the whole campaign"
+        else:
+            if span_s < self.window_s:
+                return False, "only %.1f s of readings, window is %.1f s" % (span_s, self.window_s)
+            cutoff = rows[-1]["taken_monotonic_ns"] - int(self.window_s * 1e9)
+            window, where = [row for row in rows if row["taken_monotonic_ns"] >= cutoff], \
+                "the last %.0f s" % self.window_s
+        means = block_means(window, "temperature_c", self.blocks)
+        if not means:
+            return False, "the window lacks temperature readings"
+        if len(means) < 2:
+            return False, "the window covers a single block, so no drift can be judged"
+        drift = max(means) - min(means)
+        if drift > self.temperature_c:
+            return False, "mean temperature drifted %.2f C across %d blocks of %s" % (
+                drift, len(means), where)
         clocks = [row["sm_clock_mhz"] for row in window if "sm_clock_mhz" in row]
-        if not temperatures or not clocks:
-            return False, "the window lacks temperature or clock readings"
-        swing = max(temperatures) - min(temperatures)
+        if self.clock_fraction is None:
+            return True, ("mean temperature drifted %.2f C across %d blocks of %s; "
+                          "SM clock recorded, not gated (no clock lock declared)" % (
+                              drift, len(means), where))
+        if not clocks:
+            return False, "the window lacks clock readings"
         low, high = min(clocks), max(clocks)
         spread = (high - low) / high if high else math.inf
-        if swing > self.temperature_c:
-            return False, "temperature moved %.2f C in the last %.0f s" % (swing, self.window_s)
         if spread > self.clock_fraction:
-            return False, "SM clock moved %.1f%% in the last %.0f s (%d-%d MHz)" % (
-                spread * 100, self.window_s, low, high)
-        return True, "temperature moved %.2f C and SM clock %.1f%% over %.0f s" % (
-            swing, spread * 100, self.window_s)
+            return False, "SM clock moved %.1f%% in %s (%d-%d MHz)" % (
+                spread * 100, where, low, high)
+        return True, "mean temperature drifted %.2f C across %d blocks of %s; SM clock %.1f%%" % (
+            drift, len(means), where, spread * 100)
 
 
 class Sampler:
@@ -213,14 +268,16 @@ class Record:
     samples: list[dict[str, Any]] = field(default_factory=list)
     out_of_band: list[str] = field(default_factory=list)
 
-    def review(self, band: Band | None, stability: dict[str, float] | None = None
-               ) -> tuple[bool, str]:
+    def review(self, band: Band | None, stability: dict[str, float] | None = None,
+               blocks: int = 3) -> tuple[bool, str]:
         """Whether the cohort is admissible, and the first reading or drift that is not.
 
         Two different questions, both declared in advance.  The band is where the
         device was: every reading has to be inside it.  Stability is whether it
-        stayed there: a cohort that entered and left the band is as inadmissible
-        as one that was never in it, and an average over it describes no state.
+        stayed there: a cohort whose mean moved has measured two machines, and
+        the average over it describes neither.  The drift is judged on block
+        means, not on the extremes, because the campaign's own bursts move the
+        extremes on a machine whose mean never moves.
         """
         if not self.samples:
             return False, "no device-state readings"
@@ -251,13 +308,19 @@ class Record:
                         return False, "%s moved %.1f%% within the cohort (limit %.1f%%)" % (
                             field, 100 * span / scale, 100 * limit)
                     continue
-                values = [row[name] for row in self.samples if name in row]
-                if not values:
+                # A field read in its own units is judged the same way as the
+                # precondition is (revision 3): the block means of the cohort,
+                # because a bursty workload moves the extremes without moving
+                # the state the cohort was measured in.
+                means = block_means(self.samples, name, blocks)
+                if not means:
                     return False, "no %s readings to judge stability" % name
-                span = max(values) - min(values)
-                if span > limit:
-                    return False, "%s moved %s within the cohort (limit %s)" % (
-                        name, _fmt(span), _fmt(limit))
+                if len(means) < 2:
+                    return False, "the cohort covers a single block, so no drift can be judged"
+                drift = max(means) - min(means)
+                if drift > limit:
+                    return False, "%s drifted %s across %d blocks within the cohort (limit %s)" % (
+                        name, _fmt(drift), len(means), _fmt(limit))
         inside = ("inside the band" if band is not None else "no band declared")
         return True, "%d readings %s and stable" % (len(self.samples), inside)
 

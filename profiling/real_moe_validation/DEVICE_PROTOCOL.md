@@ -118,3 +118,46 @@ paper number.
 What revision 2 does not control, and therefore does not claim: contention from
 other processes on the same machine, CPU frequency scaling, and which core a
 thread lands on. Those are refused or recorded only where a profile says so.
+
+## 7. Revision 3: the state is judged by drift, not by jitter
+
+Revision 2's predicate reads the last 60 s of the discarded campaign. On both
+machines that campaign is bursty by construction: the accelerator works for a
+few seconds at a time while the host does its part, heats during a burst and
+cools between bursts. Neither machine passed the predicate:
+
+| machine | last 60 s temperature span | whole-campaign block means |
+|---|---|---|
+| RTX 5090 | 5.0 °C from cold, 4.0 °C warm | 1.13 °C |
+| RTX 4070 Laptop | 12.0 °C from cold, 10.0 °C warm | 0.84 °C |
+
+The block-mean column is the warm-start trace, which is the one both machines
+kept as their refusal record.
+
+The extremes describe the workload; the means describe the machine. A price is
+a mean over the campaign, so a gate on the extremes refuses machines whose mean
+state never moved, and a gate on the means measures the quantity the price is
+sensitive to. Revision 3 changes the estimator and nothing else:
+
+1. **Plateau.** The analysed span (the whole discarded campaign, `window_s:
+   null`) is split into `blocks` equal spans of time; the machine is settled when
+   the largest difference between the block means of the temperature is at most
+   the declared tolerance. The same estimator judges a cohort's stability under
+   section 6, item 2. Every verdict reports the drift it measured.
+2. **No clock bound without a lock.** With clocks unlocked the SM clock follows
+   the kernel mix the campaign happens to schedule — 180 to 2685 MHz inside one
+   campaign on the same machine — so a bound on it measures the workload rather
+   than the state. A profile that does not lock clocks declares `clock_fraction:
+   null`; the clock is then recorded and reported in every cohort summary, not
+   gated. A profile that locks keeps the bound, and the lock's read back is what
+   fixes the clock.
+3. **No tolerance was retuned.** The declared tolerances (1.5 °C plateau, 4 °C
+   and 6 °C cohort stability) are the ones revision 2 declared before either
+   trace existed; the estimator changed under them, and every verdict prints the
+   drift it measured so a reader can check it against the trace.
+
+What revision 3 still does not control: the machine's mean state can differ
+between sessions (the band, and the ensemble's between-run standard deviation,
+are the record of that), and a cohort whose mean holds while its workload
+changes shape is admitted — the accuracy dispersion, not the state gate, is what
+would show it.
