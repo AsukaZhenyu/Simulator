@@ -33,8 +33,10 @@ struct Capture {
   return -1;
  }
  void prepare(int maximum_forwards,int total_rows,int layer_count,int expert_count,int k){
-  require(maximum_forwards>0&&total_rows>0&&layer_count>0&&k>0,"bounded capture allocation required");
-  const uint64_t n=uint64_t(maximum_forwards)*layer_count*3, z=uint64_t(total_rows)*layer_count*3*k;
+  // A dense model declares no expert dimension, so there is no expert ID to
+  // store and the store is empty rather than sized to a guessed expert count.
+  require(maximum_forwards>0&&total_rows>0&&layer_count>0&&expert_count>=0&&k>=0&&(expert_count>0)==(k>0),"bounded capture allocation required");
+  const uint64_t n=uint64_t(maximum_forwards)*layer_count*3, z=k>0?uint64_t(total_rows)*layer_count*3*k:0;
   require(n<=1000000&&z<=20000000,"capture exceeds owned POD envelope");
   records.assign(static_cast<size_t>(n),{}); ids.assign(static_cast<size_t>(z),0);
   used=ids_used=0;hook_ticks=0;error=0;layers=layer_count;experts=expert_count;top_k=k;

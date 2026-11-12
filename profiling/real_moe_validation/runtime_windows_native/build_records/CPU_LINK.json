@@ -1,0 +1,12 @@
+{
+  "command": [
+    "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\link.exe",
+    "@C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\build\\real-moe-validation-20261028\\runtime-windows-build-v8\\cpu-link.rsp"
+  ],
+  "started_at_utc": "2026-10-28T14:51:19.189920+00:00",
+  "ended_at_utc": "2026-10-28T14:51:19.304886+00:00",
+  "returncode": 0,
+  "stdout": "  正在创建库 C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\build\\real-moe-validation-20261028\\runtime-windows-build-v8\\lib\\ggml-cpu.lib 和对象 C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\build\\real-moe-validation-20261028\\runtime-windows-build-v8\\lib\\ggml-cpu.exp\n",
+  "stderr": "",
+  "hardware_executed": false
+}

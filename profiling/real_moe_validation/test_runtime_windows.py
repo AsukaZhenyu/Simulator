@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 from profiling.real_moe_validation.runtime_windows import patched_base,patched_cpu,patched_native
-from profiling.real_moe_validation.runtime_window_analysis import extract_windows,fit_nonnegative,fit_prices,predict_inventory,price_fit_diagnostics
+from profiling.real_moe_validation.runtime_window_analysis import extract_windows,fit_nonnegative,fit_prices,predict_inventory,price_fit_diagnostics,decode_history
 from llm_infer_model.performance.window_work import WindowWorkSpec
 
 
@@ -102,6 +102,27 @@ class RuntimeWindowsTest(unittest.TestCase):
         for patch in (patched_base,patched_cpu,patched_native):
             with self.assertRaises(ValueError):patch('unrelated source')
 
+    def test_the_observer_driver_comes_from_the_repository_alone(self):
+        """One frozen driver, composed from repository source, on every device.
+
+        The driver used to be read out of whichever build directory had produced
+        the first observer. That made a result the only copy of the instrument's
+        own code: two checkouts of one commit could compile two different
+        observers, and a checkout without that directory could not build the
+        instrument at all. The composition below is the whole driver -- the
+        frozen base plus the two patch stages -- so the hash moving means the
+        core logic moved, which is exactly what a device port must not do.
+        """
+        import hashlib
+        from profiling.real_moe_validation import tap_v5
+        here=Path(__file__).resolve().parent
+        driver=patched_native(tap_v5.native_v5(
+            (here/'tap_native/real_moe_tap_probe.cpp').read_text(encoding='utf-8')))
+        self.assertEqual(hashlib.sha256(driver.encode()).hexdigest(),
+                         '54dceda5221e2dd74ab8b9d870e63c184b7a9caec12933ec4ae35e812f636f32')
+        self.assertNotIn(str(here.parents[1]/'build'),driver,
+                         'the driver may not name a build directory')
+
     def test_distinct_same_name_nodes_keep_distinct_actual_occurrences(self):
         row=fixture();row['runtime_windows']['nodes'][2]=dict(row['runtime_windows']['nodes'][1])
         ledger=extract_windows(row,placement='cpu',frequency_hz=1_000_000_000)
@@ -119,6 +140,23 @@ class RuntimeWindowsTest(unittest.TestCase):
         cpu=[w['inventory'] for w in ledger['windows'] if w['inventory']['scope']=='CPU_NODE']
         self.assertEqual([w['query_tokens'] for w in cpu],[1,1])
         self.assertEqual([w['metadata']['actual_forward_query_tokens'] for w in cpu],[125,125])
+
+    def test_decode_history_is_a_position_within_a_padded_kv_depth(self):
+        # Two forwards at one padded depth, then a generation that crosses into
+        # the next depth: the depth, not the request, is what the position is
+        # read inside, because the excess cost returns at every depth change.
+        rank={4:0,5:1,6:2,7:0,8:1}
+        self.assertEqual([decode_history(f,rank,4) for f in (4,5,6,7,8)],
+            ['decode:first','decode:settling','decode:continuation','decode:first','decode:settling'])
+        # A window whose preceding graph is a Prefill forward keeps the previous
+        # fallback so its key does not move.
+        self.assertEqual(decode_history(3,rank,4),'decode:first')
+        self.assertEqual(decode_history(9,rank,4),'decode:continuation')
+        # The request-closing window keeps the request position even when its
+        # forward enters a depth: its identity exists once per request, and a
+        # depth class there leaves a key no calibration request can produce.
+        self.assertEqual(decode_history(7,rank,4,closes_request=True),'decode:continuation')
+        self.assertEqual(decode_history(4,rank,4,closes_request=True),'decode:first')
 
     def test_semantic_history_does_not_turn_forward_ordinal_into_price_identity(self):
         original=fixture();other=fixture()

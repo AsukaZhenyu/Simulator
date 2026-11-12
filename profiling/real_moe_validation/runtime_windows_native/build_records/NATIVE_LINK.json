@@ -1,0 +1,21 @@
+{
+  "command": [
+    "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\link.exe",
+    "/NOLOGO",
+    "/MACHINE:X64",
+    "/OUT:C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\build\\real-moe-validation-20261028\\runtime-windows-build-v8\\bin\\real-moe-runtime-window-probe.exe",
+    "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\Simulator\\build\\real-moe-validation-20261028\\runtime-windows-build-v8\\objects\\real_moe_tap_probe.obj",
+    "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\llama.cpp-implement\\release-b8705\\llama.cpp-b8705\\build\\src\\Release\\llama.lib",
+    "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\llama.cpp-implement\\release-b8705\\llama.cpp-b8705\\build\\ggml\\src\\Release\\ggml.lib",
+    "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\llama.cpp-implement\\release-b8705\\llama.cpp-b8705\\build\\ggml\\src\\Release\\ggml-base.lib",
+    "C:\\Users\\89664\\Desktop\\master degree\\LLM-Infer\\llama.cpp-implement\\release-b8705\\llama.cpp-b8705\\build\\ggml\\src\\Release\\ggml-cpu.lib",
+    "bcrypt.lib",
+    "kernel32.lib"
+  ],
+  "started_at_utc": "2026-10-28T14:51:30.657873+00:00",
+  "ended_at_utc": "2026-10-28T14:51:30.791160+00:00",
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "hardware_executed": false
+}

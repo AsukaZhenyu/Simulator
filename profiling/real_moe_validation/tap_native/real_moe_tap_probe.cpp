@@ -77,12 +77,25 @@ static json model_metadata(llama_model *model){json meta=json::object();for(int 
  if(nk>0&&nk<static_cast<int>(sizeof(key))&&nv>=0&&nv<static_cast<int>(sizeof(value)))meta[key]=value;
  else meta["unrepresented_metadata_index_"+std::to_string(i)]=json{{"key_length",nk},{"value_length",nv}};}
  return meta;}
+static int64_t metadata_integer(const json &meta,const std::string &key){
+ require(meta.contains(key),"GGUF metadata lacks "+key);
+ const auto &value=meta.at(key);require(value.is_string(),"GGUF metadata "+key+" is not a string field");
+ const auto text=value.get<std::string>();size_t used=0;int64_t parsed=0;
+ try{parsed=std::stoll(text,&used);}catch(const std::exception&){used=0;}
+ require(used==text.size(),"GGUF metadata "+key+" is not an integer");return parsed;
+}
 static json verified_contract(const json &meta,const json &expected){
  const auto arch=expected.at("architecture").get<std::string>();
  require(meta.at("general.architecture")==arch,"GGUF architecture differs from declared model contract");
- json observed{{"architecture",arch},{"layers",std::stoi(meta.at(arch+".block_count").get<std::string>())},
-  {"experts",std::stoi(meta.at(arch+".expert_count").get<std::string>())},
-  {"top_k",std::stoi(meta.at(arch+".expert_used_count").get<std::string>())}};
+ // A dense model has no expert dimension: it declares zero experts and its
+ // GGUF carries neither expert key. A mixture model must declare and carry
+ // both, so a contract and a file can never agree by one of them defaulting.
+ const bool declared_dense=expected.value("experts",-1)==0&&expected.value("top_k",-1)==0;
+ const bool carries_experts=meta.contains(arch+".expert_count")||meta.contains(arch+".expert_used_count");
+ require(declared_dense!=carries_experts,"GGUF expert metadata and declared model contract disagree");
+ json observed{{"architecture",arch},{"layers",metadata_integer(meta,arch+".block_count")},
+  {"experts",carries_experts?metadata_integer(meta,arch+".expert_count"):int64_t(0)},
+  {"top_k",carries_experts?metadata_integer(meta,arch+".expert_used_count"):int64_t(0)}};
  require(observed==expected,"GGUF model geometry differs from declared model contract");return observed;
 }
 
@@ -146,6 +159,13 @@ int main(int argc,char **argv){try{
  if(argc==2&&std::string(argv[1])=="--self-test"){
   int layer=-1;require(Capture::stage_layer("ffn_moe_up-15",layer)==0&&layer==15,"consumer stage parser failed");require(Capture::stage_layer("result_norm",layer)==-1,"nonexpert node admitted");
   require(hash_format(std::string(64,'a'))&&!hash_format("unknown"),"SHA parser failed");
+  const auto refuses=[&](const json &meta,const json &expect){try{verified_contract(meta,expect);return false;}catch(const std::exception&){return true;}};
+  const json dense_meta{{"general.architecture","qwen3"},{"qwen3.block_count","28"}},dense_expect{{"architecture","qwen3"},{"layers",28},{"experts",0},{"top_k",0}};
+  const json moe_meta{{"general.architecture","olmoe"},{"olmoe.block_count","16"},{"olmoe.expert_count","64"},{"olmoe.expert_used_count","8"}},moe_expect{{"architecture","olmoe"},{"layers",16},{"experts",64},{"top_k",8}};
+  require(verified_contract(dense_meta,dense_expect)==dense_expect&&verified_contract(moe_meta,moe_expect)==moe_expect,"declared model contracts rejected");
+  require(refuses(dense_meta,moe_expect)&&refuses(moe_meta,dense_expect),"a contract and a file may not agree by defaulting");
+  require(refuses(json{{"general.architecture","qwen3"},{"qwen3.block_count","28"},{"qwen3.expert_count","64"},{"qwen3.expert_used_count","8"}},dense_expect),"a dense contract must refuse a file that carries experts");
+  require(refuses(json{{"general.architecture","olmoe"},{"olmoe.block_count","16"}},moe_expect),"a mixture contract must refuse a file that carries none");
   std::cout<<json{{"passed",true},{"model_loaded",false},{"hardware_timing_executed",false},{"source_sha256",REAL_MOE_SOURCE_SHA256}}.dump()<<'\n';return 0;}
  require(argc==3,"usage: real-moe-probe REQUEST OUTPUT");const auto output=std::filesystem::u8path(argv[2]);require(!std::filesystem::exists(output),"output exists");
  std::ifstream stream(std::filesystem::u8path(argv[1]));require(stream.good(),"request unreadable");json request;stream>>request;

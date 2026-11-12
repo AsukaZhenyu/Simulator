@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import time
 import xml.etree.ElementTree as ET
-from .tap_v4 import sha, receipt, write, run_record
+from .tap_v4 import sha, receipt, write, run_record, private_context_header
 
 HERE=Path(__file__).resolve().parent
 DECL='static void ggml_cuda_mul_mat_id(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {'
@@ -65,6 +65,14 @@ def patched_cuda(text):
 
 def native_v5(text):
     replacements=[
+      # The dense channel is a property of the CPU candidate ledger this stage
+      # already imports, so both model shapes are exercised where the driver
+      # runs its self-test: a mixture model sizes a real ledger, and a dense
+      # model must record nothing rather than fail on a zero-sized one.
+      ('require(hash_format(std::string(64,\'a\'))&&!hash_format("unknown"),"SHA parser failed");',
+       'require(hash_format(std::string(64,\'a\'))&&!hash_format("unknown"),"SHA parser failed");\n'
+       ' {Capture dense;dense.prepare(2,3,1,0,0);require(dense.output().is_array()&&dense.output().empty(),"a dense capture must record no expert windows");\n'
+       '  Capture moe;moe.prepare(2,3,1,4,2);require(moe.top_k==2&&moe.experts==4,"mixture capture sizing failed");}'),
       ('// Revision v4: observe CPU-consumed expert IDs; no llama scheduler callback.','// Revision v5: additive same-stream GPU consumer observation, not bare timing.'),
       ('#include "route_context_inspect.hpp"','#include "route_context_inspect.hpp"\n#include "gpu_tap_pod.hpp"'),
       ('{"passed",true},{"model_loaded",false}', '{"passed",true},{"gpu_POD_contract_checks",gpu_tap_pod_contract()},{"GPU_DMA_tested",false},{"model_loaded",false}'),
@@ -96,10 +104,12 @@ def prepare(out,llama_root,v4_build):
     original=lr/'ggml/src/ggml-cuda/ggml-cuda.cu';text=original.read_text(encoding='utf-8');patched=patched_cuda(text)
     (out/'source/ggml-cuda.cu').write_text(patched,encoding='utf-8',newline='\n')
     (out/'gpu-consumer-tap.patch').write_text(''.join(difflib.unified_diff(text.splitlines(True),patched.splitlines(True),fromfile='original/ggml-cuda.cu',tofile='private/ggml-cuda.cu')),encoding='utf-8',newline='\n')
-    for name in ('route_tap_api.h','route_tap_pod.hpp','route_context_inspect.hpp','private_llama_context.h'):
-        shutil.copy2(old/'source'/name,out/'source'/name)
+    for name in ('route_tap_api.h','route_tap_pod.hpp','route_context_inspect.hpp'):
+        shutil.copy2(HERE/'tap_native'/name,out/'source'/name)
+    (out/'source/private_llama_context.h').write_text(
+        private_context_header((lr/'src/llama-context.h').read_text(encoding='utf-8')),encoding='utf-8',newline='\n')
     for name in ('gpu_tap_api.h','gpu_tap_pod.hpp'):shutil.copy2(HERE/'tap_native_v5'/name,out/'source'/name)
-    (out/'source/real_moe_tap_probe.cpp').write_text(native_v5((old/'source/real_moe_tap_probe.cpp').read_text(encoding='utf-8')),encoding='utf-8',newline='\n')
+    (out/'source/real_moe_tap_probe.cpp').write_text(native_v5((HERE/'tap_native/real_moe_tap_probe.cpp').read_text(encoding='utf-8')),encoding='utf-8',newline='\n')
     objs=sorted((lr/'build/ggml/src/ggml-cuda/ggml-cuda.dir/Release').glob('*.obj'))
     original_obj=lr/'build/ggml/src/ggml-cuda/ggml-cuda.dir/Release/ggml-cuda.obj'
     if original_obj not in objs:raise ValueError('matching original CUDA objects unavailable')

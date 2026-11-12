@@ -1,0 +1,10 @@
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml-alloc.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\Simulator\build\real-moe-validation-20261028\runtime-windows-build-v8\objects\ggml-backend.cpp.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml-opt.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml-threading.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml-quants.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\gguf.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml.c.obj"
+"C:\Users\89664\Desktop\master degree\LLM-Infer\llama.cpp-implement\release-b8705\llama.cpp-b8705\build\ggml\src\ggml-base.dir\Release\ggml.cpp.obj"
+kernel32.lib user32.lib advapi32.lib
+/DLL /NOLOGO /INCREMENTAL:NO /MACHINE:X64 /OUT:"C:\Users\89664\Desktop\master degree\LLM-Infer\Simulator\build\real-moe-validation-20261028\runtime-windows-build-v8\bin\ggml-base.dll" /IMPLIB:"C:\Users\89664\Desktop\master degree\LLM-Infer\Simulator\build\real-moe-validation-20261028\runtime-windows-build-v8\lib\ggml-base.lib"

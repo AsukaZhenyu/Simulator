@@ -12,10 +12,27 @@ from pathlib import Path
 import shutil
 import subprocess
 from .dataset import read
+from . import tap_v4, tap_v5
 from .tap_v4 import receipt,sha,write,run_record
 
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[1]
+RECORDS=HERE/'runtime_windows_native/build_records'
+
+def recorded(path):
+    """A compiler or linker line the published instrument was built with.
+
+    These live in the repository because they are part of how the observer is
+    compiled, not a result of one build. Reading them from whichever build
+    directory came first ties every later device to that directory; the paths
+    inside are only where the line was first written, and build() rewrites them
+    onto the directory being built.
+    """
+    path=Path(path)
+    fixture=RECORDS/path.name
+    if fixture.is_file():return fixture
+    if path.is_file():return path
+    raise ValueError('no recorded build line for '+path.name+'; add it under '+str(RECORDS))
 
 BASE_HOOK='''
 // Private read-only, no-sync runtime observer ABI. Registered outside execution.
@@ -95,24 +112,44 @@ def patched_native(text):
 def prepare(out,llama_root,observer_build,fixed_build):
     out,llama_root,observer_build,fixed_build=map(lambda p:Path(p).resolve(),(out,llama_root,observer_build,fixed_build))
     if out.exists():raise ValueError('new runtime-window build directory required')
-    cpu_build=Path(read(observer_build/'PREPARED.json')['v4_build']['path']).parent
+    # Every source file this instrument compiles is repository source, composed
+    # here from the frozen driver and the three patch stages. Nothing is read
+    # out of a build directory: a build directory is a result, and making one
+    # the only copy of the instrument's own code means two checkouts of the
+    # same commit can compile two different observers, and a checkout without
+    # that archive cannot build the instrument at all. A device port changes
+    # the build glue and the backend hooks, never this composition.
+    driver=patched_native(tap_v5.native_v5(
+        (HERE/'tap_native/real_moe_tap_probe.cpp').read_text(encoding='utf-8')))
+    native_from=dict(path=str(HERE/'tap_native/real_moe_tap_probe.cpp'),
+                     sha256=sha(HERE/'tap_native/real_moe_tap_probe.cpp'),
+                     stages=['tap_v5.native_v5','runtime_windows.patched_native'],
+                     origin='repository composition')
     sources={
         'ggml-backend.cpp':patched_base((llama_root/'ggml/src/ggml-backend.cpp').read_text(encoding='utf-8')),
-        'ggml-cpu.c':patched_cpu((cpu_build/'source/ggml-cpu.c').read_text(encoding='utf-8')),
-        'real_moe_tap_probe.cpp':patched_native((observer_build/'source/real_moe_tap_probe.cpp').read_text(encoding='utf-8'))}
+        'ggml-cpu.c':patched_cpu(tap_v4.patched_cpu(
+            (llama_root/'ggml/src/ggml-cpu/ggml-cpu.c').read_text(encoding='utf-8'))),
+        'private_llama_context.h':tap_v4.private_context_header(
+            (llama_root/'src/llama-context.h').read_text(encoding='utf-8')),
+        'real_moe_tap_probe.cpp':driver}
     for name in ('source','objects','bin','lib'):(out/name).mkdir(parents=True,exist_ok=True)
-    for p in (observer_build/'source').iterdir():
-        if p.suffix in ('.h','.hpp'):shutil.copy2(p,out/'source'/p.name)
-    shutil.copy2(HERE/'runtime_windows_native/runtime_windows.hpp',out/'source/runtime_windows.hpp')
+    for directory in (HERE/'tap_native',HERE/'tap_native_v5',HERE/'runtime_windows_native'):
+        for p in directory.iterdir():
+            if p.suffix in ('.h','.hpp') and (out/'source'/p.name).exists():
+                raise ValueError('two repository headers share a name: '+p.name)
+            if p.suffix in ('.h','.hpp'):shutil.copy2(p,out/'source'/p.name)
     for name,text in sources.items():(out/'source'/name).write_text(text,encoding='utf-8',newline='\n')
-    m=dict(schema='real-moe-runtime-window-build-prepared-1',llama_root=str(llama_root),observer_build=str(observer_build),cpu_build=str(cpu_build),fixed_build=receipt(fixed_build/'BUILD_COMPLETE.json'),
+    m=dict(schema='real-moe-runtime-window-build-prepared-1',llama_root=str(llama_root),observer_build=str(observer_build),fixed_build=receipt(fixed_build/'BUILD_COMPLETE.json'),
+        native_source_anchor=native_from,
         sources=[receipt(p) for p in sorted((out/'source').iterdir())],native_source_sha256=sha(out/'source/real_moe_tap_probe.cpp'),
-        original_base_source=receipt(llama_root/'ggml/src/ggml-backend.cpp'),original_cpu_source=receipt(cpu_build/'source/ggml-cpu.c'),original_native_source=receipt(observer_build/'source/real_moe_tap_probe.cpp'),
+        original_base_source=receipt(llama_root/'ggml/src/ggml-backend.cpp'),
+        original_cpu_source=receipt(llama_root/'ggml/src/ggml-cpu/ggml-cpu.c'),
+        original_native_source=receipt(HERE/'tap_native/real_moe_tap_probe.cpp'),
         mathematical_graph_changed=False,extra_GPU_syncs=0,CPU_barriers_added=0,CUDA_objects_rebuilt=False,whole_model_price_supported=False,hardware_executed=False)
     write(out/'PREPARED.json',m);return m
 
 def build(out,cl,link,env):
-    out=Path(out).resolve();m=read(out/'PREPARED.json');lr=Path(m['llama_root']);old=Path(m['observer_build']);oldcpu=Path(m['cpu_build']);src=out/'source'
+    out=Path(out).resolve();m=read(out/'PREPARED.json');lr=Path(m['llama_root']);old=Path(m['observer_build']);oldcpu=Path(m.get('cpu_build') or m['observer_build']);src=out/'source'
     for r in m['sources']:
         if sha(r['path'])!=r['sha256']:raise ValueError('prepared runtime-window source changed')
     # Use the exact original project command-line switches for its base object.
@@ -150,21 +187,29 @@ def build(out,cl,link,env):
     rsp=out/'base-link.rsp';rsp.write_text('\n'.join('"'+p+'"' for p in resolved)+'\nkernel32.lib user32.lib advapi32.lib\n/DLL /NOLOGO /INCREMENTAL:NO /MACHINE:X64 /OUT:"'+str(out/'bin/ggml-base.dll')+'" /IMPLIB:"'+str(out/'lib/ggml-base.lib')+'"\n',encoding='utf-8',newline='\n')
     run_record(out,'BASE_LINK',[link,'@'+str(rsp)],env)
     # Retain the observer CPU object's original switches; only add no-sync stamps.
-    args=read(oldcpu/'CPU_COMPILE.json')['command'];args=[cl]+[x.replace(str(oldcpu/'source'),str(src)).replace(str(oldcpu/'objects'),str(out/'objects')) for x in args[1:]]
+    # The switches are repository fixtures, not a property of whichever build
+    # directory happened to run first: they name the historical build root and
+    # are rewritten onto this one below.
+    args=read(recorded(oldcpu/'CPU_COMPILE.json'))['command']
+    cpu_named=next((x for x in args if x.lower().endswith('ggml-cpu.c')),None)
+    if cpu_named is None:raise ValueError('recorded CPU compile names no source file')
+    cpu_root=Path(cpu_named).parent.parent
+    args=[cl]+[x.replace(str(cpu_root/'source'),str(src)).replace(str(cpu_root/'objects'),str(out/'objects')) for x in args[1:]]
     for x in args:
-        if str(oldcpu) in x:raise ValueError('recorded CPU build path survived the rewrite: '+x)
+        if str(cpu_root) in x:raise ValueError('recorded CPU build path survived the rewrite: '+x)
     run_record(out,'CPU_COMPILE',args,env)
-    text=(oldcpu/'cpu-link.rsp').read_text(encoding='utf-8').replace(str(oldcpu/'objects'),str(out/'objects')).replace(str(oldcpu/'bin'),str(out/'bin')).replace(str(oldcpu/'lib'),str(out/'lib'))
-    if str(oldcpu) in text:raise ValueError('recorded CPU build path survived the link rewrite')
+    text=recorded(oldcpu/'cpu-link.rsp').read_text(encoding='utf-8').replace(str(cpu_root/'objects'),str(out/'objects')).replace(str(cpu_root/'bin'),str(out/'bin')).replace(str(cpu_root/'lib'),str(out/'lib'))
+    if str(cpu_root) in text:raise ValueError('recorded CPU build path survived the link rewrite')
     (out/'cpu-link.rsp').write_text(text,encoding='utf-8',newline='\n');run_record(out,'CPU_LINK',[link,'@'+str(out/'cpu-link.rsp')],env)
-    oldsha=read(old/'PREPARED.json')['native_source_sha256']
     # The recorded commands name the directory they were actually built in, which
     # is not necessarily PREPARED.observer_build: reusing a patched source tree
     # keeps its original request on disk. Rewriting against observer_build alone
     # would silently leave the old /Fo and /OUT paths in place and write the new
     # object and executable into the historical build directory.
-    compile_recorded=read(old/'NATIVE_COMPILE.json')['command'][1:]
-    link_recorded=read(old/'NATIVE_LINK.json')['command'][1:]
+    compile_recorded=read(recorded(old/'NATIVE_COMPILE.json'))['command'][1:]
+    link_recorded=read(recorded(old/'NATIVE_LINK.json'))['command'][1:]
+    oldsha=next((x.split('=',1)[1].strip('"') for x in compile_recorded if 'REAL_MOE_SOURCE_SHA256=' in x),None)
+    if oldsha is None:raise ValueError('recorded native compile declares no source SHA')
     named=next((x for x in compile_recorded if x.lower().endswith('.cpp')),None)
     if named is None:raise ValueError('recorded native compile names no source file')
     recorded=Path(named).parent.parent

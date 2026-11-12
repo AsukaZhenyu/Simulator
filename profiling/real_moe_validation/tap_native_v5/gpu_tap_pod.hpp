@@ -12,7 +12,10 @@ struct GPUCapture {
  void prepare(int forwards,int rows,int layers,int experts,int k,bool record){
   enabled=record;error=0;forward=-1;event_count=0;enqueue_ticks=0;copy_count=0;
   events.assign(16384,{});data.prepare(forwards,rows,layers,experts,k);copies.assign(data.records.size(),{});
-  if(record){const auto bytes=data.ids.size()*sizeof(int32_t);require(bytes<=80000000,"pinned observer envelope exceeded");
+  // A dense model declares no routed expert, so there is no ID channel to
+  // reserve. The absence is spelled out here rather than by reserving a
+  // zero-byte buffer, which some allocators refuse.
+  if(record&&k>0){const auto bytes=data.ids.size()*sizeof(int32_t);require(bytes<=80000000,"pinned observer envelope exceeded");
    if(bytes>pinned_bytes){if(pinned){require(free(pinned)==0,"pinned observer free failed");pinned=nullptr;pinned_bytes=0;}
     require(alloc&&alloc(bytes,&pinned)==0&&pinned,"pinned observer allocation failed");pinned_bytes=bytes;}}
  }
@@ -27,7 +30,7 @@ struct GPUCapture {
   if(g.enabled&&use&&experts)g.error=10;
  }
  static void *reserve(const ggml_tensor *dst,const ggml_tensor *ids,void *stream,size_t row_bytes,void *user) noexcept {
-  auto &g=*static_cast<GPUCapture*>(user);if(!g.enabled||g.error)return nullptr;
+  auto &g=*static_cast<GPUCapture*>(user);if(!g.enabled||g.error||g.data.top_k==0)return nullptr;
   LARGE_INTEGER first{},last{};QueryPerformanceCounter(&first);int layer=-1;const int stage=Capture::stage_layer(dst->name,layer);
   if(stage<0){g.error=12;return nullptr;}
   if(!stream||!ids||ids->type!=GGML_TYPE_I32||ids->nb[0]!=sizeof(int32_t)||ids->ne[0]!=g.data.top_k||ids->ne[1]<1||ids->ne[1]>4096||ids->ne[2]!=1||ids->ne[3]!=1||!ids->data||layer<0||layer>=g.data.layers||row_bytes!=size_t(g.data.top_k)*4||ids->nb[1]<row_bytes){g.error=13;return nullptr;}
