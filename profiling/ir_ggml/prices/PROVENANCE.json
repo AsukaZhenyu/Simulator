@@ -14,8 +14,8 @@
    "origin": "profiling/results/20261104-multimodel-moe-v1/granite-3.0-3b-a800m-pinned-export",
    "extension": {
     "path": "granite-3.0-3b-a800m/gpu_costs.json",
-    "sha256": "d3fcad54cf41c1e53ee70ceb6d24eec98443372aa064dbfe01c23058434a1e15",
-    "bytes": 27556,
+    "sha256": "9faf16112472ea5841514b88e582018a66f1725213910887c9a679b90c34970a",
+    "bytes": 26637,
     "entries": 9,
     "devices": [
      "gpu"
@@ -41,8 +41,8 @@
    "origin": "profiling/results/20261104-multimodel-moe-olmo/olmoe-1b-7b-pinned-r2-export",
    "extension": {
     "path": "olmoe-1b-7b/gpu_costs.json",
-    "sha256": "0c7237a7a0cccd9c4b17d75b6497ba3f1c7b97c78bbaec7723a22ca7b8f21c34",
-    "bytes": 34406,
+    "sha256": "4c622d879e8c4c33cb9aff91dc76194d891bcf7a99e308060a21be6c4075a016",
+    "bytes": 33249,
     "entries": 11,
     "devices": [
      "gpu"
@@ -68,8 +68,8 @@
    "origin": "profiling/results/20261104-multimodel-moe-v1/qwen1.5-moe-a2.7b-pinned-export",
    "extension": {
     "path": "qwen1.5-moe-a2.7b/gpu_costs.json",
-    "sha256": "719b09d15aaf8b999e826f9197d0980027e22c37995b8fb4b89a4889841a3911",
-    "bytes": 37458,
+    "sha256": "83997baf938688e42809a40c6d5cb24a778ac840198b7beeaba5c6322fd366b2",
+    "bytes": 36210,
     "entries": 11,
     "devices": [
      "gpu"
@@ -95,8 +95,8 @@
    "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-0.6b-pinned-export",
    "extension": {
     "path": "qwen3-0.6b/gpu_costs.json",
-    "sha256": "c5d95643b839d77b2afadcf1643ebbccfab14302812ba18d3aa2296db45e37dc",
-    "bytes": 22508,
+    "sha256": "2921b2ead9c97d9cc4e24955645b3793edc5784bee4f322ece84181965ba1596",
+    "bytes": 21750,
     "entries": 8,
     "devices": [
      "gpu"
@@ -122,8 +122,8 @@
    "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-1.7b-pinned-export",
    "extension": {
     "path": "qwen3-1.7b/gpu_costs.json",
-    "sha256": "31d91e727b00c5acdd176dea055e13a08f7a168112e7bd656c0f60da394a0238",
-    "bytes": 33472,
+    "sha256": "d4de0681df045e10fc5cb26903c7fc147edae1e7b4304ede14d54d5d3e2b2ce8",
+    "bytes": 32355,
     "entries": 12,
     "devices": [
      "gpu"
@@ -149,8 +149,8 @@
    "origin": "profiling/results/20261104-multimodel-dense-v2/qwen3-4b-pinned-export",
    "extension": {
     "path": "qwen3-4b/gpu_costs.json",
-    "sha256": "5521e105cf17f80e431142aec994dffc8e40ebc6f2b2157f00eb7557fb60e362",
-    "bytes": 33316,
+    "sha256": "fe31f4ca9a5386cc79af1b5a33f386cb537aa2d182ebbe8778d1e20b271c60f1",
+    "bytes": 32209,
     "entries": 12,
     "devices": [
      "gpu"
