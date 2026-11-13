@@ -1,0 +1,61 @@
+{
+ "schema": "device-ensemble-profile-1",
+ "device": "laptop-4070",
+ "host": {
+  "platform": "windows",
+  "device_name_contains": "RTX 4070 Laptop"
+ },
+ "campaign": {
+  "python": "modeling/.venv/Scripts/python.exe",
+  "runner": "tools/run_accuracy_campaign.py",
+  "root_pattern": "build/ensemble-laptop-4070-olmo-{date}-rep{nn}",
+  "arguments": [
+   "--columns",
+   "model",
+   "--heldout-index",
+   "1",
+   "--model-id",
+   "olmoe-1b-7b",
+   "--model",
+   "C:/Users/89664/Desktop/master degree/LLM-Infer/llama.cpp-implement/validation-models/OLMoE-1B-7B-0924-Instruct-Q4_K_M.gguf",
+   "--runtime-build",
+   "build/real-moe-validation-20261112/runtime-windows-build-v10"
+  ]
+ },
+ "state": {
+  "required": true,
+  "device_index": 0,
+  "band": {
+   "temperature_c": [
+    45,
+    88
+   ]
+  },
+  "stability": {
+   "temperature_c": 6.0
+  },
+  "lock": {
+   "enabled": false,
+   "required": false,
+   "sm_clock_mhz": 2100,
+   "memory_clock_mhz": 8001
+  },
+  "precondition": {
+   "enabled": true,
+   "sample_interval_s": 2.0,
+   "plateau": {
+    "window_s": null,
+    "temperature_c": 1.5,
+    "clock_fraction": null,
+    "blocks": 3
+   }
+  },
+  "sample_interval_s": 5.0
+ },
+ "ensemble": {
+  "repetitions": 10,
+  "attempt_limit": 13,
+  "state_boundary_ms": 31.0,
+  "state_boundary_source": "2026-11-12 rep01, largest ratio gap 28.2-33.9 ms"
+ }
+}
