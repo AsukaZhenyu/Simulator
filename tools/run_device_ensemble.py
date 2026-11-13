@@ -6,7 +6,8 @@ device state that produced it. This driver makes that state an input it controls
 rather than a property it discovers afterwards:
 
   1. precondition -- run the campaign once, discarded, while reading the device,
-     until the temperature and the SM clock have stopped moving;
+     and admit the run only if it sat in the state the profile declares: every
+     reading inside the band, the block means inside the declared stability;
   2. lock (optional) -- pin the clocks, then read them back; a lock that is not
      verified is reported as refused, never as held;
   3. repeat -- run the frozen campaign N times into fresh roots, reading the
@@ -124,11 +125,21 @@ def campaign_command(profile: dict, root: Path) -> list[str]:
 # ------------------------------------------------------------------ phases
 
 def precondition(profile: dict, provider: state.Provider | None, root: Path) -> dict:
-    """Run one discarded campaign and wait for the device to stop moving.
+    """Run one discarded campaign and check it ran in the state the profile admits.
 
     The workload is the campaign itself, so the machine is warmed by exactly the
     work it will be measured on; a synthetic burn would settle a different
     thermal path.
+
+    Admission is the profile's own declared state, judged by the same
+    `Record.review` every cohort is judged by: every reading inside the
+    declared band, and the block means inside the declared stability.  A
+    measurement is comparable to the profile when it sits in the profile's
+    state, not when the machine happens to be flat: a heavier model holds the
+    accelerator for longer and its warm-up outlasts one discarded campaign, so
+    a narrower settling bound would refuse the workload it is meant to admit
+    while admitting a lighter one.  The settling bound stays in the result as a
+    reported diagnostic, so a reader can see both numbers.
     """
     declared = profile.get("state", {}).get("precondition", {})
     if not declared.get("enabled", True):
@@ -163,10 +174,22 @@ def precondition(profile: dict, provider: state.Provider | None, root: Path) -> 
     if provider is None:
         return {"status": "unverified", "reason": "no device state to read",
                 "root": str(target), "seconds": round(elapsed, 1)}
-    settled, why = plateau.verdict(record.samples)
-    return {"status": "settled" if settled else "not_settled", "reason": why,
+    # The profile's declared state is what a cohort is held to; the discarded
+    # campaign is held to the same state, so the cohorts that follow are
+    # measured where the profile says they belong.  The settling bound is
+    # reported beside it, never gating on its own.
+    state_block = profile.get("state", {})
+    band = state.Band.parse(state_block["band"]) if state_block.get("band") else None
+    stability = state_block.get("stability") or None
+    admitted, why = record.review(band, stability, plateau.blocks)
+    settled, plateau_why = plateau.verdict(record.samples)
+    log(f"precondition: state verdict -- {why}")
+    log(f"precondition: settling bound {plateau.temperature_c:g} C -- {plateau_why}")
+    return {"status": "settled" if admitted else "not_settled", "reason": why,
             "root": str(target), "seconds": round(elapsed, 1),
-            "readings": len(record.samples)}
+            "readings": len(record.samples), "state": record.summary(),
+            "plateau": {"bound_c": plateau.temperature_c, "blocks": plateau.blocks,
+                        "settled": settled, "verdict": plateau_why}}
 
 
 def run_campaign(command: list[str], root: Path) -> subprocess.CompletedProcess:
