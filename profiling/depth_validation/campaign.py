@@ -25,13 +25,7 @@ from llm_infer_model.performance.history_conditioned_costs import (
 ROOT=Path(__file__).resolve().parents[2]
 read,write,sha,receipt,require=e2a.read,e2a.write,e2a.sha,e2a.receipt,e2a.require
 RECIPES=(('cpu','cpu','cpu'),('gpu','gpu','gpu'),('gpu','cpu','gpu'))
-# A copy's condition fields.  The default is the shipped one.  The declared
-# variant adds the destination device's own predicted busy state, because a
-# small copy issued onto an idle device and one issued behind queued work
-# differ by up to 40x on the laptop and one key was pooling them.
-FIELDS=(['h2d_source_reuse_bucket','destination_busy_bucket']
-        if __import__('os').environ.get('DEPTH_COPY_KEY')=='busy'
-        else ['h2d_source_reuse_bucket'])
+FIELDS=['h2d_source_reuse_bucket']
 # Ten timed blocks per process, and an estimate that drops the highest and the
 # lowest of them.  The warmup is unchanged (twenty iterations and 500 ms before
 # any block is timed, enforced by the probe); what changes is how the ten blocks

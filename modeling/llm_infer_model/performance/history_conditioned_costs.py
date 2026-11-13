@@ -23,8 +23,7 @@ from .reusable_action_costs import digest
 SCHEMA = 'history-conditioned-inclusive-response-1'
 BUCKETING = 'power_of_two_floor_bytes_v1'
 INITIALIZATION = 'fresh_logical_history_then_one_full_prime'
-ALLOWED_FIELDS = frozenset({'h2d_source_reuse_bucket', 'previous_service', 'previous_copy_route',
-    'destination_busy_bucket'})
+ALLOWED_FIELDS = frozenset({'h2d_source_reuse_bucket', 'previous_service', 'previous_copy_route'})
 FORBIDDEN_PREDICTOR_KEYS = frozenset({'program_id', 'program_sha256', 'strategy', 'strategy_id',
     'strategy_name', 'layer_id', 'layer_index', 'action_index', 'target_id', 'operation_id',
     'seed', 'observed_ns', 'actual_target_ns', 'measured_target_ns', 'end_to_end_ns'})
@@ -82,15 +81,6 @@ def response_coordinate(snapshot: HistorySnapshot, condition_fields, *, use_hist
                 if len(sources) != 1:
                     raise InvalidModel('H2D history needs one declared DRAM source')
                 condition[name] = reuse_bucket(sources[0]['distinct_other_host_bytes_since_last_access'])
-            elif name == 'destination_busy_bucket':
-                # What the destination device is already doing, as the model itself
-                # predicts it: the busy time it has accumulated when the copy is
-                # issued.  It is state, not identity, so it stays inside the scope
-                # contract; a copy issued onto an idle device and one issued behind
-                # queued work are different coordinates.
-                busy = (snapshot.features.get('predicted_busy_ns') or {}).get(
-                    snapshot.semantic.get('dst'))
-                condition[name] = reuse_bucket(int(busy) if busy else 0)
             else:
                 condition[name] = deepcopy(snapshot.features[name])
     coordinate = _json(dict(semantic=deepcopy(snapshot.semantic), condition=condition,
