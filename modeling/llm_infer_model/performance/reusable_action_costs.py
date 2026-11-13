@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 import hashlib
-import os
 import json
 
 
@@ -37,24 +36,7 @@ def semantic_action(program, index):
             config=program["physical"]["config"], threads=program["physical"]["threads"],
             port_boundary=program["boundary_contract"])
     if kind == "COPY":
-        row = dict(kind=kind, src=action["src"], dst=action["dst"], tensor=geometry(action["target_id"]))
-        # A copy's measured cost depends on what else the device is doing, and no
-        # other field of the key carries that.  DEPTH_COPY_KEY=placement declares
-        # the placement (which operator kind runs where) part of the copy's
-        # identity, so one key no longer pools an all-CPU program with a hybrid
-        # one.  Off by default: every frozen table keeps the keys it was audited
-        # with.
-        if os.environ.get("DEPTH_COPY_KEY") == "placement":
-            where = {}
-            for other in program["actions"]:
-                if other.get("kind") != "COMPUTE" or not other.get("target_id"):
-                    continue
-                binding = next((b for b in program["bindings"]
-                                if b["operation_id"] == other["target_id"]), None)
-                if binding is not None:
-                    where[binding["kind"]] = other.get("device")
-            row["placement"] = dict(sorted(where.items()))
-        return row
+        return dict(kind=kind, src=action["src"], dst=action["dst"], tensor=geometry(action["target_id"]))
     if kind in {"ADVANCE", "EVICT"}:
         return dict(kind=kind, native_behavior="logical_control_no_allocation_or_wait")
     raise ValueError("unsupported native action: " + kind)
