@@ -5,6 +5,7 @@ from collections import defaultdict
 from fractions import Fraction
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import statistics
@@ -49,6 +50,15 @@ def trimmed(values):
 MINIMUM_SHARED_COORDINATES=10
 
 
+# Which statistic a coordinate's per-program price is.  The default is the mean,
+# which is the estimator every frozen table so far uses.  `median` exists for one
+# declared experiment: a small copy's latency is bimodal inside a single program
+# (about 20 us with the device idle, several hundred behind queued work), so a
+# per-program mean lands between the modes and describes neither.  The switch is
+# read from the environment so the default path stays bit-identical.
+PRICE_ESTIMATOR=os.environ.get('DEPTH_PRICE_ESTIMATOR','mean')
+
+
 def mean_prices(prices):
     """{coordinate: {program: mean per-action ns}} from per-action samples."""
     means={}
@@ -56,7 +66,10 @@ def mean_prices(prices):
         row={}
         for p,values in per.items():
             if not values:continue
-            price=sum((Fraction(v) for v in values),Fraction(0))/len(values)
+            if PRICE_ESTIMATOR=='median':
+                price=Fraction(statistics.median(values)).limit_denominator(10**9)
+            else:
+                price=sum((Fraction(v) for v in values),Fraction(0))/len(values)
             if price>0:row[p]=float(price)
         if row:means[h]=row
     return means
